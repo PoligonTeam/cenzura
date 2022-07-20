@@ -36,9 +36,9 @@ class Help(commands.Cog):
     def get_help_embed(self, command):
         embed = lib.Embed(title="Pomoc:", color=self.bot.embed_color)
         embed.add_field(name=command.other.get("display_name", False) or command.name + ":", value="> " + ", ".join("`" + (subcommand.other.get("display_name", False) or subcommand.name) + "`" for subcommand in command.subcommands if not (subcommand.hidden and subcommand.enabled)))
-        embed.add_field(name="\u200b", value=f"\[ [Dodaj bota]({BOTINVITE}) \] " \
-                                             f"\[ [Support]({SUPPORT}) \] " \
-                                             f"\[ [Kod bota]({SOURCECODE}) \] " \
+        embed.add_field(name="\u200b", value=f"\[ [Dodaj bota]({BOTINVITE}) \] "
+                                             f"\[ [Support]({SUPPORT}) \] "
+                                             f"\[ [Kod bota]({SOURCECODE}) \] "
                                              f"\[ [Strona]({WEBSITE}) \]" % self.bot.gateway.bot_user.id)
 
         return embed
@@ -62,9 +62,9 @@ class Help(commands.Cog):
                     embed.description = selected_cog.description
 
                 embed.add_field(name=selected_cog.name + ":", value="> " + ", ".join("`" + (command.other.get("display_name", False) or command.name) + "`" for command in selected_cog.commands if not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)))
-                embed.add_field(name="\u200b", value=f"\[ [Dodaj bota]({BOTINVITE}) \] " \
-                                                     f"\[ [Support]({SUPPORT}) \] " \
-                                                     f"\[ [Kod bota]({SOURCECODE}) \] " \
+                embed.add_field(name="\u200b", value=f"\[ [Dodaj bota]({BOTINVITE}) \] "
+                                                     f"\[ [Support]({SUPPORT}) \] "
+                                                     f"\[ [Kod bota]({SOURCECODE}) \] "
                                                      f"\[ [Strona]({WEBSITE}) \]" % self.bot.gateway.bot_user.id)
             elif interaction.data.custom_id == "command":
                 selected_cog = None
