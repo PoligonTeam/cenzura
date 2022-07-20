@@ -1,18 +1,19 @@
 <div id="top"></div>
 
+
+[![Codefactor][codefactor-shield]][codefactor-url]
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-
-
+[![Apache-2.0 License][license-shield]][license-url]
 
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
+  
   <a href="https://github.com/PoligonTeam/cenzura">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
+    <img src="https://cdn.poligon.lgbt/XwrHwBjmXw.png">
   </a>
 
 <h3 align="center">cenzura</h3>
@@ -22,11 +23,12 @@
     <br />
     bot to cenzura
     <br />
-    <a href="https://docs.cenzurabot.com"><strong>Docs Â»</strong></a>
     <br />
     <br />
+    <a href="https://cenzura.poligon.lgbt/docs">Docs</a>
+    ·
     <a href="https://github.com/PoligonTeam/cenzura/issues">Report a Bug</a>
-    Â·
+    ·
     <a href="https://github.com/PoligonTeam/cenzura/issues">Request a Feature</a>
   </p>
 </div>
@@ -73,9 +75,12 @@ cenzurabot is a multifunctional discord bot that is very cool
 * [Aiohttp](https://aiohttp.org/)
 * [Asyncpg](https://github.com/MagicStack/asyncpg)
 * [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/)
+* [Httpx](https://www.python-httpx.org/)
 * [Pillow](https://python-pillow.org/)
+* [Playwright](https://playwright.dev/python/)
 * [Psutil](https://github.com/giampaolo/psutil)
 * [Pyfiglet](https://github.com/pwaller/pyfiglet)
+* [Tortoise ORM](https://github.com/tortoise/tortoise-orm)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -119,12 +124,16 @@ Project Link: [https://github.com/PoligonTeam/cenzura](https://github.com/Poligo
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
+* Allah is the most merciful
 * Hotel? Trivago
 * Femboys are hot
 * Trans rights are human rights
+* Ubuntu is the best distro
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
+[codefactor-shield]: https://www.codefactor.io/repository/github/poligonteam/cenzura/badge?style=for-the-badge
+[codefactor-url]: https://www.codefactor.io/repository/github/poligonteam/cenzura
 [contributors-shield]: https://img.shields.io/github/contributors/PoligonTeam/cenzura.svg?style=for-the-badge
 [contributors-url]: https://github.com/PoligonTeam/cenzura/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/PoligonTeam/cenzura.svg?style=for-the-badge
