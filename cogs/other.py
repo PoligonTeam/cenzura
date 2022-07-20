@@ -359,6 +359,7 @@ class Other(commands.Cog):
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
+        #CUSTOM PREFIXY
         #NAPRAWIC RATELIMITY
         #ZROBIC HACKA DO LIMITU W TYM HELPIE (25)
         #ZROBIC ZEBY NIE POKAZYWAC KOMEND Z INNYCH SERWEROW W HELPIE

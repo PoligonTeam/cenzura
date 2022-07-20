@@ -179,9 +179,9 @@ class Help(commands.Cog):
 
         embed = lib.Embed(title="Pomoc:", color=self.bot.embed_color)
         embed.add_field(name=selected_cog.name + ":", value="> " + ", ".join("`" + (command.other.get("display_name", False) or command.name) + "`" for command in selected_cog.commands if not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)))
-        embed.add_field(name="\u200b", value=f"\[ [Dodaj bota]({BOTINVITE}) \] " \
-                                             f"\[ [Support]({SUPPORT}) \] " \
-                                             f"\[ [Kod bota]({SOURCECODE}) \] " \
+        embed.add_field(name="\u200b", value=f"\[ [Dodaj bota]({BOTINVITE}) \] "
+                                             f"\[ [Support]({SUPPORT}) \] "
+                                             f"\[ [Kod bota]({SOURCECODE}) \] "
                                              f"\[ [Strona]({WEBSITE}) \]" % self.bot.gateway.bot_user.id)
 
         message = await ctx.reply(embed=embed, components=components)
