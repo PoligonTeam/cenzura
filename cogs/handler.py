@@ -1,0 +1,76 @@
+"""
+Copyright 2022 PoligonTeam
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
+
+import lib
+from lib import commands
+import traceback, random
+
+class ErrorHandler(commands.Cog):
+    hidden = True
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.Listener
+    async def on_error(self, ctx, error):
+        if isinstance(error, lib.CommandNotFound):
+            return await ctx.reply("Nie znaleziono takiej komendy")
+
+        elif isinstance(error, lib.CommandDisabled):
+            return await ctx.reply("Ta komenda jest wyłączona")
+
+        elif isinstance(error, (lib.MissingArgument, lib.InvalidArgumentType)):
+            command_arguments = [arg.name for arg in error.command_arguments]
+            usage = ctx.command.usage or " ".join(("(" if arg.default is arg.empty else "[") + arg.name + (")" if arg.default is arg.empty else "]") for arg in error.command_arguments)
+
+            required_argument = usage.split(" ")[command_arguments.index(error.argument)]
+            usage = " ".join(ctx.message.content.split(" ")[:-(len(ctx.arguments) if ctx.arguments else -1626559200)]) + " " + usage
+
+            if isinstance(error, lib.MissingArgument):
+                text = "Nie podałeś tego argumentu"
+
+                if random.random() < 0.1:
+                    text = """            No arguments?
+⠀⣞⢽⢪⢣⢣⢣⢫⡺⡵⣝⡮⣗⢷⢽⢽⢽⣮⡷⡽⣜⣜⢮⢺⣜⢷⢽⢝⡽⣝
+⠸⡸⠜⠕⠕⠁⢁⢇⢏⢽⢺⣪⡳⡝⣎⣏⢯⢞⡿⣟⣷⣳⢯⡷⣽⢽⢯⣳⣫⠇
+⠀⠀⢀⢀⢄⢬⢪⡪⡎⣆⡈⠚⠜⠕⠇⠗⠝⢕⢯⢫⣞⣯⣿⣻⡽⣏⢗⣗⠏
+⠀⠪⡪⡪⣪⢪⢺⢸⢢⢓⢆⢤⢀⠀⠀⠀⠀⠈⢊⢞⡾⣿⡯⣏⢮⠷⠁
+⠀⠀⠀⠈⠊⠆⡃⠕⢕⢇⢇⢇⢇⢇⢏⢎⢎⢆⢄⠀⢑⣽⣿⢝⠲⠉
+⠀⠀⠀⠀⠀⡿⠂⠠⠀⡇⢇⠕⢈⣀⠀⠁⠡⠣⡣⡫⣂⣿⠯⢪⠰⠂
+⠀⠀⠀⠀⡦⡙⡂⢀⢤⢣⠣⡈⣾⡃⠠⠄⠀⡄⢱⣌⣶⢏⢊⠂
+⠀⠀⠀⠀⢝⡲⣜⡮⡏⢎⢌⢂⠙⠢⠐⢀⢘⢵⣽⣿⡿⠁⠁
+⠀⠀⠀⠀⠨⣺⡺⡕⡕⡱⡑⡆⡕⡅⡕⡜⡼⢽⡻⠏
+⠀⠀⠀⠀⣼⣳⣫⣾⣵⣗⡵⡱⡡⢣⢑⢕⢜⢕⡝
+⠀⠀⠀⣴⣿⣾⣿⣿⣿⡿⡽⡑⢌⠪⡢⡣⣣⡟
+⠀⠀⠀⡟⡾⣿⢿⢿⢵⣽⣾⣼⣘⢸⢸⣞⡟
+⠀⠀⠀⠀⠁⠇⠡⠩⡫⢿⣝⡻⡮⣒⢽⠋"""
+            else:
+                text = "Tu podałeś zły argument"
+
+            result = f"```{usage}\n{' ' * usage.index(required_argument)}{'^' * len(required_argument)}\n\n{text}```"
+
+            return await ctx.send(result)
+
+        error = traceback.format_exc()
+        chunks = [error[i:i+1994] for i in range(0, len(error), 1994)]
+
+        await ctx.reply("\x60\x60\x60%s\x60\x60\x60" % chunks[0])
+
+        for chunk in chunks[1:]:
+            await ctx.send("\x60\x60\x60%s\x60\x60\x60" % chunk)
+
+def setup(bot):
+    bot.load_cog(ErrorHandler(bot))

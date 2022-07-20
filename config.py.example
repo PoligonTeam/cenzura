@@ -1,0 +1,33 @@
+TOKEN = "NDY3OTgyMDYwODU0NzA2MTc2.reszta tokenu engara"
+OWNERS = "mesik", "dżelnisław"
+PREFIX = "labs"
+
+PROXIES = {}
+
+PROXY_TEMPLATE = "socks5://<username>:<password>@{}:<port>"
+
+DB_CONFIG = {
+    "connections": {
+        "default": {
+            "engine": "tortoise.backends.asyncpg",
+            "credentials": {
+                "host": "194.163.156.17",
+                "port": 1337,
+                "user": "piesvz",
+                "password": "kochamstupkimesikaW6idQ7F4J2gum",
+                "database": "imgs-today"
+            }
+        }
+    },
+    "apps": {
+        "models": {
+            "models": [
+                "models"
+            ]
+        }
+    }
+}
+
+LASTFM_API_URL = "http://ws.audioscrobbler.com/2.0/"
+LASTFM_API_KEY = "dawjkldjawkldjawkljdkalwjdklaj"
+LASTFM_API_SECRET = "dawkjdklwajdkljawkdljwakdjawkd"
