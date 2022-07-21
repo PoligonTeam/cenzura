@@ -64,7 +64,7 @@ class ErrorHandler(commands.Cog):
 
             return await ctx.send(result)
 
-        error = traceback.format_exc()
+        error = "".join(traceback.format_exception(type(error), error, error.__traceback__))
         chunks = [error[i:i+1994] for i in range(0, len(error), 1994)]
 
         await ctx.reply("\x60\x60\x60%s\x60\x60\x60" % chunks[0])

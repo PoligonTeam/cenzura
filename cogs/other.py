@@ -28,6 +28,9 @@ class CustomCommands(commands.Cog):
     name = "Komendy serwerowe"
     description = "Komendy które są dostępne tylko na tym serwerze ([dokumentacja](https://cenzura.poligon.lgbt/docs))"
 
+    def __init__(self):
+        self.prefixes = []
+
 class Other(commands.Cog):
     name = "Inne"
 
@@ -117,14 +120,33 @@ class Other(commands.Cog):
 
         await ctx.reply(str(result))
 
+    @commands.Listener
+    async def on_message_create(self, message):
+        if message.author.bot:
+            return
+
+        for prefix in self.custom_commands_cog.prefixes:
+            if message.content.startswith(prefix):
+                command_name = message.content.split(" ")[0][len(prefix):]
+                command = self.bot.get_command(command_name, guild=message.guild)
+
+                if not command:
+                    return
+
+                fake_message = types.Message(**message.__dict__)
+                fake_message.content = (await self.bot.get_prefix(self.bot, message)) + message.content[len(prefix):]
+
+                await self.bot.listeners[0](fake_message)
+
     @commands.command(description="Tworzenie komendy serwerowej", usage="(kod)", aliases=["cc", "createcommand"])
     async def customcommand(self, ctx, *, code):
         if not ctx.member.permissions.has("manage_guild"):
             return await ctx.reply("Nie masz uprawnień (`manage_guild`)")
 
-        guild = Guilds.filter(guild_id=ctx.guild.id)
-        custom_commands = (await guild.first()).custom_commands
+        guild = Guilds.get(guild_id=ctx.guild.id)
+        custom_commands = (await guild).custom_commands
 
+        command_prefix = None
         command_name = None
         command_description = None
         command_usage = None
@@ -133,9 +155,13 @@ class Other(commands.Cog):
 
         return_text = None
 
-        def set_command_name(name):
-            nonlocal command_name, code
+        def set_command_name(name, *, prefix = None):
+            nonlocal command_prefix, command_name, code
+            command_prefix = prefix
             command_name = name
+
+            if prefix is not None:
+                self.custom_commands_cog.prefixes.append(prefix)
 
             if not re.findall(r"# (GUILD|CHANNEL|AUTHOR): \d+", code) == ["GUILD", "CHANNEL", "AUTHOR"]:
                 code = f"# GUILD: {ctx.guild.id}\n" \
@@ -198,6 +224,10 @@ class Other(commands.Cog):
             nonlocal return_text
 
             command = self.bot.get_command(ctx.guild.id + "_" + name, guild=ctx.guild)
+
+            if command.other["prefix"] is not None:
+                self.custom_commands_cog.prefixes.remove(command.other["prefix"])
+
             custom_commands.remove(command.other["code"])
             self.bot.remove_command(command)
 
@@ -259,6 +289,9 @@ class Other(commands.Cog):
         text = "Stworzono"
 
         if command_object:
+            if command_object.other["prefix"] is not None:
+                self.custom_commands_cog.prefixes.remove(command_object.other["prefix"])
+
             custom_commands.remove(command_object.other["code"])
             self.bot.remove_command(command_object)
 
@@ -272,6 +305,7 @@ class Other(commands.Cog):
             "cog": self.custom_commands_cog,
             "guild": ctx.guild,
             "other": {
+                "prefix": command_prefix,
                 "display_name": command_name,
                 "code": code
             }
@@ -349,17 +383,17 @@ class Other(commands.Cog):
 
         if not command_arguments:
             @commands.command(**command_info)
-            async def command(self, ctx):
+            async def command(_, ctx):
                 await command_function(ctx)
         else:
             @commands.command(**command_info)
-            async def command(self, ctx, *args):
+            async def command(_, ctx, *args):
                 await command_function(ctx, args)
 
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
-        #CUSTOM PREFIXY
+        #DATE W CUSTOM COMMAND
         #NAPRAWIC RATELIMITY
         #ZROBIC HACKA DO LIMITU W TYM HELPIE (25)
         #ZROBIC ZEBY NIE POKAZYWAC KOMEND Z INNYCH SERWEROW W HELPIE

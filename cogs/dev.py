@@ -98,15 +98,6 @@ class Dev(commands.Cog):
         for chunk in chunks[1:]:
             await ctx.send("\x60\x60\x60py\n%s\x60\x60\x60" % chunk)
 
-    @commands.command(description="cenzura to bot, bot to cenzura", usage="(komenda)")
-    async def shell(self, ctx, *, command):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
-
-        output, error = subprocess.Popen(command, shell=True, executable="/usr/bin/fish", stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-
-        await ctx.send(f"```root in seks via 🐍 v3.10.4\n❯ {command}\n{output.decode() if not error else error.decode()}```")
-
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
     async def load(self, ctx, extensions):
         if not ctx.author.id in self.bot.owners:

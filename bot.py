@@ -55,7 +55,7 @@ class Bot(commands.Bot):
             customcommand_command = self.get_command("customcommand")
 
             for guild in self.gateway.guilds:
-                db_guild = await Guilds.filter(guild_id=guild.id).first()
+                db_guild = await Guilds.get(guild_id=guild.id)
 
                 if db_guild is None:
                     db_guild = await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[])
@@ -74,7 +74,7 @@ class Bot(commands.Bot):
             print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - start_time:.2f}s)")
 
     async def get_prefix(self, _, message):
-        guild = await Guilds.get(guild_id=message.guild.id).first()
+        guild = await Guilds.get(guild_id=message.guild.id)
         return guild.prefix or config.PREFIX
 
     async def create_psql_connection(self):

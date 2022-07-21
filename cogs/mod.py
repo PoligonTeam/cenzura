@@ -15,7 +15,7 @@ limitations under the License.
 """
 
 import lib
-from lib import commands, types
+from lib import commands, types, HTTPException
 import time
 
 class Admin(commands.Cog):
@@ -41,7 +41,7 @@ class Admin(commands.Cog):
 
         try:
             await member.user.send(f"Zostałes wyrzucony z serwera `{ctx.guild.name}` przez `{ctx.author.username}#{ctx.author.discriminator}` z powodu `{reason}`")
-        except:
+        except HTTPException:
             pass
 
     @commands.command(description="Banuje użytkownika", usage="(użytkownik) [powód]")
@@ -61,7 +61,7 @@ class Admin(commands.Cog):
 
         try:
             await member.user.send(f"Zostałes zbanowany na serwerze `{ctx.guild.name}` przez `{ctx.author.username}#{ctx.author.discriminator}` z powodu `{reason}`")
-        except:
+        except HTTPException:
             pass
 
     @commands.command(description="Odbanowuje użytkownika", usage="(użytkownik) [powód]")
@@ -78,7 +78,7 @@ class Admin(commands.Cog):
 
         try:
             await user.send(f"Zostałes odbanowany na serwerze `{ctx.guild.name}` przez `{ctx.author.username}#{ctx.author.discriminator}` z powodu `{reason}`")
-        except:
+        except HTTPException:
             pass
 
     @commands.command(description="Usuwa wiadomości na kanale", usage="(limit) [użytkownik]", aliases=["purge"])

@@ -150,6 +150,8 @@ class Bot(Client):
 
             cog = self.cogs[index]
 
+        cog.cog_on_unload()
+
         for command in cog.commands:
             self.remove_command(command)
 
@@ -203,8 +205,8 @@ class Bot(Client):
 
     @Listener
     async def _on_message_create(self, message):
-        if message.author.bot: return
-        if not message.content: return
+        if message.author.bot or not message.content:
+            return
 
         prefixes = prefix = await self.command_prefix(self, message)
 

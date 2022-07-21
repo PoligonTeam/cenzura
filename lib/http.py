@@ -84,7 +84,7 @@ class Http:
 
             try:
                 response_data = await response.json()
-            except:
+            except aiohttp.ContentTypeError:
                 response_data = await response.text()
 
             if 300 > response.status >= 200:

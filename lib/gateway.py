@@ -96,8 +96,8 @@ class Gateway:
             if listener[0] == event:
                 if listener[2](*args, **kwargs) is True:
                     try:
-                        await listener[1](*args, **kwargs)
-                    except:
+                        self.loop.create_task(listener[1](*args, **kwargs))
+                    except Exception:
                         traceback.print_exc()
 
                     return self.waiting_for.remove(listener)
@@ -105,8 +105,8 @@ class Gateway:
         for listener in self.listeners:
             if listener.__name__ == "on_" + event:
                 try:
-                    await listener(*args, **kwargs)
-                except:
+                    self.loop.create_task(listener(*args, **kwargs))
+                except Exception:
                     traceback.print_exc()
 
     async def on_message(self, op, data, sequences, event_name):

@@ -15,9 +15,8 @@ limitations under the License.
 """
 
 import lib
-from lib import commands
+from lib import commands, CommandNotFound
 from lib.permissions import Permissions
-from lib.errors import CommandNotFound
 
 permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles")
 

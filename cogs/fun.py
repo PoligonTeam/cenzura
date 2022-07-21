@@ -15,9 +15,8 @@ limitations under the License.
 """
 
 import lib
-from lib import commands, types
+from lib import commands, types, InvalidArgument, HTTPException
 from lib.http import Route
-from lib.errors import InvalidArgument, HTTPException
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from pyfiglet import Figlet
 from bs4 import BeautifulSoup
@@ -542,7 +541,7 @@ class Fun(commands.Cog):
                 await page.goto(url)
                 await page.main_frame.wait_for_timeout(delay)
                 screenshot_bytes = await page.screenshot()
-            except:
+            except Exception:
                 screenshot_bytes = open("./assets/images/attacl.png", "rb").read()
 
             image = io.BytesIO(screenshot_bytes)
@@ -595,7 +594,7 @@ class Fun(commands.Cog):
             try:
                 soup = BeautifulSoup(await resp.content.read(), "lxml")
                 _id = json.loads(soup.find_all("script", {"type": "text/javascript"}, text=re.compile("g_rgProfileData"))[0].string.splitlines()[1][20:-1])["steamid"]
-            except:
+            except json.decoder.JSONDecodeError:
                 return await ctx.send("Nie znaleziono takiego konta steam")
 
         resp = await self.bot.http.session.get("https://api.truckersmp.com/v2/player/" + _id)

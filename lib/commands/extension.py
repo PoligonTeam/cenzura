@@ -105,3 +105,6 @@ class Cog:
     def __init__(self):
         self.listeners = []
         self.commands = []
+
+    def on_cog_unload(self):
+        pass
