@@ -305,7 +305,7 @@ class Bot(Client):
 
                     arguments[index] = parsed_argument
                     break
-                except:
+                except Exception:
                     errors.append(annotation.__name__)
 
             if (len(errors), len(annotations)) == (1, 1):
