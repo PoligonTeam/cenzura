@@ -64,13 +64,7 @@ class ErrorHandler(commands.Cog):
 
             return await ctx.send(result)
 
-        error = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-        chunks = [error[i:i+1994] for i in range(0, len(error), 1994)]
-
-        await ctx.reply("\x60\x60\x60%s\x60\x60\x60" % chunks[0])
-
-        for chunk in chunks[1:]:
-            await ctx.send("\x60\x60\x60%s\x60\x60\x60" % chunk)
+        await self.bot.paginator(ctx.reply, ctx, "".join(traceback.format_exception(type(error), error, error.__traceback__)), prefix="```py\n", suffix="```")
 
 def setup(bot):
     bot.load_cog(ErrorHandler(bot))

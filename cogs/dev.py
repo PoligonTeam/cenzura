@@ -66,8 +66,8 @@ class Dev(commands.Cog):
 
         result = str(result)
 
-        prefix = "\x60\x60\x60py\n"
-        suffix = "\x60\x60\x60"
+        prefix = "```py\n"
+        suffix = "```"
 
         if len(result) < 100:
             prefix = ""
@@ -91,7 +91,7 @@ class Dev(commands.Cog):
 
         code = inspect.getsource(command_object.callback)
 
-        await self.bot.paginator(ctx.reply, ctx, code, prefix="\x60\x60\x60py\n", suffix="\x60\x60\x60")
+        await self.bot.paginator(ctx.reply, ctx, code, prefix="```py\n", suffix="```")
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
     async def load(self, ctx, extensions):

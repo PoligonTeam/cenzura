@@ -218,7 +218,7 @@ class Other(commands.Cog):
             if not command or not "code" in command.other or not command.guild.id == ctx.guild.id:
                 raise lib.CommandNotFound()
 
-            return_text = "\x60\x60\x60py\n%s\x60\x60\x60" % re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]).replace("`", "\`")
+            return_text = "```py\n%s```" % re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]).replace("`", "\`")
 
         def delete_command(name):
             nonlocal return_text
@@ -378,6 +378,9 @@ class Other(commands.Cog):
 
             if isinstance(result, lib.Embed):
                 return await ctx.reply(embed=result)
+
+            if len(result) > 2000:
+                return await self.bot.paginator(ctx.reply, ctx, result)
 
             await ctx.reply(result)
 

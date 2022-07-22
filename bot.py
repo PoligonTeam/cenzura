@@ -84,6 +84,8 @@ class Bot(commands.Bot):
         print("connected to database")
 
     async def paginator(self, function, ctx, content, **kwargs):
+        content = content.replace("`", "\`")
+
         prefix = kwargs.pop("prefix", "")
         suffix = kwargs.pop("suffix", "")
         limit = kwargs.pop("limit", 2000)
