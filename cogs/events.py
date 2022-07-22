@@ -31,7 +31,7 @@ class Events(commands.Cog):
 
     @commands.Listener
     async def on_guild_delete(self, guild):
-        await Guilds.delete(guild_id=guild.id)
+        await Guilds.filter(guild_id=guild.id).delete()
 
     @commands.Listener
     async def on_message_create(self, message):

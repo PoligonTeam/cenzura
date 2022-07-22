@@ -550,7 +550,8 @@ class Fun(commands.Cog):
             message = await ctx.reply(files=[("image.png", image)], components=components)
 
             async def curl(interaction):
-                await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, embeds=[], components={}, files=[("response.html", (await self.bot.http.session.get(url)).content)])
+                await interaction.callback(lib.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
+                await self.bot.paginator(message.edit, ctx, (await (await self.bot.http.session.get(url)).content.read()).decode(), embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
 
             async def on_timeout():
                 components = lib.Components(lib.Row(lib.Button("curl", style=lib.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))
