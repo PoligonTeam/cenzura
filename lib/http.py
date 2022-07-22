@@ -46,24 +46,9 @@ class Http:
         self.session = aiohttp.ClientSession(loop=self.loop)
         self.token = client.token
         self.bot = client.bot
-        self.ratelimits = {}
-
-    async def call_later(self, callback, *args, delay: int):
-        await asyncio.sleep(delay)
-        await callback(*args)
-
-    async def remove_ratelimit(self, endpoint):
-        requests = self.ratelimits.pop(endpoint)
-
-        for route, headers, data, params, files in requests:
-            await self.request(route, headers=headers, data=data, params=params, files=files)
 
     async def request(self, route: Route, *, headers: dict = {}, data: dict = None, params: dict = None, files: list = None):
         headers.update({"authorization": ("Bot " if self.bot is True else "") + self.token, "user-agent": "cenzuralib"})
-
-        for route.endpoint in self.ratelimits:
-            self.ratelimits[route.endpoint].append((route, data, files))
-            return
 
         kwargs = dict(json=data)
 
@@ -99,11 +84,8 @@ class Http:
                 raise HTTPException(message, response.status, response_data)
 
             elif response.status == 429:
-                if not route.endpoint in self.ratelimits:
-                    self.ratelimits[route.endpoint] = []
-
-                self.ratelimits[route.endpoint].append((route, headers, data, params, files))
-                self.loop.create_task(self.call_later(self.remove_ratelimit, route.endpoint, delay=response_data["retry_after"]))
+                await asyncio.sleep(response_data["retry_after"])
+                return await self.request(route, headers=headers, data=data, params=params, files=files)
 
     def start_typing(self, channel_id):
         return self.request(Route("POST", "channels", channel_id, "typing"))
@@ -133,8 +115,9 @@ class Http:
 
         return self.request(Route("POST", "channels", channel_id, "messages"), data=data, files=files)
 
-    def edit_message(self, channel_id, message_id, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = [], other: dict = {}):
-        data = other
+    def edit_message(self, channel_id, message_id, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = [], mentions: list = [], other: dict = {}):
+        data = {"allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}
+        data.update(other)
 
         if content is not None:
             data["content"] = str(content)

@@ -16,7 +16,7 @@ limitations under the License.
 
 import lib
 from lib import commands, types
-import ast, subprocess, inspect
+import ast, inspect
 
 class Dev(commands.Cog):
     hidden = True
@@ -66,15 +66,14 @@ class Dev(commands.Cog):
 
         result = str(result)
 
+        prefix = "\x60\x60\x60py\n"
+        suffix = "\x60\x60\x60"
+
         if len(result) < 100:
-            return await ctx.reply(result)
+            prefix = ""
+            suffix = ""
 
-        chunks = [result[i:i+1991] for i in range(0, len(result), 1991)]
-
-        await ctx.reply("\x60\x60\x60py\n%s\x60\x60\x60" % chunks[0])
-
-        for chunk in chunks[1:]:
-            await ctx.send("\x60\x60\x60py\n%s\x60\x60\x60" % chunk)
+        await self.bot.paginator(ctx.reply, ctx, str(result), prefix=prefix, suffix=suffix)
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(komenda)", aliases=["src"])
     async def source(self, ctx, *, command):
@@ -91,12 +90,8 @@ class Dev(commands.Cog):
                     command_object = command_object.get_subcommand(command[0])
 
         code = inspect.getsource(command_object.callback)
-        chunks = [code[i:i+1991] for i in range(0, len(code), 1991)]
 
-        await ctx.reply("\x60\x60\x60py\n%s\x60\x60\x60" % chunks[0])
-
-        for chunk in chunks[1:]:
-            await ctx.send("\x60\x60\x60py\n%s\x60\x60\x60" % chunk)
+        await self.bot.paginator(ctx.reply, ctx, code, prefix="\x60\x60\x60py\n", suffix="\x60\x60\x60")
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
     async def load(self, ctx, extensions):

@@ -547,12 +547,16 @@ class Fun(commands.Cog):
             image = io.BytesIO(screenshot_bytes)
             components = lib.Components(lib.Row(lib.Button("curl", style=lib.ButtonStyles.SECONDARY, custom_id="curl")))
 
-            msg = await ctx.reply(files=[("image.png", image)], components=components)
+            message = await ctx.reply(files=[("image.png", image)], components=components)
 
             async def curl(interaction):
                 await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, embeds=[], components={}, files=[("response.html", (await self.bot.http.session.get(url)).content)])
 
-            self.bot.wait_for("interaction_create", curl, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == msg.id)
+            async def on_timeout():
+                components = lib.Components(lib.Row(lib.Button("curl", style=lib.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))
+                await message.edit(components=components)
+
+            await self.bot.wait_for("interaction_create", curl, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
 
             await browser.close()
 

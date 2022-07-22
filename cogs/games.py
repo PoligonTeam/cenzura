@@ -79,7 +79,7 @@ class Games(commands.Cog):
             ),
             lib.Row(
                 lib.Button(style=lib.ButtonStyles.SECONDARY, custom_id="left", emoji=Emoji("\N{LEFTWARDS BLACK ARROW}")),
-                lib.Button(style=lib.ButtonStyles.DANGER, custom_id="close", emoji=Emoji("\N{CROSS MARK}")),
+                lib.Button(style=lib.ButtonStyles.DANGER, custom_id="close", emoji=Emoji("\N{BLACK SQUARE FOR STOP}")),
                 lib.Button(style=lib.ButtonStyles.SECONDARY, custom_id="right", emoji=Emoji("\N{BLACK RIGHTWARDS ARROW}"))
             ),
             lib.Row(

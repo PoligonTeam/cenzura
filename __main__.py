@@ -72,13 +72,13 @@ def main():
         flag = flag.split()
 
         if flag[0] in ["-h", "--help"]:
-            print("""\"cenzura to bot, bot to cenzura\"
+            print(""""cenzura to bot, bot to cenzura"
 
     -h  or --help                shows help
     -l  or --logging             enable logging
     -lt or --logterminal         prints logs to a specified terminal
     -p  or --path                saves logs to a specified path
-    -bl or --blacklist           for example "^[\d\s:,-]+\[DEBUG:.+\].(sent.)?op:.HEARTBEAT.+$" or "^.+event.name:.PRESENCE_UPDATE$"
+    -bl or --blacklist           for example "^[\\d\\s:,-]+\\[DEBUG:.+\\].(sent.)?op:.HEARTBEAT.+$" or "^.+event.name:.PRESENCE_UPDATE$"
     -t  or --token               bot token
     -b  or --bot <true/false>    true if token is a bot token""")
             exit(0)

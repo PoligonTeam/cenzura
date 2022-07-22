@@ -204,15 +204,20 @@ class Guild:
         guild["banner_url"] = banner_url
 
         if "public_updates_channel" in guild:
-            guild["public_updates_channel"] = [channel := [channel for channel in channels if channel.id == guild["public_updates_channel"]], channel if len(channel) >= 1 else None][1]
+            index = get_index(guild["channels"], guild["public_updates_channel"], key=lambda channel: channel.id)
+            guild["public_updates_channel"] = guild["channels"][index] if index is not None else None
         if "afk_channel" in guild:
-            guild["afk_channel"] = [channel := [channel for channel in channels if channel.id == guild["afk_channel"]], channel if len(channel) >= 1 else None][1]
+            index = get_index(guild["channels"], guild["afk_channel"], key=lambda channel: channel.id)
+            guild["afk_channel"] = guild["channels"][index] if index is not None else None
         if "system_channel" in guild:
-            guild["system_channel"] = [channel := [channel for channel in channels if channel.id == guild["system_channel"]], channel if len(channel) >= 1 else None][1]
+            index = get_index(guild["channels"], guild["system_channel"], key=lambda channel: channel.id)
+            guild["system_channel"] = guild["channels"][index] if index is not None else None
         if "rules_channel" in guild:
-            guild["rules_channel"] = [channel := [channel for channel in channels if channel.id == guild["rules_channel"]], channel if len(channel) >= 1 else None][1]
+            index = get_index(guild["channels"], guild["rules_channel"], key=lambda channel: channel.id)
+            guild["rules_channel"] = guild["channels"][index] if index is not None else None
         if "widget_channel" in guild:
-            guild["widget_channel"] = [channel := [channel for channel in channels if channel.id == guild["widget_channel"]], channel if len(channel) >= 1 else None][1]
+            index = get_index(guild["channels"], guild["widget_channel"], key=lambda channel: channel.id)
+            guild["widget_channel"] = guild["channels"][index] if index is not None else None
         if "welcome_screen" in guild:
             guild["welcome_screen"] = WelcomeScreen.from_raw(channels, guild["welcome_screen"])
 

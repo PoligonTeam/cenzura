@@ -15,10 +15,10 @@ limitations under the License.
 """
 
 import lib
-from lib import commands
+from lib import commands, types
 from tortoise import Tortoise
 from models import Guilds
-import re, os, time, config
+import re, os, time, config, asyncio
 
 class FakeCtx:
     def __init__(self, guild, channel, member):
@@ -82,6 +82,66 @@ class Bot(commands.Bot):
         await Tortoise.generate_schemas()
 
         print("connected to database")
+
+    async def paginator(self, function, ctx, content, **kwargs):
+        prefix = kwargs.pop("prefix", "")
+        suffix = kwargs.pop("suffix", "")
+        limit = kwargs.pop("limit", 2000)
+        timeout = kwargs.pop("timeout", 60)
+
+        if limit > 2000:
+            limit = 2000
+
+        length = limit - len(prefix) - len(suffix)
+
+        chunks = [prefix + content[i:i+length] + suffix for i in range(0, len(content), length)]
+        current_index = 0
+
+        def get_components(disabled: bool = False):
+            return lib.Components(
+                lib.Row(
+                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
+                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="back", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING TRIANGLE}")),
+                    lib.Button(f"{current_index + 1}/{len(chunks)}", custom_id="cancel", disabled=disabled, style=lib.ButtonStyles.DANGER),
+                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="forward", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING TRIANGLE}")),
+                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
+                )
+            )
+
+        message = await function(chunks[current_index], components=get_components(), **kwargs)
+
+        canceled = False
+
+        async def change_page(interaction):
+            nonlocal current_index, canceled
+
+            if interaction.data.custom_id == "first":
+                current_index = 0
+            elif interaction.data.custom_id == "back":
+                current_index -= 1
+                if current_index < 0:
+                    current_index = 0
+            elif interaction.data.custom_id == "forward":
+                current_index += 1
+                if current_index >= len(chunks):
+                    current_index = len(chunks) - 1
+            elif interaction.data.custom_id == "last":
+                current_index = len(chunks) - 1
+            elif interaction.data.custom_id == "cancel":
+                canceled = True
+
+            await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, chunks[current_index], components=get_components(disabled=canceled), **kwargs)
+
+            if not canceled:
+                await self.wait_for("interaction_create", change_page, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id,  timeout=timeout, on_timeout=on_timeout)
+
+        async def on_timeout():
+            nonlocal canceled
+            canceled = True
+
+            await message.edit(chunks[current_index], components=get_components(disabled=canceled), **kwargs)
+
+        await self.wait_for("interaction_create", change_page, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=timeout, on_timeout=on_timeout)
 
     def run(self, token, *, bot: bool = True):
         self.loop.run_until_complete(self.create_psql_connection())

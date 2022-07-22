@@ -25,12 +25,18 @@ class List(list):
     def has(self, item):
         return item in self
 
+    def get(self, item):
+        return self[item] if item in self else None
+
 class Dict(dict):
     def __init__(self, **kwargs):
         super().__init__(kwargs)
 
     def has(self, item):
         return item in self
+
+    def get(self, item):
+        return self[item] if item in self else None
 
     def items(self):
         return [(k, self[k]) for k in self]

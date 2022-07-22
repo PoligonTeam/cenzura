@@ -118,7 +118,7 @@ class Other(commands.Cog):
         if isinstance(result, lib.Embed):
             return await ctx.reply(embed=result)
 
-        await ctx.reply(str(result))
+        await self.bot.paginator(ctx.reply, ctx, str(result))
 
     @commands.Listener
     async def on_message_create(self, message):
@@ -393,15 +393,13 @@ class Other(commands.Cog):
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
+        #ZROBIC ZEBY PO PREFIXIE DALO SIE ZNALESC KOMENDE W ON MESSAGE CREATE
         #DATE W CUSTOM COMMAND
-        #NAPRAWIC RATELIMITY
-        #ZROBIC HACKA DO LIMITU W TYM HELPIE (25)
         #ZROBIC ZEBY NIE POKAZYWAC KOMEND Z INNYCH SERWEROW W HELPIE
+        #ZROBIC HACKA DO LIMITU W TYM HELPIE (25)
         #ZROBIC LIB.EVENTHANDLERS NAPRAWIC
         #HTTP PROXY
         #LIMIT WIELKOSCI (PODOBNIE JAK Z BAZA DANYCH) DLA REQUESTOW
-        #PAGINATOR
-        #PRZEPISAC NIEKTORE RZECZY NP SET, WARNY
         #ZROBIC DEKORATOR DO PERMISJI
         #BEZPIECZNE IMPORTY
         #NAPRAWIC RETURNY W IFACH

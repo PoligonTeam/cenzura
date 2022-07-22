@@ -47,7 +47,7 @@ class About(commands.Cog):
         description = f"Serwery: `{len(self.bot.gateway.guilds)}`\n" \
                       f"Użytkownicy: `{len(self.bot.gateway.users)}`\n\n" \
                       f"Komendy: `{len(self.bot.commands)}`\n\n" \
-                      f"RAM: `{round(self.process.memory_full_info().rss / 1000 / 1000, 1)} MB ({round((memory.total - memory.available) / 1000 / 1000 / 1000, 1)} GB / {round(memory.total / 1000 / 1000 / 1000, 1)} GB)`\n" \
+                      f"RAM: `{self.process.memory_full_info().rss / 1000 / 1000:.1f} MB ({(memory.total - memory.available) / 1000 / 1000 / 1000:.1f} GB / {memory.total / 1000 / 1000 / 1000:.1f} GB)`\n" \
                       f"Procesor: `{psutil.cpu_percent()}%`\n\n" + \
                       self.get_ping_text() + "\n\n" \
                       f"Uptime: `{diff.days} dni, {diff.days * 24 + diff.seconds // 3600} godzin, {(diff.seconds % 3600) // 60} minut, {diff.seconds % 60} sekund`\n\n"

@@ -80,8 +80,8 @@ def set_functions(client):
         return await self.channel.send(content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)
 
     @client.func_for(Message)
-    async def edit(self: Message, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = None, other: dict = {}):
-        resp = await client.http.edit_message(self.channel.id, self.id, content, embed=embed, embeds=embeds, components=components, files=files, other=other)
+    async def edit(self: Message, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = None, mentions: list = [], other: dict = {}):
+        resp = await client.http.edit_message(self.channel.id, self.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)
 
         if resp is not None:
             return await Message.from_raw(client.gateway, resp)

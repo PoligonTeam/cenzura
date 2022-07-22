@@ -38,8 +38,17 @@ class Client:
     def event(self, func):
         self.listeners.append(func)
 
-    def wait_for(self, name, func, key):
+    async def wait_for(self, name, func, key, *, timeout: int = None, on_timeout = None):
         self.waiting_for.append((name, func, key))
+
+        if timeout is not None:
+            await asyncio.sleep(timeout)
+
+            if (name, func, key) in self.waiting_for:
+                self.waiting_for.remove((name, func, key))
+
+                if on_timeout is not None:
+                    await on_timeout()
 
     def run(self, token, *, bot: bool = True):
         self.token = token
