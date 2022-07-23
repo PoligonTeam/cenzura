@@ -22,7 +22,7 @@ from types import CoroutineType
 from httpx import AsyncClient, Timeout
 from json.decoder import JSONDecodeError
 from models import Guilds
-import re, random, config
+import re, random, datetime, config
 
 class CustomCommands(commands.Cog):
     name = "Komendy serwerowe"
@@ -47,6 +47,7 @@ class Other(commands.Cog):
             "execute_webhook": self.execute_webhook,
             "table": table
         }
+        self.void = lambda *args, **kwargs: False
 
     async def request(self, method, url, *, headers = None, data = None, proxy = None):
         proxy_address = random.choice(list(config.PROXIES.values()))
@@ -61,7 +62,7 @@ class Other(commands.Cog):
             "http://": proxy
         }
 
-        async with AsyncClient(proxies=proxies, timeout=Timeout(10)) as session:
+        async with AsyncClient(proxies=proxies, timeout=Timeout(30)) as session:
             response = await session.request(method, url, headers=headers, json=data)
 
             try:
@@ -118,7 +119,14 @@ class Other(commands.Cog):
         if isinstance(result, lib.Embed):
             return await ctx.reply(embed=result)
 
-        await self.bot.paginator(ctx.reply, ctx, str(result))
+        result = str(result)
+
+        prefix_suffix = "```"
+
+        if len(result) < 100:
+            prefix_suffix = ""
+
+        await self.bot.paginator(ctx.reply, ctx, result, prefix=prefix_suffix, suffix=prefix_suffix)
 
     @commands.Listener
     async def on_message_create(self, message):
@@ -163,8 +171,9 @@ class Other(commands.Cog):
             if prefix is not None:
                 self.custom_commands_cog.prefixes.append(prefix)
 
-            if not re.findall(r"# (GUILD|CHANNEL|AUTHOR): \d+", code) == ["GUILD", "CHANNEL", "AUTHOR"]:
-                code = f"# GUILD: {ctx.guild.id}\n" \
+            if not re.findall(r"# (DATE|GUILD|CHANNEL|AUTHOR): \d+", code) == ["DATE", "GUILD", "CHANNEL", "AUTHOR"]:
+                code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
+                       f"# GUILD: {ctx.guild.id}\n" \
                        f"# CHANNEL: {ctx.channel.id}\n" \
                        f"# AUTHOR: {ctx.author.id}\n\n" \
                      + code
@@ -210,7 +219,7 @@ class Other(commands.Cog):
                 command_arguments[key] = value
                 parser.variables[key] = value
 
-        def get_command_code(name):
+        async def get_command_code(name):
             nonlocal return_text
 
             command = self.bot.get_command(name, guild=ctx.guild)
@@ -218,7 +227,16 @@ class Other(commands.Cog):
             if not command or not "code" in command.other or not command.guild.id == ctx.guild.id:
                 raise lib.CommandNotFound()
 
-            return_text = "```py\n%s```" % re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]).replace("`", "\`")
+            await self.bot.paginator(ctx.reply, ctx, re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]), prefix="```py\n", suffix="```")
+
+            return_text = ""
+
+        async def get_commands():
+            nonlocal return_text
+
+            await self.bot.paginator(ctx.reply, ctx, pages=[re.sub(r"hide\(\".+\"\)", "HIDDEN", command) for command in custom_commands], prefix="```py\n", suffix="```")
+
+            return_text = ""
 
         def delete_command(name):
             nonlocal return_text
@@ -245,13 +263,14 @@ class Other(commands.Cog):
                     "set_command_aliases": set_command_aliases,
                     "set_command_arguments": set_command_arguments,
                     "get_command_code": get_command_code,
+                    "get_commands": get_commands,
                     "delete_command": delete_command,
                     "get": lambda *args, **kwargs: {"text": "", "json": {}},
                     "post": lambda *args, **kwargs: {"text": "", "json": {}},
                     "patch": lambda *args, **kwargs: {"text": "", "json": {}},
                     "put": lambda *args, **kwargs: {"text": "", "json": {}},
                     "delete": lambda *args, **kwargs: {"text": "", "json": {}},
-                    "execute_webhook": lambda *args, **kwargs: False,
+                    "execute_webhook": self.void,
                     "hide": lambda item: item
                 }
             },
@@ -273,6 +292,9 @@ class Other(commands.Cog):
         await parser.parse()
 
         if return_text is not None:
+            if return_text == "":
+                return
+
             await guild.update(custom_commands=custom_commands)
             return await ctx.reply(return_text)
 
@@ -344,13 +366,14 @@ class Other(commands.Cog):
                 builtins = {
                     **self.builtins,
                     **{
-                        "set_command_name": lambda *args, **kwargs: False,
-                        "set_command_description": lambda *args, **kwargs: False,
-                        "set_command_usage": lambda *args, **kwargs: False,
-                        "set_command_aliases": lambda *args, **kwargs: False,
-                        "set_command_arguments": lambda *args, **kwargs: False,
-                        "get_command_code": lambda *args, **kwargs: False,
-                        "delete_command": lambda *args, **kwargs: False,
+                        "set_command_name": self.void,
+                        "set_command_description": self.void,
+                        "set_command_usage": self.void,
+                        "set_command_aliases": self.void,
+                        "set_command_arguments": self.void,
+                        "get_command_code": self.void,
+                        "get_commands": self.void,
+                        "delete_command": self.void,
                         "hide": lambda item: item
                     }
                 },
@@ -379,10 +402,7 @@ class Other(commands.Cog):
             if isinstance(result, lib.Embed):
                 return await ctx.reply(embed=result)
 
-            if len(result) > 2000:
-                return await self.bot.paginator(ctx.reply, ctx, result)
-
-            await ctx.reply(result)
+            await self.bot.paginator(ctx.reply, ctx, result)
 
         if not command_arguments:
             @commands.command(**command_info)
@@ -397,7 +417,6 @@ class Other(commands.Cog):
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
         #ZROBIC ZEBY PO PREFIXIE DALO SIE ZNALESC KOMENDE W ON MESSAGE CREATE
-        #DATE W CUSTOM COMMAND
         #ZROBIC ZEBY NIE POKAZYWAC KOMEND Z INNYCH SERWEROW W HELPIE
         #ZROBIC HACKA DO LIMITU W TYM HELPIE (25)
         #ZROBIC LIB.EVENTHANDLERS NAPRAWIC

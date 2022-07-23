@@ -64,7 +64,7 @@ class Bot(commands.Bot):
                     guild.owner = await guild.get_member(guild.owner)
 
                 for custom_command in db_guild.custom_commands:
-                    channel_id, author_id = re.findall(r"# \w+: (\d+)", custom_command)[1:3]
+                    channel_id, author_id = re.findall(r"# \w+: (\d+)", custom_command)[2:4]
                     fake_ctx = FakeCtx(guild, guild.get_channel(channel_id), await guild.get_member(author_id))
 
                     await customcommand_command(fake_ctx, code=custom_command)
@@ -83,65 +83,74 @@ class Bot(commands.Bot):
 
         print("connected to database")
 
-    async def paginator(self, function, ctx, content, **kwargs):
-        content = content.replace("`", "\`")
-
+    async def paginator(self, function, ctx, content: str = None, **kwargs):
+        pages = kwargs.pop("pages", None)
         prefix = kwargs.pop("prefix", "")
         suffix = kwargs.pop("suffix", "")
         limit = kwargs.pop("limit", 2000)
         timeout = kwargs.pop("timeout", 60)
+        page = kwargs.pop("page", 0)
 
         if limit > 2000:
             limit = 2000
 
         length = limit - len(prefix) - len(suffix)
 
-        chunks = [prefix + content[i:i+length] + suffix for i in range(0, len(content), length)]
-        current_index = 0
+        if pages is None:
+            content = str(content).replace("`", "\`")
+            pages = [prefix + content[i:i+length] + suffix for i in range(0, len(content), length)]
+        else:
+            pages = [prefix + page.replace("`", "\`") + suffix for page in pages]
+
+        if len(pages) == 1:
+            return await function(pages[page], **kwargs)
+
+        if page < 0:
+            page = pages.index(pages[page])
 
         def get_components(disabled: bool = False):
             return lib.Components(
                 lib.Row(
                     lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
                     lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="back", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING TRIANGLE}")),
-                    lib.Button(f"{current_index + 1}/{len(chunks)}", custom_id="cancel", disabled=disabled, style=lib.ButtonStyles.DANGER),
+                    lib.Button(f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=lib.ButtonStyles.DANGER),
                     lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="forward", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING TRIANGLE}")),
                     lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
                 )
             )
 
-        message = await function(chunks[current_index], components=get_components(), **kwargs)
+        message = await function(pages[page], components=get_components(), **kwargs)
 
         canceled = False
 
         async def change_page(interaction):
-            nonlocal current_index, canceled
+            nonlocal page, canceled
 
             if interaction.data.custom_id == "first":
-                current_index = 0
+                page = 0
             elif interaction.data.custom_id == "back":
-                current_index -= 1
-                if current_index < 0:
-                    current_index = 0
+                page -= 1
+                if page < 0:
+                    page = 0
             elif interaction.data.custom_id == "forward":
-                current_index += 1
-                if current_index >= len(chunks):
-                    current_index = len(chunks) - 1
+                page += 1
+                if page >= len(pages):
+                    page = len(pages) - 1
             elif interaction.data.custom_id == "last":
-                current_index = len(chunks) - 1
+                page = len(pages) - 1
             elif interaction.data.custom_id == "cancel":
                 canceled = True
 
-            await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, chunks[current_index], components=get_components(disabled=canceled), **kwargs)
+            await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, pages[page], components=get_components(disabled=canceled), **kwargs)
 
             if not canceled:
-                await self.wait_for("interaction_create", change_page, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id,  timeout=timeout, on_timeout=on_timeout)
+                await self.wait_for("interaction_create", change_page, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=timeout, on_timeout=on_timeout)
 
         async def on_timeout():
             nonlocal canceled
             canceled = True
 
-            await message.edit(chunks[current_index], components=get_components(disabled=canceled), **kwargs)
+            await message.edit(pages[page], components=get_components(disabled=canceled), **kwargs)
 
         await self.wait_for("interaction_create", change_page, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=timeout, on_timeout=on_timeout)
 

@@ -64,7 +64,7 @@ class ErrorHandler(commands.Cog):
 
             return await ctx.send(result)
 
-        await self.bot.paginator(ctx.reply, ctx, "".join(traceback.format_exception(type(error), error, error.__traceback__)), prefix="```py\n", suffix="```")
+        await self.bot.paginator(ctx.reply, ctx, "".join(traceback.format_exception(type(error), error, error.__traceback__)), prefix="```py\n", suffix="```", page=-1)
 
 def setup(bot):
     bot.load_cog(ErrorHandler(bot))
