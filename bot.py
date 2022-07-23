@@ -112,9 +112,9 @@ class Bot(commands.Bot):
             return lib.Components(
                 lib.Row(
                     lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
-                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="back", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING TRIANGLE}")),
+                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="previous", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING TRIANGLE}")),
                     lib.Button(f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=lib.ButtonStyles.DANGER),
-                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="forward", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING TRIANGLE}")),
+                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="next", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING TRIANGLE}")),
                     lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
                 )
             )
@@ -128,11 +128,11 @@ class Bot(commands.Bot):
 
             if interaction.data.custom_id == "first":
                 page = 0
-            elif interaction.data.custom_id == "back":
+            elif interaction.data.custom_id == "previous":
                 page -= 1
                 if page < 0:
                     page = 0
-            elif interaction.data.custom_id == "forward":
+            elif interaction.data.custom_id == "next":
                 page += 1
                 if page >= len(pages):
                     page = len(pages) - 1

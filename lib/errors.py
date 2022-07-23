@@ -21,52 +21,11 @@ class HTTPException(Exception):
         self.status = status
         self.original_error = original_error
 
-class CommandError(Exception):
-    def __init__(self, description, command):
-        super().__init__(description)
-
-        self.command = command
-
-class CommandArgumentError(CommandError):
-    def __init__(self, description, command, command_arguments, arguments, argument):
-        super().__init__(description, command)
-
-        self.command_arguments = command_arguments
-        self.arguments = arguments
-        self.argument = argument
-
-class InvalidArgument(Exception):
-    pass
-
 class IntentNotExist(Exception):
     pass
 
 class PermissionNotExist(Exception):
     pass
 
-class ExtensionNotFound(Exception):
-    pass
-
-class ExtensionAlreadyLoaded(Exception):
-    pass
-
-class ExtensionNotLoaded(Exception):
-    pass
-
-class CogAlreadyLoaded(Exception):
-    pass
-
-class CogNotFound(Exception):
-    pass
-
-class CommandNotFound(Exception):
-    pass
-
-class CommandDisabled(CommandError):
-    pass
-
-class MissingArgument(CommandArgumentError):
-    pass
-
-class InvalidArgumentType(CommandArgumentError):
+class InvalidArgument(Exception):
     pass

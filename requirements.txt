@@ -3,6 +3,7 @@ httpx[socks]
 asyncpg
 tortoise-orm
 beautifulsoup4
+lxml
 Pillow
 psutil
 pyfiglet

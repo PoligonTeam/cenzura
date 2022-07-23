@@ -50,10 +50,8 @@ class Dev(commands.Cog):
         return await eval("penis()", env)
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(kod)")
+    @commands.is_owner
     async def eval(self, ctx, *, code):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
-
         result = await self._eval(code, {
             "lib": lib,
             "ctx": ctx,
@@ -76,10 +74,8 @@ class Dev(commands.Cog):
         await self.bot.paginator(ctx.reply, ctx, str(result), prefix=prefix, suffix=suffix)
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(komenda)", aliases=["src"])
+    @commands.is_owner
     async def source(self, ctx, *, command):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
-
         command = command.split(" ")
         command_object = self.bot.get_command(command[0])
 
@@ -94,10 +90,8 @@ class Dev(commands.Cog):
         await self.bot.paginator(ctx.reply, ctx, code, prefix="```py\n", suffix="```")
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
+    @commands.is_owner
     async def load(self, ctx, extensions):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
-
         loaded = []
 
         for extension in extensions.split():
@@ -108,10 +102,8 @@ class Dev(commands.Cog):
         await ctx.reply("\n".join("\N{WHITE HEAVY CHECK MARK} `%s`" % extension_name for extension_name in loaded))
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
+    @commands.is_owner
     async def reload(self, ctx, extensions):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
-
         reloaded = []
 
         for extension in extensions.split():
@@ -123,10 +115,8 @@ class Dev(commands.Cog):
         await ctx.reply("\n".join("\N{WHITE HEAVY CHECK MARK} `%s`" % extension_name for extension_name in reloaded))
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
+    @commands.is_owner
     async def unload(self, ctx, extensions):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
-
         unloaded = []
 
         for extension in extensions.split():
@@ -137,10 +127,8 @@ class Dev(commands.Cog):
         await ctx.reply("\n".join("\N{WHITE HEAVY CHECK MARK} `%s`" % extension_name for extension_name in unloaded))
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(użytkownik) (komenda) [argumenty]")
+    @commands.is_owner
     async def su(self, ctx, member: types.Member, command, *, args = None):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
-
         message = types.Message(**ctx.message.__dict__)
         message.author = member.user
         message.member = member

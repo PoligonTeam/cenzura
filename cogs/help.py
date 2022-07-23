@@ -15,7 +15,7 @@ limitations under the License.
 """
 
 import lib
-from lib import commands, CommandNotFound
+from lib import commands
 from lib.permissions import Permissions
 
 permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles")
@@ -116,7 +116,7 @@ class Help(commands.Cog):
             command_object = self.bot.get_command(command[0])
 
             if command_object is None:
-                raise CommandNotFound(command)
+                raise commands.CommandNotFound(command)
 
             usage = command_object.other.get("display_name", False) or command_object.name
 
@@ -129,7 +129,7 @@ class Help(commands.Cog):
                     if command:
                         command_object = command_object.get_subcommand(command[0])
                         if command_object is None:
-                            raise CommandNotFound(command)
+                            raise commands.CommandNotFound(command)
                         usage += " " + (command_object.other.get("display_name", False) or command_object.name)
                         if command_object.usage and command_object.type is commands.CommandTypes.SUBCOMMAND:
                             usage += " " + command_object.usage

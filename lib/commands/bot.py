@@ -16,8 +16,9 @@ limitations under the License.
 
 from ..client import Client
 from ..intents import Intents
-from ..errors import *
+from ..errors import InvalidArgument
 from ..utils import get_index
+from .errors import *
 from .extension import Cog, Command, Group, Listener
 from .enums import CommandTypes
 from .context import Context

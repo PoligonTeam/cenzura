@@ -364,10 +364,8 @@ class Fun(commands.Cog):
         await ctx.reply(files=[("gay.png", image.getvalue())])
 
     @commands.command(description="losowy mem z jbzd", aliases=["mem"])
+    @commands.is_nsfw
     async def meme(self, ctx):
-        if not ctx.channel.nsfw:
-            return await ctx.reply("Kanał musi być nsfw")
-
         memes = []
 
         while not memes:
@@ -628,6 +626,7 @@ class Fun(commands.Cog):
         await ctx.reply(embed=embed)
 
     @commands.command(description="Słownik", usage="(język) (słowo)", aliases=["definition", "word", "dict", "def"], other={"embed": lib.Embed(description="\nJęzyki: `pl`, `en`, `es`, `urban`")})
+    @commands.is_nsfw
     async def dictionary(self, ctx, language: lambda arg: arg if arg in "pl" + "en" + "es" + "urban" else None, *, word):
         async def fetch(url, tag, attributes, expression):
             resp = await self.bot.http.session.get(url, headers={"user-agent": self.bot.user_agent})
@@ -653,9 +652,6 @@ class Fun(commands.Cog):
                 definition = await fetch("https://dictionary.cambridge.org/pl/dictionary/spanish-english/" + word, "div", {"class": "def"}, r"[\w,. ]+")
 
             case "urban":
-                if not ctx.channel.nsfw:
-                    return await ctx.reply("Kanał musi być nsfw")
-
                 definition = await fetch("https://www.urbandictionary.com/define.php?term=" + word, "div", {"class": "meaning mb-4"}, r".+")
 
         await ctx.reply(definition)
