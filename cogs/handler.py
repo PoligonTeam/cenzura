@@ -70,6 +70,9 @@ class ErrorHandler(commands.Cog):
         elif isinstance(error, commands.NotNsfw):
             return await ctx.reply("Kanał musi być nsfw")
 
+        elif isinstance(error, commands.NoPermission):
+            return await ctx.reply("Nie masz uprawnień")
+
         await self.bot.paginator(ctx.reply, ctx, "".join(traceback.format_exception(type(error), error, error.__traceback__)), prefix="```py\n", suffix="```", page=-1)
 
 def setup(bot):

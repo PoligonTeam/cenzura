@@ -63,3 +63,6 @@ class NotOwner(CheckFailure):
 
 class NotNsfw(CheckFailure):
     pass
+
+class NoPermission(CheckFailure):
+    pass

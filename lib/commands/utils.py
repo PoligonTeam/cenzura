@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from .errors import CheckFailure, NotOwner, NotNsfw
+from .errors import *
 from functools import wraps
 
 def check(check_func, *, error=CheckFailure):
@@ -27,6 +27,7 @@ def check(check_func, *, error=CheckFailure):
             return func(self, ctx, *args, **kwargs)
 
         return wrapper
+
     return decorator
 
 def is_owner(func):
@@ -40,3 +41,12 @@ def is_nsfw(func):
         return ctx.channel.nsfw
 
     return check(check_func, error=NotNsfw)(func)
+
+def has_permission(permission):
+    def decorator(func):
+        def check_func(self, ctx):
+            return ctx.member.permissions.has(permission)
+
+        return check(check_func, error=NoPermission)(func)
+
+    return decorator

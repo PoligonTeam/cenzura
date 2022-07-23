@@ -16,7 +16,6 @@ limitations under the License.
 
 import lib
 from lib import commands, types, HTTPException
-import time
 
 class Admin(commands.Cog):
     name = "Moderacyjne"
@@ -25,10 +24,8 @@ class Admin(commands.Cog):
         self.bot = bot
 
     @commands.command(description="Wyrzuca użytkownika", usage="(użytkownik) [powód]")
+    @commands.has_permission("kick_members")
     async def kick(self, ctx, member: types.Member, *, reason = "nie podano powodu"):
-        if not ctx.member.permissions.has("kick_members"):
-            return await ctx.reply("Nie masz uprawnień (`kick_members`)")
-
         if ctx.member.roles[-1].position <= member.roles[-1].position:
             return await ctx.reply("Nie możesz wyrzucić użytkownika równego lub wyższego od ciebie")
 
@@ -45,10 +42,8 @@ class Admin(commands.Cog):
             pass
 
     @commands.command(description="Banuje użytkownika", usage="(użytkownik) [powód]")
+    @commands.has_permission("ban_members")
     async def ban(self, ctx, member: types.Member, *, reason = "nie podano powodu"):
-        if not ctx.member.permissions.has("ban_members"):
-            return await ctx.reply("Nie masz uprawnień (`ban_members`)")
-
         if ctx.member.roles[-1].position <= member.roles[-1].position:
             return await ctx.reply("Nie możesz zbanować użytkownika równego lub wyższego od ciebie")
 
@@ -65,10 +60,8 @@ class Admin(commands.Cog):
             pass
 
     @commands.command(description="Odbanowuje użytkownika", usage="(użytkownik) [powód]")
+    @commands.has_permission("ban_members")
     async def unban(self, ctx, user: types.User, *, reason = "nie podano powodu"):
-        if not ctx.member.permissions.has("ban_members"):
-            return await ctx.reply("Nie masz uprawnień (`ban_members`)")
-
         if not ctx.guild.me.permissions.has("ban_members"):
             return await ctx.reply("Bot nie ma uprawnień (`ban_members`)")
 
@@ -82,10 +75,8 @@ class Admin(commands.Cog):
             pass
 
     @commands.command(description="Usuwa wiadomości na kanale", usage="(limit) [użytkownik]", aliases=["purge"])
+    @commands.has_permission("manage_messages")
     async def clear(self, ctx, limit: int, user: types.User = None):
-        if not ctx.member.permissions.has("manage_messages"):
-            return await ctx.reply("Nie masz uprawnień (`manage_messages`)")
-
         if not ctx.guild.me.permissions.has("manage_messages"):
             return await ctx.reply("Bot nie ma uprawnień (`manage_messages`)")
 
