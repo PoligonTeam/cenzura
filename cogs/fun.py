@@ -17,6 +17,7 @@ limitations under the License.
 import lib
 from lib import commands, types, InvalidArgument, HTTPException
 from lib.http import Route
+from lib.utils import get_index
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from pyfiglet import Figlet
 from bs4 import BeautifulSoup
@@ -418,7 +419,7 @@ class Fun(commands.Cog):
 
         await ctx.reply("https://tapetus.pl/obrazki/n/" + image["href"][:-3].replace(",", "_") + "jpg")
 
-    @commands.command(description="Pokazuje informacje o użytkowniku", usage="[użytkownik]", aliases=["ui", "user", "whois", "cotozacwel", "kimtykurwajestes", "ktoto", "coto"])
+    @commands.command(description="Pokazuje informacje o użytkowniku", usage="[użytkownik]", aliases=["ui", "user", "cotozacwel", "kimtykurwajestes"])
     async def userinfo(self, ctx, user: Union[types.Member, types.User] = None):
         user = user or ctx.member
 
@@ -659,10 +660,64 @@ class Fun(commands.Cog):
 
         await ctx.reply(definition)
 
-    @commands.command()
-    async def filmweb(self, ctx, nazwa):
-        embed = lib.Embed(title="Informacje o filmie")
-        await ctx.reply(embed=embed)
+    @commands.command(description="zgadnij kto to", aliases=["who", "ktoto", "coto"])
+    async def whois(self, ctx):
+        members = []
+
+        members_with_pfp = [member for member in ctx.guild.members if member.user.avatar]
+
+        if len(members_with_pfp) < 10:
+            return await ctx.reply("Na tym serwerze nie ma wymaganej ilości użytkowników z avatarem")
+
+        while not len(members) == 10:
+            member = random.choice(members_with_pfp)
+
+            if not member in members:
+                members.append(member)
+
+        correct = random.choice(members)
+
+        color = self.bot.embed_color
+
+        if correct.hoisted_role is not None:
+            color = correct.hoisted_role.color
+
+        embed = lib.Embed(title="Zgadnij kto to:", color=color)
+        embed.set_image(url=correct.user.avatar_url)
+
+        def get_components():
+            return lib.Components(
+                lib.Row(
+                    lib.SelectMenu(
+                        custom_id = "members",
+                        placeholder = "Wybierz użytkownika",
+                        options = [
+                            lib.Option(member.user.username, member.user.id) for member in members
+                        ]
+                    )
+                )
+            )
+
+        message = await ctx.reply(embed=embed, components=get_components())
+
+        async def on_select(interaction):
+            nonlocal members
+
+            selected_member = members[get_index(members, interaction.data.values[0], key=lambda member: member.user.id)]
+
+            if selected_member == correct:
+                return await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, f"{types.m @ interaction.member} zgadł!", embeds=[], components={})
+            elif len(members) == 4:
+                return await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, "Nie udało sie nikomu zgadnąć", embeds=[], components={})
+            else:
+                members.remove(selected_member)
+                await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=get_components())
+                await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id, timeout=60 * 5)
+
+        async def on_timeout():
+            await message.edit("Nie udało się nikomu zgadnąć", embeds=[])
+
+        await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id, timeout=60 * 5, on_timeout=on_timeout)
 
 def setup(bot):
     bot.load_cog(Fun(bot))

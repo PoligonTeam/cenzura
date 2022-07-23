@@ -60,9 +60,12 @@ class Member:
 
             if "premium_since" in member:
                 member["premium_since"] = parse_time(member["premium_since"])
-            if "hoisted_role" in member:
-                member["hoisted_role"] = guild.get_role(member["hoisted_role"])
             if "communication_disabled_until" in member:
                 member["communication_disabled_until"] = parse_time(member["communication_disabled_until"])
+
+            for role in member["roles"][::-1]:
+                if role.hoist is True:
+                    member["hoisted_role"] = role
+                    break
 
         return cls(**member)
