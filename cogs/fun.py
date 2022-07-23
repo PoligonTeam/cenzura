@@ -712,12 +712,12 @@ class Fun(commands.Cog):
             else:
                 members.remove(selected_member)
                 await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=get_components())
-                await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id, timeout=60 * 5)
+                await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id, timeout=60 * 5)
 
         async def on_timeout():
             await message.edit("Nie udało się nikomu zgadnąć", embeds=[])
 
-        await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id, timeout=60 * 5, on_timeout=on_timeout)
+        await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id, timeout=60 * 5, on_timeout=on_timeout)
 
 def setup(bot):
     bot.load_cog(Fun(bot))

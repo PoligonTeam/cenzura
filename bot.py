@@ -18,7 +18,7 @@ import lib
 from lib import commands, types
 from tortoise import Tortoise
 from models import Guilds
-import re, os, time, config, asyncio
+import re, os, time, config
 
 class FakeCtx:
     def __init__(self, guild, channel, member):

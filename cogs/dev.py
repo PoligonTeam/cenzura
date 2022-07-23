@@ -144,7 +144,7 @@ class Dev(commands.Cog):
         message = types.Message(**ctx.message.__dict__)
         message.author = member.user
         message.member = member
-        message.content = ctx.guild.prefix + command + " " + (args if args is not None else "")
+        message.content = await self.bot.get_prefix(self.bot, ctx.message) + command + " " + (args if args is not None else "")
 
         await self.bot.gateway.dispatch("message_create", message)
 
