@@ -86,13 +86,13 @@ class Fun(commands.Cog):
 
         await ctx.reply(f"**{user.username}** + **{user2.username}** = **{user.username[:len(user.username) // 2].lower()}{user2.username[len(user2.username) // 2:].lower()}**\nIch miłość jest równa **{percent}%**!", files=[("ship.png", image.getvalue())])
 
-    @commands.command(description="pies", aliases=["pies", "sterzi", "ars", "mesik", "6vz"])
+    @commands.command(description="pies", aliases=["pies", "sterzi", "ars", "mesik", "6vz", "<@338075554937044994>", "<@!338075554937044994>"])
     async def dog(self, ctx):
         alias = ctx.message.content.split()[0][len(await self.bot.get_prefix(self.bot, ctx.message)):]
 
         if alias in ("sterzi", "mesik"):
             return await ctx.reply("to pies")
-        elif alias == "6vz":
+        elif alias in ("6vz", "<@338075554937044994>", "<@!338075554937044994>"):
             return await ctx.reply("to pies, ten niżej to też pies", files=[("dog.png", open("./assets/images/6vz.png", "rb"))])
         elif alias == "ars":
             return await ctx.reply("to pies, ten niżej to też pies", files=[("dog.jpg", open("./assets/images/ars.jpg", "rb"))])
