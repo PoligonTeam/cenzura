@@ -62,7 +62,7 @@ class Other(commands.Cog):
             "http://": proxy
         }
 
-        async with AsyncClient(proxies=proxies, timeout=Timeout(30)) as session:
+        async with AsyncClient(proxies=proxies, timeout=Timeout(60)) as session:
             response = await session.request(method, url, headers=headers, json=data)
 
             try:

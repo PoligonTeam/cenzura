@@ -93,7 +93,7 @@ class Fun(commands.Cog):
         if alias in ("sterzi", "mesik"):
             return await ctx.reply("to pies")
         elif alias in ("6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"):
-            return await ctx.reply("to pies, ten niżej to też pies", files=[("dog.png", open("./assets/images/6vz.png", "rb"))])
+            return await ctx.reply("to pies, ten niżej to też pies", files=[("dog.png", open("./assets/images/6vz.png", "rb")), ("dog2.png", open("./assets/images/6vz2.png", "rb"))])
         elif alias == "ars":
             return await ctx.reply("to pies, ten niżej to też pies", files=[("dog.jpg", open("./assets/images/ars.jpg", "rb"))])
 
