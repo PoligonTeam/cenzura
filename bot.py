@@ -131,15 +131,16 @@ class Bot(commands.Bot):
             elif interaction.data.custom_id == "previous":
                 page -= 1
                 if page < 0:
-                    page = 0
+                    page = len(pages) - 1
             elif interaction.data.custom_id == "next":
                 page += 1
                 if page >= len(pages):
-                    page = len(pages) - 1
+                    page = 0
             elif interaction.data.custom_id == "last":
                 page = len(pages) - 1
             elif interaction.data.custom_id == "cancel":
                 canceled = True
+                return await message.delete()
 
             await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, pages[page], components=get_components(disabled=canceled), **kwargs)
 
