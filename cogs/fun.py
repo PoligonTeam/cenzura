@@ -88,7 +88,7 @@ class Fun(commands.Cog):
 
     @commands.command(description="pies", aliases=["pies", "sterzi", "ars", "mesik", "6vz"])
     async def dog(self, ctx):
-        alias = ctx.message.content.split()[0][len(ctx.guild.prefix):]
+        alias = ctx.message.content.split()[0][len(await self.bot.get_prefix(self.bot, ctx.message)):]
 
         if alias in ("sterzi", "mesik"):
             return await ctx.reply("to pies")
