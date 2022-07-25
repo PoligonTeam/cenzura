@@ -32,6 +32,12 @@ class Dict(dict):
     def __init__(self, **kwargs):
         super().__init__(kwargs)
 
+    def __getattribute__(self, name):
+        if name in self:
+            return self[name]
+
+        return super().__getattribute__(name)
+
     def has(self, item):
         return item in self
 

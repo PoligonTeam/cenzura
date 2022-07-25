@@ -42,10 +42,14 @@ def is_nsfw(func):
 
     return check(check_func, error=NotNsfw)(func)
 
-def has_permission(permission):
+def has_permissions(*permissions):
     def decorator(func):
         def check_func(self, ctx):
-            return ctx.member.permissions.has(permission)
+            for permission in permissions:
+                if not ctx.member.permissions.has(permission):
+                    return False
+
+                return True
 
         return check(check_func, error=NoPermission)(func)
 

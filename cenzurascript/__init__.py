@@ -15,7 +15,7 @@ limitations under the License.
 """
 
 from .lexer import Lexer
-from .parser import Parser
+from .parser import Parser, List, Dict
 
 async def run(code, *, builtins = {}, variables = {}):
     parser = Parser(Lexer(code), builtins=builtins, variables=variables)

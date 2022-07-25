@@ -15,6 +15,7 @@ limitations under the License.
 """
 
 from lib import types
+from cenzurascript import Dict
 
 CHARS = (("\u200b", ("0", "1", "2", "3")), ("\u200c", ("4", "5", "6", "7")), ("\u200d", ("8", "9", "A", "B")), ("\u200e", ("C", "D", "E", "F")))
 SEPARATOR = "\u200f"
@@ -35,47 +36,47 @@ def replace_chars(text):
 
 def convert(**items):
     objects = {
-        types.Guild: lambda guild: {
-            "id": guild.id,
-            "name": guild.name,
-            "description": guild.description or False,
-            "icon_url": guild.icon_url or False,
-            "banner_url": guild.banner_url or False,
-            "owner": {
-                "id": guild.owner.user.id,
-                "username": guild.owner.user.username,
-                "discriminator": guild.owner.user.discriminator,
-                "avatar_url": guild.owner.user.avatar_url or False,
-                "bot": guild.owner.user.bot
-            },
-            "members": len(guild.members),
-            "channels": len(guild.channels),
-            "roles": len(guild.roles),
-            "emojis": len(guild.emojis),
-            "stickers": len(guild.stickers)
-        },
-        types.Channel: lambda channel: {
-            "id": channel.id,
-            "name": channel.name,
-            "topic": channel.topic or False,
-            "nsfw": channel.nsfw,
-            "position": channel.position
-        },
-        types.Role: lambda role: {
-            "id": role.id,
-            "name": role.name,
-            "color": role.color,
-            "hoist": role.hoist,
-            "mentionable": role.mentionable,
-            "position": role.position
-        },
-        types.User: lambda user: {
-            "id": user.id,
-            "username": user.username,
-            "discriminator": user.discriminator,
-            "avatar_url": user.avatar_url,
-            "bot": user.bot or False
-        }
+        types.Guild: lambda guild: Dict(
+            id = guild.id,
+            name = guild.name,
+            description = guild.description or False,
+            icon_url = guild.icon_url or False,
+            banner_url = guild.banner_url or False,
+            owner = Dict(
+                id = guild.owner.user.id,
+                username = guild.owner.user.username,
+                discriminator = guild.owner.user.discriminator,
+                avatar_url = guild.owner.user.avatar_url or False,
+                bot = guild.owner.user.bot
+            ),
+            members = len(guild.members),
+            channels = len(guild.channels),
+            roles = len(guild.roles),
+            emojis = len(guild.emojis),
+            stickers = len(guild.stickers)
+        ),
+        types.Channel: lambda channel: Dict(
+            id = channel.id,
+            name = channel.name,
+            topic = channel.topic or False,
+            nsfw = channel.nsfw,
+            position = channel.position
+        ),
+        types.Role: lambda role: Dict(
+            id = role.id,
+            name = role.name,
+            color = role.color,
+            hoist = role.hoist,
+            mentionable = role.mentionable,
+            position = role.position
+        ),
+        types.User: lambda user: Dict(
+            id = user.id,
+            username = user.username,
+            discriminator = user.discriminator,
+            avatar_url = user.avatar_url,
+            bot = user.bot or False
+        )
     }
 
     converted = {}

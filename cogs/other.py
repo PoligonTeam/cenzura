@@ -16,8 +16,8 @@ limitations under the License.
 
 import lib
 from lib import commands, types
-from utils import convert, table
 from cenzurascript import Lexer, Parser, run
+from utils import convert, table
 from types import CoroutineType
 from httpx import AsyncClient, Timeout
 from json.decoder import JSONDecodeError
@@ -147,10 +147,8 @@ class Other(commands.Cog):
                 await self.bot.listeners[0](fake_message)
 
     @commands.command(description="Tworzenie komendy serwerowej", usage="(kod)", aliases=["cc", "createcommand"])
+    @commands.has_permissions("manage_guild")
     async def customcommand(self, ctx, *, code):
-        if not ctx.member.permissions.has("manage_guild"):
-            return await ctx.reply("Nie masz uprawnień (`manage_guild`)")
-
         guild = Guilds.get(guild_id=ctx.guild.id)
         custom_commands = (await guild).custom_commands
 
@@ -168,7 +166,7 @@ class Other(commands.Cog):
             command_prefix = prefix
             command_name = name
 
-            if prefix is not None:
+            if prefix is not None and not prefix in self.custom_commands_cog.prefixes:
                 self.custom_commands_cog.prefixes.append(prefix)
 
             if not re.findall(r"# (DATE|GUILD|CHANNEL|AUTHOR): \d+", code) == ["DATE", "GUILD", "CHANNEL", "AUTHOR"]:
@@ -243,9 +241,6 @@ class Other(commands.Cog):
 
             command = self.bot.get_command(ctx.guild.id + "_" + name, guild=ctx.guild)
 
-            if command.other["prefix"] is not None:
-                self.custom_commands_cog.prefixes.remove(command.other["prefix"])
-
             custom_commands.remove(command.other["code"])
             self.bot.remove_command(command)
 
@@ -311,8 +306,8 @@ class Other(commands.Cog):
         text = "Stworzono"
 
         if command_object:
-            if command_object.other["prefix"] is not None:
-                self.custom_commands_cog.prefixes.remove(command_object.other["prefix"])
+            if command_prefix is not None and not command_prefix in self.custom_commands_cog.prefixes:
+                self.custom_commands_cog.prefixes.append(command_object.other["prefix"])
 
             custom_commands.remove(command_object.other["code"])
             self.bot.remove_command(command_object)
@@ -417,18 +412,15 @@ class Other(commands.Cog):
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
         #RECONNECTY
-        #ZROBIC ZEBY PO PREFIXIE DALO SIE ZNALESC KOMENDE W ON MESSAGE CREATE
+        #ZROBIC ZEBY PO PREFIXIE DALO SIE ZNALESC KOMENDE W ON MESSAGE CREATE PRZY OKAZJI TO NAPRAWIC
         #ZROBIC ZEBY NIE POKAZYWAC KOMEND Z INNYCH SERWEROW W HELPIE
-        #ZROBIC HACKA DO LIMITU W TYM HELPIE (25)
-        #ZROBIC LIB.EVENTHANDLERS NAPRAWIC
+        #PRZEPISAC HELP
+        #NAPRAWIC LIB.EVENTHANDLERS W NIEKTORYCH MIEJSCACH
         #HTTP PROXY
-        #LIMIT WIELKOSCI (PODOBNIE JAK Z BAZA DANYCH) DLA REQUESTOW
-        #BEZPIECZNE IMPORTY
         #NAPRAWIC RETURNY W IFACH
-        #ZABEZPIECZENIE DO INTOW ZEBY BYL JAKIS LIMIT TAK SAMO W CALC
         #COS W PEWNYM RODZAJU BAZA DANYCH
         #HANDLOWANIE PRAWIE WSZYSTKICH ERROROW W PARSER.PY
-        #RESZTA W todo/todo.todo
+        #VOICESTATE
 
         self.custom_commands_cog.commands.append(command)
         self.bot.commands.append(command)

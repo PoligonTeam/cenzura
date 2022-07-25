@@ -48,7 +48,12 @@ class Bot(commands.Bot):
 
         @self.before_call
         async def before_call(ctx):
-            await ctx.channel.start_typing()
+            ctx.typing = lib.Typing(ctx.message)
+            await ctx.typing.start()
+
+        @self.after_call
+        async def after_call(ctx):
+            await ctx.typing.stop()
 
         @self.event
         async def on_ready():

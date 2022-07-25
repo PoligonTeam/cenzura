@@ -27,6 +27,7 @@ from .components import Components, Row, Button, SelectMenu, Option, TextInput
 from .types import Presence, Activity
 from .enums import ActivityTypes, StatusTypes, ButtonStyles, TextInputStyles, InteractionCallbackTypes, InteractionTypes
 from .errors import *
+from .typing import Typing
 from . import utils
 
 from . import types

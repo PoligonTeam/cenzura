@@ -16,6 +16,10 @@ limitations under the License.
 
 import lib
 from lib import commands, types, HTTPException
+from cenzurascript import run
+from utils import convert
+from typing import Union
+from models import Guilds
 
 class Admin(commands.Cog):
     name = "Moderacyjne"
@@ -24,7 +28,7 @@ class Admin(commands.Cog):
         self.bot = bot
 
     @commands.command(description="Wyrzuca użytkownika", usage="(użytkownik) [powód]")
-    @commands.has_permission("kick_members")
+    @commands.has_permissions("kick_members")
     async def kick(self, ctx, member: types.Member, *, reason = "nie podano powodu"):
         if ctx.member.roles[-1].position <= member.roles[-1].position:
             return await ctx.reply("Nie możesz wyrzucić użytkownika równego lub wyższego od ciebie")
@@ -42,7 +46,7 @@ class Admin(commands.Cog):
             pass
 
     @commands.command(description="Banuje użytkownika", usage="(użytkownik) [powód]")
-    @commands.has_permission("ban_members")
+    @commands.has_permissions("ban_members")
     async def ban(self, ctx, member: types.Member, *, reason = "nie podano powodu"):
         if ctx.member.roles[-1].position <= member.roles[-1].position:
             return await ctx.reply("Nie możesz zbanować użytkownika równego lub wyższego od ciebie")
@@ -60,7 +64,7 @@ class Admin(commands.Cog):
             pass
 
     @commands.command(description="Odbanowuje użytkownika", usage="(użytkownik) [powód]")
-    @commands.has_permission("ban_members")
+    @commands.has_permissions("ban_members")
     async def unban(self, ctx, user: types.User, *, reason = "nie podano powodu"):
         if not ctx.guild.me.permissions.has("ban_members"):
             return await ctx.reply("Bot nie ma uprawnień (`ban_members`)")
@@ -75,7 +79,7 @@ class Admin(commands.Cog):
             pass
 
     @commands.command(description="Usuwa wiadomości na kanale", usage="(limit) [użytkownik]", aliases=["purge"])
-    @commands.has_permission("manage_messages")
+    @commands.has_permissions("manage_messages")
     async def clear(self, ctx, limit: int, user: types.User = None):
         if not ctx.guild.me.permissions.has("manage_messages"):
             return await ctx.reply("Bot nie ma uprawnień (`manage_messages`)")
@@ -98,6 +102,21 @@ class Admin(commands.Cog):
         embed = cog.get_help_embed(ctx.command)
 
         await ctx.reply(embed=embed)
+
+    @set.command(description="Ustawia prefix", usage="(prefix)")
+    @commands.has_permissions("manage_guild")
+    async def prefix(self, ctx, prefix):
+        if len(prefix) > 5:
+            return await ctx.reply(f"Prefix jest za długi (`{len(prefix)}/5`)")
+
+        await Guilds.filter(guild_id=ctx.guild.id).update(prefix=prefix)
+
+        await ctx.reply("Ustawiono prefix")
+
+    @set.command(description="Ustawia wiadomość powitalną", usage="(kod)", aliases=["welcome", "welcomemsg"])
+    @commands.has_permissions("manage_guild")
+    async def welcomemessage(self, ctx, *, code):
+        pass
 
 def setup(bot):
     bot.load_cog(Admin(bot))

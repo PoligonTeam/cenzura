@@ -46,6 +46,7 @@ class Bot(Client):
         self.commands = []
 
         self.before_call_functions = []
+        self.after_call_functions = []
 
         self._on_message_create.__name__ = "on_message_create"
         self._on_message_create.cog = self
@@ -55,6 +56,9 @@ class Bot(Client):
 
     def before_call(self, func):
         self.before_call_functions.append(func)
+
+    def after_call(self, func):
+        self.after_call_functions.append(func)
 
     def command(self, **kwargs):
         def decorator(func):
@@ -347,18 +351,19 @@ class Bot(Client):
 
         async def run_command():
             for before_call in self.before_call_functions:
-                result = await before_call(context)
-                if result is False:
-                    return
+                await before_call(context)
 
             try:
-                return await command(context, *args, **kwargs)
+                await command(context, *args, **kwargs)
             except Exception as error:
                 context.arguments = arguments
 
                 if not on_error:
                     return traceback.print_exc()
 
-                return await self.gateway.dispatch("error", context, error)
+                await self.gateway.dispatch("error", context, error)
+
+            for after_call in self.after_call_functions:
+                await after_call(context)
 
         self.loop.create_task(run_command())

@@ -16,6 +16,7 @@ limitations under the License.
 
 import lib
 from lib import commands, types
+from lib.permissions import Permissions
 import ast, inspect
 
 class Dev(commands.Cog):
@@ -132,7 +133,10 @@ class Dev(commands.Cog):
         message = types.Message(**ctx.message.__dict__)
         message.author = member.user
         message.member = member
-        message.content = await self.bot.get_prefix(self.bot, ctx.message) + command + " " + (args if args is not None else "")
+        message.content = await self.bot.get_prefix(self.bot, ctx.message) + command
+
+        if args is not None:
+            message.content += " " + args
 
         await self.bot.gateway.dispatch("message_create", message)
 
