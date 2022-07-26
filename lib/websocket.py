@@ -62,7 +62,6 @@ class WebSocket:
 
         self.gateway.heartbeat.stop()
         await self.session.close()
-        await asyncio.sleep(5)
         self.gateway.resuming = True
         self.gateway.last_sequence_number = self.gateway.sequence_number
         await WebSocket.__init__(self, self.gateway, self.client)
