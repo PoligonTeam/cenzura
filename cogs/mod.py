@@ -38,7 +38,7 @@ class Admin(commands.Cog):
 
         await member.kick(reason)
 
-        await ctx.reply(f"Wyrzucono `{member.user.username}#{member.user.discriminator}` z powodu `{reason}`")
+        await ctx.reply(f"Wyrzucono `{member.user}` z powodu `{reason}`")
 
         try:
             await member.user.send(f"Zostałes wyrzucony z serwera `{ctx.guild.name}` przez `{ctx.author.username}#{ctx.author.discriminator}` z powodu `{reason}`")
@@ -56,7 +56,7 @@ class Admin(commands.Cog):
 
         await member.ban(reason)
 
-        await ctx.reply(f"Zbanowano `{member.user.username}#{member.user.discriminator}` z powodu `{reason}`")
+        await ctx.reply(f"Zbanowano `{member.user}` z powodu `{reason}`")
 
         try:
             await member.user.send(f"Zostałes zbanowany na serwerze `{ctx.guild.name}` przez `{ctx.author.username}#{ctx.author.discriminator}` z powodu `{reason}`")

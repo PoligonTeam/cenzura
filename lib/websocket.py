@@ -56,13 +56,15 @@ class WebSocket:
                 s = data.get("s")
                 t = data.get("t")
 
-                logging.debug(f"op: {Opcodes(op).name}, data: {None if not isinstance(data, dict) else data}, sequences: {s}, event name: {t}")
+                logging.debug(f"op: {Opcodes(op).name}, data: {None if not isinstance(data, dict) else data}, sequence number: {s}, event name: {t}")
 
                 await self.gateway.on_message(Opcodes(op), d, s, t)
 
-        self.gateway.reset()
+        self.gateway.heartbeat.stop()
         await self.session.close()
         await asyncio.sleep(5)
+        self.gateway.resuming = True
+        self.gateway.last_sequence_number = self.gateway.sequence_number
         await WebSocket.__init__(self, self.gateway, self.client)
 
     async def send(self, op, data, *, sequences = None):

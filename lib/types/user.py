@@ -56,7 +56,7 @@ class User:
     dm: Channel = None
 
     def __str__(self):
-        return "<User id={!r} username={!r} discriminator={!r} public_flags={!r}>".format(self.id, self.username, self.discriminator, self.public_flags)
+        return "{}#{}".format(self.username, self.discriminator)
 
     def __repr__(self):
         return "<User id={!r} username={!r} discriminator={!r} public_flags={!r}>".format(self.id, self.username, self.discriminator, self.public_flags)

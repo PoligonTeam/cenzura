@@ -5,10 +5,13 @@ class Typing:
         self.loop = asyncio.get_event_loop()
         self.message = message
 
+    def send(self):
+        return self.message.channel.start_typing()
+
     async def do_typing(self):
         while True:
             await asyncio.sleep(5)
-            await self.message.channel.start_typing()
+            await self.send()
 
     def start(self):
         return self.__aenter__()
@@ -17,7 +20,7 @@ class Typing:
         return self.__aexit__(None, None, None)
 
     async def __aenter__(self):
-        await self.message.channel.start_typing()
+        await self.send()
         self.task = self.loop.create_task(self.do_typing())
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

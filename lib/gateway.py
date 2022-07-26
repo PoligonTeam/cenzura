@@ -32,11 +32,16 @@ class Heartbeat:
         self.heartbeat_task = None
         self.time = None
 
+    def send(self):
+        return self.gateway.ws.send(Opcodes.HEARTBEAT, self.gateway.sequence_number)
+
     async def heartbeat_loop(self):
+        await self.send()
+
         while True:
             self.time = time.time()
             await asyncio.sleep(self.heartbeat_interval / 1000)
-            await self.gateway.ws.send(Opcodes.HEARTBEAT, self.gateway.sequences)
+            await self.send()
 
     def start(self):
         self.heartbeat_task = self.loop.create_task(self.heartbeat_loop())
@@ -62,9 +67,12 @@ class Gateway:
         self.last_latencies = []
         self.last_latencies_limit = client.last_latencies_limit
         self.session_id = None
-        self.sequences = None
+        self.sequence_number = None
         self.listeners = client.listeners
         self.waiting_for = client.waiting_for
+
+        self.resuming = False
+        self.last_sequence_number = None
 
         self.bot_user: User = None
 
@@ -81,15 +89,6 @@ class Gateway:
         self.presence = None
 
         await WebSocket(self, client)
-
-    def reset(self):
-        self.heartbeat.stop()
-
-        self.guilds = []
-        self.unavailable_guilds = []
-        self.requested_guilds = []
-        self.users = []
-        self.request_members = []
 
     async def dispatch(self, event, *args, **kwargs):
         for listener in self.waiting_for:
@@ -109,33 +108,60 @@ class Gateway:
                 except Exception:
                     traceback.print_exc()
 
-    async def on_message(self, op, data, sequences, event_name):
-        self.sequences = sequences
+    def reset(self):
+        self.guilds = []
+        self.unavailable_guilds = []
+        self.requested_guilds = []
+        self.users = []
+        self.request_members = []
 
-        if op == Opcodes.HELLO:
-            await self.ws.send(Opcodes.HEARTBEAT, self.sequences)
+    async def identify(self):
+        self.reset()
 
-            identify_data = {
-                "token": self.token,
-                "properties": {
-                   "$os": sys.platform,
-                   "$browser": "cenzuralib",
-                   "$device": "cenzuralib"
-                }
+        identify_data = {
+            "token": self.token,
+            "properties": {
+                "$os": sys.platform,
+                "$browser": "cenzuralib",
+                "$device": "cenzuralib"
             }
+        }
 
-            if self.bot is True:
-                identify_data["intents"] = self.intents.get_int()
+        if self.bot is True:
+            identify_data["intents"] = self.intents.get_int()
 
-            if self.presence is not None:
-                identify_data["presence"] = self.presence.to_dict()
+        if self.presence is not None:
+            identify_data["presence"] = self.presence.to_dict()
 
-            await self.ws.send(Opcodes.IDENTIFY, identify_data)
+        await self.ws.send(Opcodes.IDENTIFY, identify_data)
 
+    async def resume(self):
+        await self.ws.send(Opcodes.RESUME, {
+            "token": self.token,
+            "session_id": self.session_id,
+            "seq": self.last_sequence_number
+        })
+
+        self.resuming = False
+        self.last_sequence_number = None
+
+    async def on_message(self, op, data, sequence_number, event_name):
+        self.sequence_number = sequence_number
+
+        if op is Opcodes.HELLO:
             self.heartbeat = Heartbeat(self, data["heartbeat_interval"])
             self.heartbeat.start()
 
-        elif op == Opcodes.HEARTBEAT_ACK:
+            if self.resuming is True:
+                return await self.resume()
+
+            await self.identify()
+
+        elif op is Opcodes.INVALID_SESSION:
+            await asyncio.sleep(5)
+            await self.identify()
+
+        elif op is Opcodes.HEARTBEAT_ACK:
             if len(self.last_latencies) > self.last_latencies_limit:
                 self.last_latencies.pop(0)
 

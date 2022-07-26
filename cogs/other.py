@@ -397,7 +397,7 @@ class Other(commands.Cog):
             if isinstance(result, lib.Embed):
                 return await ctx.reply(embed=result)
 
-            await self.bot.paginator(ctx.reply, ctx, result)
+            await self.bot.paginator(ctx.reply, ctx, result, replace=False)
 
         if not command_arguments:
             @commands.command(**command_info)
@@ -411,10 +411,7 @@ class Other(commands.Cog):
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
-        #RECONNECTY
         #ZROBIC ZEBY PO PREFIXIE DALO SIE ZNALESC KOMENDE W ON MESSAGE CREATE PRZY OKAZJI TO NAPRAWIC
-        #ZROBIC ZEBY NIE POKAZYWAC KOMEND Z INNYCH SERWEROW W HELPIE
-        #PRZEPISAC HELP
         #NAPRAWIC LIB.EVENTHANDLERS W NIEKTORYCH MIEJSCACH
         #HTTP PROXY
         #NAPRAWIC RETURNY W IFACH

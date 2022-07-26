@@ -80,7 +80,7 @@ class Parser:
                 "chr": chr,
                 "ord": ord,
                 "random_int": random.randint,
-                "random_str": lambda *args: random.choice(args),
+                "random_str": lambda *args: random.choice(args[0] if len(args) == 1 else args),
                 "match": lambda pattern, string: not not re.match(pattern, string),
                 "find": lambda pattern, string, index = 0: (re.findall(pattern, string) or [False])[index],
                 "find_all": lambda pattern, string, join_string = "": join_string.join(re.findall(pattern, string)) or False,
@@ -177,8 +177,9 @@ class Parser:
                     _result = getattr(self.convert(self.position - 1), math_operators[current_token])(self.convert(self.position + 1))
                     if isinstance(_result, str):
                         _type = Types.STR
-                    elif isinstance(_result, int):
+                    elif isinstance(_result, (int, float)):
                         _type = Types.INT
+                        _result = int(_result)
                     self.set(Token(_type, _result))
                     continue
                 elif current_token in comparison_operators:

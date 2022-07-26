@@ -95,6 +95,7 @@ class Bot(commands.Bot):
         limit = kwargs.pop("limit", 2000)
         timeout = kwargs.pop("timeout", 60)
         page = kwargs.pop("page", 0)
+        replace = kwargs.pop("replace", True)
 
         if limit > 2000:
             limit = 2000
@@ -102,10 +103,14 @@ class Bot(commands.Bot):
         length = limit - len(prefix) - len(suffix)
 
         if pages is None:
-            content = str(content).replace("`", "\`")
+            content = str(content)
+
+            if replace is True:
+                content = content.replace("`", "\`")
+
             pages = [prefix + content[i:i+length] + suffix for i in range(0, len(content), length)]
         else:
-            pages = [prefix + page.replace("`", "\`") + suffix for page in pages]
+            pages = [prefix + (page if replace is False else page.replace("`", "\`")) + suffix for page in pages]
 
         if len(pages) == 1:
             return await function(pages[page], **kwargs)
