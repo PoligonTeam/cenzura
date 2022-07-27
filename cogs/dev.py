@@ -17,7 +17,7 @@ limitations under the License.
 import lib
 from lib import commands, types
 from lib.permissions import Permissions
-import ast, inspect
+import ast, inspect, copy, datetime
 
 class Dev(commands.Cog):
     hidden = True
@@ -130,15 +130,42 @@ class Dev(commands.Cog):
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(użytkownik) (komenda) [argumenty]")
     @commands.is_owner
     async def su(self, ctx, member: types.Member, command, *, args = None):
-        message = types.Message(**ctx.message.__dict__)
-        message.author = member.user
-        message.member = member
-        message.content = await self.bot.get_prefix(self.bot, ctx.message) + command
+        fake_member = copy.deepcopy(member)
+        fake_permissions = Permissions.all()
+        fake_message = copy.deepcopy(ctx.message)
+
+        su_role = types.Role(
+            id = "su",
+            name = "su",
+            color = 0xffffff,
+            hoist = True,
+            icon = None,
+            unicode_emoji = None,
+            position = float("inf"),
+            permissions = fake_permissions,
+            managed = False,
+            mentionable = False,
+            created_at = datetime.datetime.now()
+        )
+
+        fake_member.roles.append(su_role)
+        fake_member.hoisted_role = su_role
+        fake_member.permissions = fake_permissions
+
+        fake_message.author = fake_member.user
+        fake_message.member = fake_member
+        fake_message.content = await self.bot.get_prefix(self.bot, ctx.message) + command
 
         if args is not None:
-            message.content += " " + args
+            fake_message.content += " " + args
 
-        await self.bot.gateway.dispatch("message_create", message)
+        async def before_call(ctx):
+            self.bot.owners.append(ctx.author.id)
+
+        async def after_call(ctx):
+            self.bot.owners.remove(ctx.author.id)
+
+        await self.bot.process_commands(fake_message, before_call_functions=before_call, after_call_functions=after_call)
 
 def setup(bot):
     bot.load_cog(Dev(bot))
