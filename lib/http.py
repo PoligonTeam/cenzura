@@ -21,8 +21,6 @@ from .components import Components
 from .enums import *
 from typing import Sequence
 
-URL = "https://discord.com/api/v10"
-
 class Route:
     def __init__(self, method, *endpoint):
         self.method = method
@@ -35,6 +33,8 @@ class Route:
         return self.method != route.method and self.endpoint != route.endpoint
 
 class Http:
+    URL = "https://discord.com/api/v10"
+
     async def __new__(cls, *args):
         instance = super().__new__(cls)
         await instance.__init__(*args)
@@ -64,7 +64,7 @@ class Http:
 
             kwargs = dict(data=form)
 
-        async with self.session.request(route.method, URL + route.endpoint, headers=headers, **kwargs) as response:
+        async with self.session.request(route.method, self.URL + route.endpoint, headers=headers, **kwargs) as response:
             logging.debug(f"{route.method} {route.endpoint}, data: {data}, params: {params}, files: {[file[0] for file in files] if files is not None else None}; status: {response.status}, text: {await response.text()}")
 
             try:

@@ -130,9 +130,9 @@ class Dev(commands.Cog):
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(użytkownik) (komenda) [argumenty]")
     @commands.is_owner
     async def su(self, ctx, member: types.Member, command, *, args = None):
-        fake_message = copy.deepcopy(ctx.message)
         fake_member = copy.deepcopy(member)
         fake_permissions = Permissions.all()
+        fake_message = copy.deepcopy(ctx.message)
 
         su_role = types.Role(
             id = "su",

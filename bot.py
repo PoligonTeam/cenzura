@@ -46,15 +46,6 @@ class Bot(commands.Bot):
 
                 print("loaded %s" % filename)
 
-        @self.before_call
-        async def before_call(ctx):
-            ctx.typing = lib.Typing(ctx.message)
-            await ctx.typing.start()
-
-        @self.after_call
-        async def after_call(ctx):
-            await ctx.typing.stop()
-
         @self.event
         async def on_ready():
             customcommand_command = self.get_command("customcommand")

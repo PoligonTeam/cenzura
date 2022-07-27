@@ -17,9 +17,9 @@ limitations under the License.
 import asyncio, aiohttp, zlib, json, logging
 from .enums import Opcodes
 
-URL = "wss://gateway.discord.gg/?v=9&encoding=json&compress=zlib-stream"
-
 class WebSocket:
+    URL = "wss://gateway.discord.gg/?v=9&encoding=json&compress=zlib-stream"
+
     async def __new__(cls, *args):
         instance = super().__new__(cls)
         await instance.__init__(*args)
@@ -31,7 +31,7 @@ class WebSocket:
         self.gateway = gateway
         self.client = client
 
-        self.ws = await self.session.ws_connect(URL)
+        self.ws = await self.session.ws_connect(self.URL)
         self.gateway.ws = self
         self.client.gateway = self.gateway
 
@@ -74,7 +74,7 @@ class WebSocket:
             "d": data
         }
 
-        if not sequences is None:
+        if sequences is not None:
             ready_data["s"] = sequences
 
         await self.ws.send_json(ready_data)
