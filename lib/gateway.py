@@ -223,7 +223,7 @@ class Gateway:
     async def get_user(self, user: Union[dict, str]):
         for cached_user in self.users:
             if isinstance(user, str):
-                if user.lower() == cached_user.username.lower() or user == cached_user.id:
+                if user.lower() in (cached_user.username.lower(), cached_user.id):
                     return cached_user
             elif isinstance(user, dict):
                 if user["id"] == cached_user.id:

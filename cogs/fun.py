@@ -438,7 +438,7 @@ class Fun(commands.Cog):
         embed.set_thumbnail(url=user.avatar_url)
 
         embed.add_field(name="ID:", value=user.id)
-        embed.add_field(name="Nick z tagiem:", value=str(user))
+        embed.add_field(name="Nazwa użytkownika z tagiem:", value=str(user))
         if member is not None:
             if member.nick is not None:
                 embed.add_field(name="Nick na serwerze:", value=member.nick)
