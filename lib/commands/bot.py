@@ -25,7 +25,7 @@ from .context import Context
 from .typesfunctions import set_functions
 from types import CoroutineType
 from dataclasses import is_dataclass
-from typing import Union, Iterable
+from typing import Callable, Union, Iterable
 import importlib.util, inspect, traceback, sys
 
 class Bot(Client):
@@ -33,7 +33,7 @@ class Bot(Client):
         super().__init__(intents = intents, messages_limit = messages_limit)
 
         self.original_prefix = self.command_prefix = command_prefix
-        self.owners = owners
+        self.owners = list(owners)
 
         if not callable(self.command_prefix):
             async def command_prefix(self, message):
@@ -48,11 +48,14 @@ class Bot(Client):
         self.before_call_functions = []
         self.after_call_functions = []
 
-        self._on_message_create.__name__ = "on_message_create"
-        self._on_message_create.cog = self
-        self.listeners.append(self._on_message_create)
-
         set_functions(self)
+
+        @self.event
+        async def on_message_create(message):
+            if message.author.bot:
+                return
+
+            await self.process_commands(message)
 
     def before_call(self, func):
         self.before_call_functions.append(func)
@@ -208,10 +211,11 @@ class Bot(Client):
         del sys.modules[name]
         del self.extensions[index]
 
-    @Listener
-    async def _on_message_create(self, message):
-        if message.author.bot or not message.content:
-            return
+    async def process_commands(self, message, *, before_call_functions: Union[list, Callable] = [], after_call_functions: Union[list, Callable] = []):
+        if isinstance(before_call_functions, Callable):
+            before_call_functions = [before_call_functions]
+        if isinstance(after_call_functions, Callable):
+            after_call_functions = [after_call_functions]
 
         prefixes = prefix = await self.command_prefix(self, message)
 
@@ -350,7 +354,7 @@ class Bot(Client):
                 kwargs[command_argument.name] = argument
 
         async def run_command():
-            for before_call in self.before_call_functions:
+            for before_call in self.before_call_functions + before_call_functions:
                 await before_call(context)
 
             try:
@@ -363,7 +367,7 @@ class Bot(Client):
 
                 await self.gateway.dispatch("error", context, error)
 
-            for after_call in self.after_call_functions:
+            for after_call in self.after_call_functions + after_call_functions:
                 await after_call(context)
 
         self.loop.create_task(run_command())
