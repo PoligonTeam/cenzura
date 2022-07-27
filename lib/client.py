@@ -19,7 +19,7 @@ from .gateway import Gateway
 from .http import Http
 from .intents import Intents
 from .types import *
-from .typesfunctions import set_functions
+from .typefunctions import set_functions
 from datetime import datetime
 
 class Client:

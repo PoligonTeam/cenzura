@@ -22,7 +22,7 @@ from .errors import *
 from .extension import Cog, Command, Group, Listener
 from .enums import CommandTypes
 from .context import Context
-from .typesfunctions import set_functions
+from .typefunctions import set_functions
 from types import CoroutineType
 from dataclasses import is_dataclass
 from typing import Callable, Union, Iterable
