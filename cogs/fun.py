@@ -464,8 +464,8 @@ class Fun(commands.Cog):
                         break
                 if text:
                     embed.add_field(name="Status:", value=text)
-            embed.add_field(name="Dołączył na serwer:", value=f"<t:{int(member.joined_at.timestamp())}> (<t:{int(member.joined_at.timestamp())}:R>)")
-        embed.add_field(name="Utworzył konto:" if not user.bot else "Stworzony dnia:", value=f"<t:{int(user.created_at.timestamp())}> (<t:{int(user.created_at.timestamp())}:R>)")
+            embed.add_field(name="Dołączył na serwer:", value=f"{lib.types.t @ member.joined_at} ({lib.types.t['R'] @ member.joined_at})")
+        embed.add_field(name="Utworzył konto:" if not user.bot else "Stworzony dnia:", value=f"{lib.types.t @ user.created_at} ({lib.types.t['R'] @ user.created_at})")
         if user.public_flags:
             embed.add_field(name="Odznaki:", value=" ".join(f"<:{flag.name}:{self.public_flags_emojis[flag.name]}>" for flag in user.public_flags if flag.name in self.public_flags_emojis))
         embed.add_field(name="Avatar:", value=f"[link]({user.avatar_url})")
@@ -486,7 +486,7 @@ class Fun(commands.Cog):
         embed.add_field(name="Role:", value=len(ctx.guild.roles), inline=True)
         embed.add_field(name="Emotki:", value=len(ctx.guild.emojis), inline=True)
         embed.add_field(name="Naklejki:", value=len(ctx.guild.stickers), inline=True)
-        embed.add_field(name="Został stworzony:", value=f"<t:{int(ctx.guild.created_at.timestamp())}> (<t:{int(ctx.guild.created_at.timestamp())}:R>)")
+        embed.add_field(name="Został stworzony:", value=f"{lib.types.t @ ctx.guild.created_at} ({lib.types.t['R'] @ ctx.guild.created_at})")
         embed.add_field(name="Ulepszenia:", value=ctx.guild.premium_subscription_count, inline=True)
         embed.add_field(name="Poziom:", value=ctx.guild.premium_tier, inline=True)
         if ctx.guild.vanity_url is not None:
@@ -623,7 +623,7 @@ class Fun(commands.Cog):
         embed.add_field(name="ID:", value=resp["id"])
         embed.add_field(name="ID Steam64:", value=resp["steamID64"])
         embed.add_field(name="Nick:", value=resp["name"])
-        embed.add_field(name="Utworzył konto:", value="<t:" + str(round(datetime.strptime(resp["joinDate"], "%Y-%m-%d %H:%M:%S").timestamp())) + ">")
+        embed.add_field(name="Utworzył konto:", value=lib.types.t @ datetime.strptime(resp["joinDate"], "%Y-%m-%d %H:%M:%S"))
         if resp["banned"]:
             embed.add_field(name="Zbanowany:", value="Tak")
         if resp["patreon"]["isPatron"]:

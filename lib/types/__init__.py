@@ -84,4 +84,29 @@ class M:
         elif isinstance(item, Role):
             return f"<@&{item.id}>"
 
+class T:
+    styles = {
+        "t": "16:20",
+        "T": "16:20:30",
+        "d": "20/04/2021",
+        "D": "20 April 2021",
+        "f": "20 April 2021 16:20",
+        "F": "Tuesday, 20 April 2021 16:20",
+        "R": "2 months ago"
+    }
+    style = "f"
+
+    def __getitem__(self, style):
+        if style in self.styles:
+            self.style = style
+
+        return self
+
+    def __matmul__(self, item):
+        text = f"<t:{int(item.timestamp())}:{self.style}>"
+        self.style = "f"
+
+        return text
+
 m = M()
+t = T()
