@@ -46,7 +46,8 @@ class Fun(commands.Cog):
                                     "EARLY_SUPPORTER": "933476948338966578", "BUG_HUNTER_LEVEL_2": "933476948276019220",
                                     "VERIFIED_BOT_DEVELOPER": "933476948594790460", "CERTIFIED_MODERATOR": "933476947915333633"}
         self.status_emojis = {"ONLINE": "977693019279077399", "IDLE": "977693019321028649", "DND": "977693019430076456",
-                              "INVISIBLE": "977693019518160916", "OFFLINE": "977693019518160916"}
+                              "INVISIBLE": "977693019518160916", "OFFLINE": "977693019518160916", "MOBILEONLINE": "1002296215456714953",
+                              "MOBILEIDLE": "1002296213913214976", "MOBILEDND": "1002296212503932988"}
         self.interactions = []
         self.results = {}
         self.urls = {}
@@ -445,16 +446,22 @@ class Fun(commands.Cog):
             if member.roles[1:]:
                 embed.add_field(name="Role:", value=" ".join(types.m @ role for role in member.roles[1:]))
             if member.presence:
+                client_status = member.presence.client_status
+                if client_status.desktop:
+                    desktop_status = client_status.desktop.name
+                    text = f"<:{desktop_status}:{self.status_emojis[desktop_status]}>"
+                if client_status.mobile:
+                    mobile_status = client_status.mobile.name
+                    text += f"<:MOBILE{mobile_status}:{self.status_emojis['MOBILE' + mobile_status]}>"
                 for activity in member.presence.activities:
-                    status = member.presence.status.name
-                    text = f"<:{status}:{self.status_emojis[status]}> "
                     if activity.type is lib.ActivityTypes.CUSTOM:
+                        text += " "
                         if activity.emoji and not activity.emoji.id:
                             text += activity.emoji.name + " "
                         if activity.state:
                             text += activity.state
-                        embed.add_field(name="Status:", value=text)
                         break
+                embed.add_field(name="Status:", value=text)
             embed.add_field(name="Dołączył na serwer:", value=f"<t:{int(member.joined_at.timestamp())}> (<t:{int(member.joined_at.timestamp())}:R>)")
         embed.add_field(name="Utworzył konto:" if not user.bot else "Stworzony dnia:", value=f"<t:{int(user.created_at.timestamp())}> (<t:{int(user.created_at.timestamp())}:R>)")
         if user.public_flags:

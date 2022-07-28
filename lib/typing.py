@@ -1,16 +1,15 @@
 import asyncio
 
 class Typing:
-    def __init__(self, message, *, times = 6):
+    def __init__(self, message):
         self.loop = asyncio.get_event_loop()
         self.message = message
-        self.times = times
 
     def send(self):
         return self.message.channel.start_typing()
 
     async def do_typing(self):
-        for _ in range(self.times):
+        while True:
             await asyncio.sleep(5)
             await self.send()
 

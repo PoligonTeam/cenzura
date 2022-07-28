@@ -411,6 +411,7 @@ class Other(commands.Cog):
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
+        #LIMIT DO INTOW W CS
         #LIB.COMMANDS.TYPEFUNCTIONS
         #DODAC WSZEDZIE GDZIE TRZEBA ASYNC WITH TYPING
         #ZROBIC ZEBY PO PREFIXIE DALO SIE ZNALESC KOMENDE W ON MESSAGE CREATE PRZY OKAZJI TO NAPRAWIC
