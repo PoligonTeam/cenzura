@@ -446,10 +446,11 @@ class Fun(commands.Cog):
             if member.roles[1:]:
                 embed.add_field(name="Role:", value=" ".join(types.m @ role for role in member.roles[1:]))
             if member.presence:
+                text = ""
                 client_status = member.presence.client_status
                 if client_status.desktop:
                     desktop_status = client_status.desktop.name
-                    text = f"<:{desktop_status}:{self.status_emojis[desktop_status]}>"
+                    text += f"<:{desktop_status}:{self.status_emojis[desktop_status]}>"
                 if client_status.mobile:
                     mobile_status = client_status.mobile.name
                     text += f"<:MOBILE{mobile_status}:{self.status_emojis['MOBILE' + mobile_status]}>"
@@ -461,7 +462,8 @@ class Fun(commands.Cog):
                         if activity.state:
                             text += activity.state
                         break
-                embed.add_field(name="Status:", value=text)
+                if text:
+                    embed.add_field(name="Status:", value=text)
             embed.add_field(name="Dołączył na serwer:", value=f"<t:{int(member.joined_at.timestamp())}> (<t:{int(member.joined_at.timestamp())}:R>)")
         embed.add_field(name="Utworzył konto:" if not user.bot else "Stworzony dnia:", value=f"<t:{int(user.created_at.timestamp())}> (<t:{int(user.created_at.timestamp())}:R>)")
         if user.public_flags:
