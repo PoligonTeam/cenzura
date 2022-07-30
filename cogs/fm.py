@@ -29,38 +29,116 @@ class Fm(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.templates = {
-            "embedfull": "return \"jeszcze nie zrobione\"",
-            "embedmini": """username = user.username
+            "embedfull": """username = user.username
+
 lastfm_username = lastfm_user.username
 scrobbles = lastfm_user.scrobbles
-last_track = tracks.0
-title = last_track.title
-track_url = last_track.url
-artist = last_track.artist
-album = last_track.album
 
-embed_description = "[" + title + "](" + track_url + ")
-Przez **" + artist + "** | _" + album + "_"
+current_track = tracks.0
+previous_track = tracks.1
+
+current_title = current_track.title
+curret_track_url = current_track.url
+current_artist = current_track.artist
+current_album = current_track.album
+
+previous_title = previous_track.title
+previous_track_url = previous_track.url
+previous_artist = previous_track.artist
+previous_album = previous_track.album
+
 embed_color = hex("b22487")
 author_name = "Ostatnie utwory dla " + username + ":"
-
-embed = Embed(description: embed_description, color: embed_color)
-
-footer_text = lastfm_username + " ma łącznie " + scrobbles + " scrobbli"
+author_url = "https://www.last.fm/user/" + lastfm_username
+current_value = "[" + current_title + "](" + curret_track_url + ")
+Przez **" + current_artist + "** | _" + current_album + "_"
+previous_value = "[" + previous_title + "](" + previous_track_url + ")
+Przez **" + previous_artist + "** | _" + previous_album + "_"
+footer_text = lastfm_username + " posiada łącznie " + scrobbles + " scrobbli"
 
 nowplaying == false {
-    timestamp = last_track.timestamp
+    timestamp = current_track.timestamp
     date = from_timestamp(timestamp, "%Y/%m/%d %H:%M")
     footer_text = footer_text + " | Ostatni scrobble: " + date
 }
 
-Embed.set_author(embed, name: author_name, icon_url: user.avatar_url)
-Embed.set_thumbnail(embed, url: last_track.image)
+embed = Embed(color: embed_color)
+
+Embed.set_author(embed, name: author_name, url: author_url, icon_url: user.avatar_url)
+Embed.set_thumbnail(embed, url: current_track.image)
+Embed.add_field(embed, name: "Obecnie:", value: current_value)
+Embed.add_field(embed, name: "Poprzednie:", value: previous_value)
 Embed.set_footer(embed, text: footer_text)
 
 return embed""",
-            "textfull": "return \"jeszcze nie zrobione\"",
-            "textminit": "return \"jeszcze nie zrobione\""
+            "embedmini": """username = user.username
+
+lastfm_username = lastfm_user.username
+scrobbles = lastfm_user.scrobbles
+
+current_track = tracks.0
+
+current_title = current_track.title
+curret_track_url = current_track.url
+current_artist = current_track.artist
+current_album = current_track.album
+
+embed_color = hex("b22487")
+author_name = "Ostatnie utwory dla " + username + ":"
+author_url = "https://www.last.fm/user/" + lastfm_username
+current_description = "[" + current_title + "](" + curret_track_url + ")
+Przez **" + current_artist + "** | _" + current_album + "_"
+footer_text = lastfm_username + " posiada łącznie " + scrobbles + " scrobbli"
+
+nowplaying == false {
+    timestamp = current_track.timestamp
+    date = from_timestamp(timestamp, "%Y/%m/%d %H:%M")
+    footer_text = footer_text + " | Ostatni scrobble: " + date
+}
+
+embed = Embed(description: current_description, color: embed_color)
+
+Embed.set_author(embed, name: author_name, url: author_url, icon_url: user.avatar_url)
+Embed.set_thumbnail(embed, url: current_track.image)
+Embed.set_footer(embed, text: footer_text)
+
+return embed""",
+            "textfull": """lastfm_username = lastfm_user.username
+scrobbles = lastfm_user.scrobbles
+
+current_track = tracks.0
+previous_track = tracks.1
+
+current_title = current_track.title
+current_artist = current_track.artist
+current_album = current_track.album
+
+previous_title = previous_track.title
+previous_artist = previous_track.artist
+previous_album = previous_track.album
+
+return "**Obecnie**:
+" + current_title + "
+" + "Przez **" + current_artist + "** | _" + current_album + "_
+
+**Poprzednie**:
+" + previous_title + "
+" + "Przez **" + previous_artist + "** | _" + previous_album + "_
+`" + lastfm_username + " posiada łącznie " + scrobbles + " scrobbli`""",
+            "textmini": """lastfm_username = lastfm_user.username
+scrobbles = lastfm_user.scrobbles
+
+current_track = tracks.0
+
+current_title = current_track.title
+current_artist = current_track.artist
+current_album = current_track.album
+
+return "**Obecnie**:
+" + current_title + "
+" + "Przez **" + current_artist + "** | _" + current_album + "_
+
+`" + lastfm_username + " posiada łącznie " + scrobbles + " scrobbli`"""
         }
 
     def sign(self, method, token):
