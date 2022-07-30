@@ -67,9 +67,6 @@ class Parser:
         self.builtins = {
             **builtins,
             **{
-                "get_tokens": lambda: self.tokens,
-                "get_builtins": lambda: self.builtins,
-                "get_variables": lambda: self.variables,
                 "str": str,
                 "int": int,
                 "list": List,
@@ -85,7 +82,8 @@ class Parser:
                 "find": lambda pattern, string, index = 0: (re.findall(pattern, string) or [False])[index],
                 "find_all": lambda pattern, string, join_string = "": join_string.join(re.findall(pattern, string)) or False,
                 "now": lambda format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.now().strftime(format),
-                "timestamp": lambda: int(datetime.datetime.now().timestamp())
+                "timestamp": lambda: int(datetime.datetime.now().timestamp()),
+                "from_timestamp": lambda timestamp, format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.fromtimestamp(timestamp).strftime(format)
             }
         }
         self.variables = {

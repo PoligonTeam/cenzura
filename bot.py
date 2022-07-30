@@ -51,7 +51,7 @@ class Bot(commands.Bot):
             customcommand_command = self.get_command("customcommand")
 
             for guild in self.gateway.guilds:
-                db_guild = await Guilds.get(guild_id=guild.id)
+                db_guild = await Guilds.filter(guild_id=guild.id).first()
 
                 if db_guild is None:
                     db_guild = await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[])

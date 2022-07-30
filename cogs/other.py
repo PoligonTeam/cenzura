@@ -412,7 +412,7 @@ class Other(commands.Cog):
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
         #LIMIT DO INTOW W CS
-        #LIB.COMMANDS.TYPEFUNCTIONS
+        #LIB.COMMANDS.EVENTHANDLERS
         #DODAC WSZEDZIE GDZIE TRZEBA ASYNC WITH TYPING
         #ZROBIC ZEBY PO PREFIXIE DALO SIE ZNALESC KOMENDE W ON MESSAGE CREATE PRZY OKAZJI TO NAPRAWIC
         #NAPRAWIC LIB.EVENTHANDLERS W NIEKTORYCH MIEJSCACH

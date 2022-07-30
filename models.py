@@ -46,4 +46,4 @@ class LastFM(Model):
     user_id = TextField()
     username = TextField()
     token = TextField()
-    mode = TextField()
+    script = TextField()

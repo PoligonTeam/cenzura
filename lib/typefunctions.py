@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+from numpy import isin
 from .http import Route
 from .types import *
 from .embed import Embed
 from .components import Components
 from .http import Route
 from .enums import *
-from typing import Union, Sequence, Callable, Any
+from typing import Union, Sequence, Callable
 
 def set_functions(client):
     @client.func_for(Guild)
@@ -81,7 +82,12 @@ def set_functions(client):
 
     @client.func_for(Message)
     async def edit(self: Message, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = None, mentions: list = [], other: dict = {}):
-        resp = await client.http.edit_message(self.channel.id, self.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)
+        channel_id = self.channel
+
+        if isinstance(self.channel, Channel):
+            channel_id = self.channel.id
+
+        resp = await client.http.edit_message(channel_id, self.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)
 
         if resp is not None:
             return await Message.from_raw(client.gateway, resp)
