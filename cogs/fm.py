@@ -50,7 +50,7 @@ footer_text = lastfm_username + " ma łącznie " + scrobbles + " scrobbli"
 
 nowplaying == false {
     timestamp = last_track.timestamp
-    date = from_timestamp(timestamp, "%Y/%M/%d %H:%M")
+    date = from_timestamp(timestamp, "%Y/%m/%d %H:%M")
     footer_text = footer_text + " | Ostatni scrobble: " + date
 }
 
