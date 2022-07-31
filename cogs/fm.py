@@ -117,7 +117,7 @@ class Fm(commands.Cog):
                     if len(tracks) == 3:
                         cs_data["nowplaying"] = True
 
-                    async def append_track(index):
+                    async def append_track(index, track):
                         async with session.get(LASTFM_API_URL + f"?method=track.getInfo&user={lastfm.username}&artist={track['artist']['name']}&track={track['name']}&api_key={LASTFM_API_KEY}&format=json") as response:
                             data = await response.json()
                             track_info = data["track"]
@@ -151,7 +151,7 @@ class Fm(commands.Cog):
                         cs_data["tracks"].append((index, cs_track))
 
                     for index, track in enumerate(tracks):
-                        self.bot.loop.create_task(append_track(index))
+                        self.bot.loop.create_task(append_track(index, track))
 
                     while len(cs_data["tracks"]) < 2:
                         await asyncio.sleep(0.1)
