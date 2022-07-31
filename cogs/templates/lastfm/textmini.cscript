@@ -5,10 +5,11 @@ current_track = tracks.0
 
 current_title = current_track.title
 current_artist = current_track.artist
+current_artist_name = current_artist.name
 current_album = current_track.album
 
 return "**Obecnie**:
 " + current_title + "
-" + "Przez **" + current_artist + "** | _" + current_album + "_
+" + "Przez **" + current_artist_name + "** | _" + current_album + "_
 
 `" + lastfm_username + " posiada łącznie " + scrobbles + " scrobbli`

@@ -87,6 +87,7 @@ class Bot(commands.Bot):
         timeout = kwargs.pop("timeout", 60)
         page = kwargs.pop("page", 0)
         replace = kwargs.pop("replace", True)
+        buttons = kwargs.pop("buttons", False)
 
         if limit > 2000:
             limit = 2000
@@ -103,7 +104,7 @@ class Bot(commands.Bot):
         else:
             pages = [prefix + (page if replace is False else page.replace("`", "\`")) + suffix for page in pages]
 
-        if len(pages) == 1:
+        if len(pages) == 1 and buttons is False:
             return await function(pages[page], **kwargs)
 
         if page < 0:

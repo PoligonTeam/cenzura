@@ -411,7 +411,6 @@ class Other(commands.Cog):
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
-        #DO LASTFM DODAC TO ILE MA SIE NA JAKIEJS UTWOR SCROBEL
         #DODAC DO PAGINATORA TO ZEBY ROBIL PAGINATOR NA PAGES JAK SIE MU DA
         #LIMIT DO INTOW W CS
         #LIB.COMMANDS.EVENTHANDLERS

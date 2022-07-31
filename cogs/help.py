@@ -109,7 +109,7 @@ class Help(commands.Cog):
 
             await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=components)
 
-    @commands.command(description="Pokazuje pomoc", usage="[komenda]", aliases=["pomoc", "hlep"])
+    @commands.command(description="Pokazuje pomoc", usage="[komenda]", aliases=["pomoc", "hlep", "hepl"])
     async def help(self, ctx, *, command = None):
         if command is not None:
             command = command.split(" ")

@@ -7,22 +7,24 @@ current_track = tracks.0
 previous_track = tracks.1
 
 current_title = current_track.title
-curret_track_url = current_track.url
+current_track_url = current_track.url
 current_artist = current_track.artist
+current_artist_name = current_artist.name
 current_album = current_track.album
 
 previous_title = previous_track.title
 previous_track_url = previous_track.url
 previous_artist = previous_track.artist
+previous_artist_name = previous_artist.name
 previous_album = previous_track.album
 
 embed_color = hex("b22487")
 author_name = "Ostatnie utwory dla " + username + ":"
 author_url = "https://www.last.fm/user/" + lastfm_username
-current_value = "[" + current_title + "](" + curret_track_url + ")
-Przez **" + current_artist + "** | _" + current_album + "_"
+current_value = "[" + current_title + "](" + current_track_url + ")
+Przez **" + current_artist_name + "** | _" + current_album + "_"
 previous_value = "[" + previous_title + "](" + previous_track_url + ")
-Przez **" + previous_artist + "** | _" + previous_album + "_"
+Przez **" + previous_artist_name + "** | _" + previous_album + "_"
 footer_text = lastfm_username + " posiada łącznie " + scrobbles + " scrobbli"
 
 embed = Embed(color: embed_color)

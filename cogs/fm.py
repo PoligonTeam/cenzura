@@ -93,7 +93,7 @@ class Fm(commands.Cog):
 
         async with lib.Typing(ctx.message):
             async with ClientSession() as session:
-                async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&user={lastfm.username}&limit=2&api_key={LASTFM_API_KEY}&format=json") as response:
+                async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&user={lastfm.username}&limit=2&extended=1&api_key={LASTFM_API_KEY}&format=json") as response:
                     if not response.status == 200:
                         return await ctx.reply("Takie konto LastFM nie istnieje")
 
@@ -119,8 +119,10 @@ class Fm(commands.Cog):
 
                     for track in tracks:
                         cs_track = {
-                            "artist": track["artist"]["#text"],
-                            "artist_url": "https://www.last.fm/music/" + urllib.parse.quote(track["artist"]["#text"]),
+                            "artist": {
+                                "name": track["artist"]["name"],
+                                "url": track["artist"]["url"]
+                            },
                             "image": track["image"][-1]["#text"],
                             "title": track["name"],
                             "url": track["url"],
@@ -192,16 +194,17 @@ class Fm(commands.Cog):
 
         async with lib.Typing(ctx.message):
             async with ClientSession() as session:
-                async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&username={lastfm_user.username}&limit=1&api_key={LASTFM_API_KEY}&format=json") as response:
+                async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&username={lastfm_user.username}&limit=1&extended=1&api_key={LASTFM_API_KEY}&format=json") as response:
                     data = await response.json()
 
-                    artist = data["recenttracks"]["track"][0]["artist"]["#text"]
-                    artist_url = "https://www.last.fm/music/" + urllib.parse.quote(artist)
+                    artist = data["recenttracks"]["track"][0]["artist"]
+                    artist_name = artist["name"]
+                    artist_url = artist["url"]
 
                     async def get_scrobbles(lastfm_user):
                         nonlocal lastfm_scrobbles, artist_url
 
-                        async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&artist={artist}&username={lastfm_user.username}&api_key={LASTFM_API_KEY}&format=json") as response:
+                        async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&artist={artist_name}&username={lastfm_user.username}&api_key={LASTFM_API_KEY}&format=json") as response:
                             data = await response.json()
 
                             lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, data["artist"]["stats"]["userplaycount"]))
@@ -231,7 +234,7 @@ class Fm(commands.Cog):
 
                         description += f"{index} [{member.user.username}](https://www.last.fm/user/{lastfm_user.username}) - **{scrobbles}** odtworzeń\n"
 
-                    embed = lib.Embed(title="Użytkownicy którzy znają " + artist + ":", url=artist_url, description=description, color=self.bot.embed_color)
+                    embed = lib.Embed(title="Użytkownicy którzy znają " + artist_name + ":", url=artist_url, description=description, color=self.bot.embed_color)
 
                     await ctx.reply(embed=embed)
 
@@ -241,6 +244,14 @@ class Fm(commands.Cog):
 
         async with lib.Typing(ctx.message):
             async with ClientSession() as session:
+                if name == r"%radio":
+                    async with session.get("https://radio.poligon.lgbt/api/live/nowplaying/station_1") as response:
+                        data = await response.json()
+                        track = data["now_playing"]["song"]
+
+                        source = "Poligon Radio"
+                        name = track["title"] + " " + track["artist"]
+
                 if name is None:
                     activities = ctx.member.presence.activities
                     index = lib.utils.get_index(activities, "Spotify", key=lambda activity: activity.name)
@@ -268,14 +279,9 @@ class Fm(commands.Cog):
                             name = tracks[0]["name"] + " " + tracks[0]["artist"]["#text"]
 
                 if name is None:
-                    async with session.get("https://radio.poligon.lgbt/api/live/nowplaying/station_1") as response:
-                        data = await response.json()
-                        track = data["now_playing"]["song"]
+                    return await ctx.reply("Nie podałeś nazwy")
 
-                        source = "Poligon Radio"
-                        name = track["title"] + " " + track["artist"]
-
-                async with session.get(f"https://api.musixmatch.com/ws/1.1/track.search?q_track_artist={urllib.parse.quote_plus(name)}&page_size=1&page=1&s_track_rating=desc&s_artist_rating=desc&country=us&apikey={MUSIXMATCH}") as response:
+                async with session.get(f"https://api.musixmatch.com/ws/1.1/track.search?q_track_artist={name}&page_size=1&page=1&s_track_rating=desc&s_artist_rating=desc&country=us&apikey={MUSIXMATCH}") as response:
                     data = await response.json(content_type=None)
 
                     track_list = data["message"]["body"]["track_list"]
@@ -305,7 +311,7 @@ class Fm(commands.Cog):
                                  f"# ALBUM NAME: {album_name}\n\n" \
                                + lyrics
 
-        await self.bot.paginator(ctx.reply, ctx, lyrics, prefix="```md\n", suffix="```")
+        await self.bot.paginator(ctx.reply, ctx, lyrics, prefix="```md\n", suffix="```", buttons=True)
 
 def setup(bot):
     bot.load_cog(Fm(bot))
