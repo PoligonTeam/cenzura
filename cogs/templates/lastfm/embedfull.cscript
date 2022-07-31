@@ -8,6 +8,7 @@ previous_track = tracks.1
 
 current_title = current_track.title
 current_track_url = current_track.url
+current_track_scrobbles = current_track.scrobbles
 current_artist = current_track.artist
 current_artist_name = current_artist.name
 current_album = current_track.album
@@ -25,7 +26,7 @@ current_value = "[" + current_title + "](" + current_track_url + ")
 Przez **" + current_artist_name + "** | _" + current_album + "_"
 previous_value = "[" + previous_title + "](" + previous_track_url + ")
 Przez **" + previous_artist_name + "** | _" + previous_album + "_"
-footer_text = lastfm_username + " posiada łącznie " + scrobbles + " scrobbli"
+footer_text = lastfm_username + " posiada " + current_track_scrobbles + " scrobbli na tym utworze | Łącznie posiada " + scrobbles + " scrobbli"
 
 embed = Embed(color: embed_color)
 
