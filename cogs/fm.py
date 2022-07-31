@@ -274,7 +274,7 @@ return "**Obecnie**:
 
         await self.fmscript(ctx, script=self.templates[template])
 
-    @commands.command(description="Pokazuje osoby które znają obecny utwór", aliases=["wk"])
+    @commands.command(description="Użytkownicy którzy znają artyste", aliases=["wk"])
     async def whoknows(self, ctx):
         lastfm_users = await LastFM.all()
 
