@@ -313,18 +313,28 @@ return "**Obecnie**:
                     if not track_list:
                         return await ctx.reply("Nie znaleziono takiego utworu")
 
-                    track_share_url = track_list[0]["track"]["track_share_url"]
+                    track = track_list[0]["track"]
+
+                    artist_name = track["artist_name"]
+                    track_name = track["track_name"]
+                    album_name = track["album_name"]
+                    track_share_url = track["track_share_url"]
 
                     async with session.get(track_share_url, headers={"user-agent": self.bot.user_agent}) as response:
                         soup = BeautifulSoup(await response.content.read(), features="lxml")
 
-                        lyrics = soup.find_all("p", {"class": "mxm-lyrics__content"})
-                        lyrics = "\n".join([x.get_text() for x in lyrics])
+                        elements = soup.find_all("p", {"class": "mxm-lyrics__content"})
+                        lyrics = "\n".join([element.get_text() for element in elements])
 
                         if not lyrics:
                             return await ctx.reply("Nie znaleziono takiego utworu")
 
-        await self.bot.paginator(ctx.reply, ctx, lyrics, prefix="```", suffix="```")
+                        lyrics = f"# ARTIST NAME: {artist_name}\n" \
+                                 f"# TRACK NAME: {track_name}\n" \
+                                 f"# ALBUM NAME: {album_name}\n\n" \
+                               + lyrics
+
+        await self.bot.paginator(ctx.reply, ctx, lyrics, prefix="```md\n", suffix="```")
 
 def setup(bot):
     bot.load_cog(Fm(bot))

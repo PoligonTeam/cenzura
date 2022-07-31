@@ -225,14 +225,14 @@ class Other(commands.Cog):
             if not command or not "code" in command.other or not command.guild.id == ctx.guild.id:
                 raise lib.CommandNotFound()
 
-            await self.bot.paginator(ctx.reply, ctx, re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]), prefix="```py\n", suffix="```")
+            await self.bot.paginator(ctx.reply, ctx, re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]), prefix="```md\n", suffix="```")
 
             return_text = ""
 
         async def get_commands():
             nonlocal return_text
 
-            await self.bot.paginator(ctx.reply, ctx, pages=[re.sub(r"hide\(\".+\"\)", "HIDDEN", command) for command in custom_commands], prefix="```py\n", suffix="```")
+            await self.bot.paginator(ctx.reply, ctx, pages=[re.sub(r"hide\(\".+\"\)", "HIDDEN", command) for command in custom_commands], prefix="```md\n", suffix="```")
 
             return_text = ""
 
@@ -411,6 +411,7 @@ class Other(commands.Cog):
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
+        #DODAC DO PAGINATORA TO ZEBY ROBIL PAGINATOR NA PAGES JAK SIE MU DA
         #LIMIT DO INTOW W CS
         #LIB.COMMANDS.EVENTHANDLERS
         #DODAC WSZEDZIE GDZIE TRZEBA ASYNC WITH TYPING
