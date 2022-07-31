@@ -106,5 +106,5 @@ class Cog:
         self.listeners = []
         self.commands = []
 
-    def on_cog_unload(self):
+    def on_unload(self):
         pass

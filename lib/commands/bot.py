@@ -158,7 +158,7 @@ class Bot(Client):
 
             cog = self.cogs[index]
 
-        cog.cog_on_unload()
+        cog.on_unload()
 
         for command in cog.commands:
             self.remove_command(command)

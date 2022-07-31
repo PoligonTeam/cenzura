@@ -128,23 +128,23 @@ class Other(commands.Cog):
 
         await self.bot.paginator(ctx.reply, ctx, result, prefix=prefix_suffix, suffix=prefix_suffix)
 
-    @commands.Listener
-    async def on_message_create(self, message):
-        if message.author.bot:
-            return
+    # @commands.Listener
+    # async def on_message_create(self, message):
+    #     if message.author.bot:
+    #         return
 
-        for prefix in self.custom_commands_cog.prefixes:
-            if message.content.startswith(prefix):
-                command_name = message.content.split(" ")[0][len(prefix):]
-                command = self.bot.get_command(command_name, guild=message.guild)
+    #     for prefix in self.custom_commands_cog.prefixes:
+    #         if message.content.startswith(prefix):
+    #             command_name = message.content.split(" ")[0][len(prefix):]
+    #             command = self.bot.get_command(command_name, guild=message.guild)
 
-                if not command:
-                    return
+    #             if not command:
+    #                 return
 
-                fake_message = types.Message(**message.__dict__)
-                fake_message.content = (await self.bot.get_prefix(self.bot, message)) + message.content[len(prefix):]
+    #             fake_message = types.Message(**message.__dict__)
+    #             fake_message.content = (await self.bot.get_prefix(self.bot, message)) + message.content[len(prefix):]
 
-                await self.bot.listeners[0](fake_message)
+    #             await self.bot.listeners[0](fake_message)
 
     @commands.command(description="Tworzenie komendy serwerowej", usage="(kod)", aliases=["cc", "createcommand"])
     @commands.has_permissions("manage_guild")

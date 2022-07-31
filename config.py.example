@@ -35,3 +35,5 @@ DB_CONFIG = {
 LASTFM_API_URL = "http://ws.audioscrobbler.com/2.0/"
 LASTFM_API_KEY = "dawjkldjawkldjawkljdkalwjdklaj"
 LASTFM_API_SECRET = "dawkjdklwajdkljawkdljwakdjawkd"
+
+MUSIXMATCH = "ahdjkwhdjkawhdjkwha"

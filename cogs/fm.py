@@ -19,9 +19,10 @@ from lib import commands, types, HTTPException
 from cenzurascript import run
 from utils import convert, table
 from aiohttp import ClientSession
+from bs4 import BeautifulSoup
 from models import LastFM
-from config import LASTFM_API_KEY, LASTFM_API_SECRET, LASTFM_API_URL
-import hashlib, asyncio
+from config import LASTFM_API_KEY, LASTFM_API_SECRET, LASTFM_API_URL, MUSIXMATCH
+import urllib.parse, hashlib, asyncio
 
 class Fm(commands.Cog):
     name = "Muzyka"
@@ -272,6 +273,58 @@ return "**Obecnie**:
             return await ctx.reply("Nie ma takiego szablonu")
 
         await self.fmscript(ctx, script=self.templates[template])
+
+    @commands.command(description="Pokazuje tekst piosenki", usage="[nazwa]")
+    async def lyrics(self, ctx, *, name = None):
+        async with lib.Typing(ctx.message):
+            async with ClientSession() as session:
+                if name is None:
+                    activities = ctx.member.presence.activities
+                    index = lib.utils.get_index(activities, "Spotify", key=lambda activity: activity.name)
+
+                    if index is not None:
+                        activity = activities[index]
+                        name = activity.details + " " + activity.state
+
+                if name is None:
+                    lastfm = await LastFM.filter(user_id=ctx.author.id).first()
+
+                    if lastfm is None:
+                        return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+
+                    async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&username={lastfm.username}&limit=1&api_key={LASTFM_API_KEY}&format=json") as response:
+                        data = await response.json()
+                        tracks = data["recenttracks"]["track"]
+
+                        if not tracks:
+                            return await ctx.reply("Nie ma żadnych utworów")
+
+                        if len(tracks) == 2:
+                            name = tracks[0]["name"] + " " + tracks[0]["artist"]["#text"]
+
+                if name is None:
+                    return await ctx.reply("Nie znaleziono żadnego utworu")
+
+                async with session.get(f"https://api.musixmatch.com/ws/1.1/track.search?q_track_artist={urllib.parse.quote_plus(name)}&page_size=1&page=1&s_track_rating=desc&s_artist_rating=desc&country=us&apikey={MUSIXMATCH}") as response:
+                    data = await response.json(content_type=None)
+
+                    track_list = data["message"]["body"]["track_list"]
+
+                    if not track_list:
+                        return await ctx.reply("Nie znaleziono takiego utworu")
+
+                    track_share_url = track_list[0]["track"]["track_share_url"]
+
+                    async with session.get(track_share_url, headers={"user-agent": self.bot.user_agent}) as response:
+                        soup = BeautifulSoup(await response.content.read(), features="lxml")
+
+                        lyrics = soup.find_all("p", {"class": "mxm-lyrics__content"})
+                        lyrics = "\n".join([x.get_text() for x in lyrics])
+
+                        if not lyrics:
+                            return await ctx.reply("Nie znaleziono takiego utworu")
+
+        await self.bot.paginator(ctx.reply, ctx, lyrics, prefix="```", suffix="```")
 
 def setup(bot):
     bot.load_cog(Fm(bot))
