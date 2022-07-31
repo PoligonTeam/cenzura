@@ -276,6 +276,8 @@ return "**Obecnie**:
 
     @commands.command(description="Pokazuje tekst piosenki", usage="[nazwa]")
     async def lyrics(self, ctx, *, name = None):
+        source = "Command Argument"
+
         async with lib.Typing(ctx.message):
             async with ClientSession() as session:
                 if name is None:
@@ -284,6 +286,7 @@ return "**Obecnie**:
 
                     if index is not None:
                         activity = activities[index]
+                        source = "Discord Spotify Activity"
                         name = activity.details + " " + activity.state
 
                 if name is None:
@@ -300,10 +303,16 @@ return "**Obecnie**:
                             return await ctx.reply("Nie ma żadnych utworów")
 
                         if len(tracks) == 2:
+                            source = "LastFM"
                             name = tracks[0]["name"] + " " + tracks[0]["artist"]["#text"]
 
                 if name is None:
-                    return await ctx.reply("Nie znaleziono żadnego utworu")
+                    async with session.get("https://radio.poligon.lgbt/api/live/nowplaying/station_1") as response:
+                        data = await response.json()
+                        track = data["now_playing"]["song"]
+
+                        source = "Poligon Radio"
+                        name = track["title"] + " " + track["artist"]
 
                 async with session.get(f"https://api.musixmatch.com/ws/1.1/track.search?q_track_artist={urllib.parse.quote_plus(name)}&page_size=1&page=1&s_track_rating=desc&s_artist_rating=desc&country=us&apikey={MUSIXMATCH}") as response:
                     data = await response.json(content_type=None)
@@ -329,7 +338,8 @@ return "**Obecnie**:
                         if not lyrics:
                             return await ctx.reply("Nie znaleziono takiego utworu")
 
-                        lyrics = f"# ARTIST NAME: {artist_name}\n" \
+                        lyrics = f"# SOURCE: {source}\n" \
+                                 f"# ARTIST NAME: {artist_name}\n" \
                                  f"# TRACK NAME: {track_name}\n" \
                                  f"# ALBUM NAME: {album_name}\n\n" \
                                + lyrics
