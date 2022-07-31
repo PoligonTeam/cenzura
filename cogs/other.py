@@ -411,10 +411,8 @@ class Other(commands.Cog):
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
-        #DODAC DO PAGINATORA TO ZEBY ROBIL PAGINATOR NA PAGES JAK SIE MU DA
         #LIMIT DO INTOW W CS
         #LIB.COMMANDS.EVENTHANDLERS
-        #DODAC WSZEDZIE GDZIE TRZEBA ASYNC WITH TYPING
         #ZROBIC ZEBY PO PREFIXIE DALO SIE ZNALESC KOMENDE W ON MESSAGE CREATE PRZY OKAZJI TO NAPRAWIC
         #NAPRAWIC LIB.EVENTHANDLERS W NIEKTORYCH MIEJSCACH
         #HTTP PROXY

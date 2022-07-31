@@ -117,22 +117,47 @@ class Fm(commands.Cog):
                     if len(tracks) == 3:
                         cs_data["nowplaying"] = True
 
-                    for track in tracks:
+                    async def append_track(index):
+                        async with session.get(LASTFM_API_URL + f"?method=track.getInfo&user={lastfm.username}&artist={track['artist']['name']}&track={track['name']}&api_key={LASTFM_API_KEY}&format=json") as response:
+                            data = await response.json()
+                            track_info = data["track"]
+
+                        async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&user={lastfm.username}&artist={track['artist']['name']}&api_key={LASTFM_API_KEY}&format=json") as response:
+                            data = await response.json()
+                            artist_info = data["artist"]
+
                         cs_track = {
                             "artist": {
                                 "name": track["artist"]["name"],
-                                "url": track["artist"]["url"]
+                                "url": track["artist"]["url"],
+                                "listeners": artist_info["stats"]["listeners"],
+                                "playcount": artist_info["stats"]["playcount"],
+                                "scrobbles": artist_info["stats"]["userplaycount"],
+                                "tags": artist_info["tags"]["tag"]
                             },
                             "image": track["image"][-1]["#text"],
                             "title": track["name"],
                             "url": track["url"],
-                            "album": track["album"]["#text"]
+                            "album": track["album"]["#text"],
+                            "listeners": track_info["listeners"],
+                            "playcount": track_info["playcount"],
+                            "scrobbles": track_info["userplaycount"],
+                            "tags": track_info["toptags"]["tag"]
                         }
 
                         if "date" in track:
                             cs_track["timestamp"] = int(track["date"]["uts"]) + 60 * 60 * 2
 
-                        cs_data["tracks"].append(cs_track)
+                        cs_data["tracks"].append((index, cs_track))
+
+                    for index, track in enumerate(tracks):
+                        self.bot.loop.create_task(append_track(index))
+
+                    while len(cs_data["tracks"]) < 2:
+                        await asyncio.sleep(0.1)
+
+                    cs_data["tracks"] = sorted(cs_data["tracks"], key=lambda track: track[0])
+                    cs_data["tracks"] = [track[1] for track in cs_data["tracks"]]
 
                     result = await run(
                         lastfm.script,
@@ -219,7 +244,7 @@ class Fm(commands.Cog):
 
                     description = ""
 
-                    for (member, lastfm_user, scrobbles), index in zip(lastfm_scrobbles, range(len(lastfm_scrobbles))):
+                    for index, (member, lastfm_user, scrobbles) in zip(range(len(lastfm_scrobbles)), lastfm_scrobbles):
                         if scrobbles == "0":
                             continue
 

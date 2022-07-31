@@ -392,7 +392,7 @@ class Fun(commands.Cog):
         random_product = random.choice(item_list)
         await ctx.reply(f"\"{random_product['title']['displayTitle']}\"\nhttps://aliexpress.com/item/{random_product['productId']}.html\n\n*z aliexpress.com*")
 
-    @commands.command(description="shopee wyszukiwarka", usage="shopee (produkt)", aliases=["shopenis", "fakeali", "alisexpress"])
+    @commands.command(description="shopee wyszukiwarka", usage="(produkt)", aliases=["shopenis", "fakeali", "alisexpress"])
     async def shopee(self, ctx, *, product):
         resp = (await (await self.bot.http.session.get("https://shopee.pl/api/v4/search/search_items?by=relevancy&keyword=" + urllib.parse.quote_plus(product) + "&limit=60&newest=0&order=desc&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2")).json())["items"]
 
