@@ -274,6 +274,65 @@ return "**Obecnie**:
 
         await self.fmscript(ctx, script=self.templates[template])
 
+    @commands.command(description="Pokazuje osoby które znają obecny utwór", aliases=["wk"])
+    async def whoknows(self, ctx):
+        lastfm_users = await LastFM.all()
+
+        if not ctx.author.id in [lastfm_user.user_id for lastfm_user in lastfm_users]:
+            return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+
+        lastfm_users = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id in [member.user.id for member in ctx.guild.members]]
+        lastfm_scrobbles = []
+
+        lastfm_user = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == ctx.author.id][0]
+
+        async with lib.Typing(ctx.message):
+            async with ClientSession() as session:
+                async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&username={lastfm_user.username}&limit=1&api_key={LASTFM_API_KEY}&format=json") as response:
+                    data = await response.json()
+
+                    artist = data["recenttracks"]["track"][0]["artist"]["#text"]
+                    artist_url = None
+
+                    async def get_scrobbles(lastfm_user):
+                        nonlocal lastfm_scrobbles, artist_url
+
+                        async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&artist={artist}&username={lastfm_user.username}&api_key={LASTFM_API_KEY}&format=json") as response:
+                            data = await response.json()
+
+                            artist_url = data["artist"]["url"]
+
+                            lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, data["artist"]["stats"]["userplaycount"]))
+
+                    for lastfm_user in lastfm_users:
+                        self.bot.loop.create_task(get_scrobbles(lastfm_user))
+
+                    while len(lastfm_scrobbles) < len(lastfm_users):
+                        await asyncio.sleep(0.1)
+
+                    lastfm_scrobbles.sort(key=lambda scrobbles: int(scrobbles[2]), reverse=True)
+
+                    description = ""
+
+                    for (member, lastfm_user, scrobbles), index in zip(lastfm_scrobbles, range(len(lastfm_scrobbles))):
+                        if scrobbles == "0":
+                            continue
+
+                        index += 1
+
+                        if index == 1:
+                            index = "\N{CROWN}"
+                        elif member is ctx.member:
+                            index = f"**{index}**."
+                        else:
+                            index = f"{index}."
+
+                        description += f"{index} [{member.user.username}](https://www.last.fm/user/{lastfm_user.username}) - **{scrobbles}** odtworzeń\n"
+
+                    embed = lib.Embed(title="Kto zna " + artist + ":", url=artist_url, description=description, color=self.bot.embed_color)
+
+                    await ctx.reply(embed=embed)
+
     @commands.command(description="Pokazuje tekst piosenki", usage="[nazwa]")
     async def lyrics(self, ctx, *, name = None):
         source = "Command Argument"

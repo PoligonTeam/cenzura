@@ -30,7 +30,9 @@ class Embed:
         if color is not None:
             self.color = color
         if timestamp is not None:
-            self.timestamp = (timestamp - timedelta(hours=1)).isoformat()
+            if isinstance(timestamp, int):
+                timestamp = datetime.fromtimestamp(timestamp)
+            self.timestamp = (timestamp - timedelta(hours=2)).isoformat()
 
     def __add__(self, embed: Embed):
         new_embed = Embed()
