@@ -22,7 +22,7 @@ from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from models import LastFM
 from config import LASTFM_API_KEY, LASTFM_API_SECRET, LASTFM_API_URL, MUSIXMATCH
-import urllib.parse, hashlib, asyncio, os
+import urllib.parse, hashlib, datetime, asyncio, os
 
 class Fm(commands.Cog):
     name = "Muzyka"
@@ -120,6 +120,7 @@ class Fm(commands.Cog):
                     for track in tracks:
                         cs_track = {
                             "artist": track["artist"]["#text"],
+                            "artist_url": "https://www.last.fm/music/" + urllib.parse.quote(track["artist"]["#text"]),
                             "image": track["image"][-1]["#text"],
                             "title": track["name"],
                             "url": track["url"],
@@ -161,6 +162,12 @@ class Fm(commands.Cog):
         if script == "get_code()":
             return await self.bot.paginator(ctx.reply, ctx, lastfm_user.script, prefix="```py\n", suffix="```")
 
+        script = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
+                 f"# GUILD: {ctx.guild.id}\n" \
+                 f"# CHANNEL: {ctx.channel.id}\n" \
+                 f"# AUTHOR: {ctx.author.id}\n\n" \
+               + script
+
         await query.update(script=script)
         await ctx.reply("Skrypt został ustawiony")
 
@@ -189,14 +196,13 @@ class Fm(commands.Cog):
                     data = await response.json()
 
                     artist = data["recenttracks"]["track"][0]["artist"]["#text"]
-                    artist_url = None
+                    artist_url = "https://www.last.fm/music/" + urllib.parse.quote(artist)
 
                     async def get_scrobbles(lastfm_user):
                         nonlocal lastfm_scrobbles, artist_url
 
                         async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&artist={artist}&username={lastfm_user.username}&api_key={LASTFM_API_KEY}&format=json") as response:
                             data = await response.json()
-                            artist_url = data["artist"]["url"]
 
                             lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, data["artist"]["stats"]["userplaycount"]))
 
@@ -225,7 +231,7 @@ class Fm(commands.Cog):
 
                         description += f"{index} [{member.user.username}](https://www.last.fm/user/{lastfm_user.username}) - **{scrobbles}** odtworzeń\n"
 
-                    embed = lib.Embed(title="Kto zna " + artist + ":", url=artist_url, description=description, color=self.bot.embed_color)
+                    embed = lib.Embed(title="Użytkownicy którzy znają " + artist + ":", url=artist_url, description=description, color=self.bot.embed_color)
 
                     await ctx.reply(embed=embed)
 
