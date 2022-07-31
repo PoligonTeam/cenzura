@@ -225,14 +225,14 @@ class Other(commands.Cog):
             if not command or not "code" in command.other or not command.guild.id == ctx.guild.id:
                 raise lib.CommandNotFound()
 
-            await self.bot.paginator(ctx.reply, ctx, re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]), prefix="```md\n", suffix="```")
+            await self.bot.paginator(ctx.reply, ctx, re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]), prefix="```py\n", suffix="```")
 
             return_text = ""
 
         async def get_commands():
             nonlocal return_text
 
-            await self.bot.paginator(ctx.reply, ctx, pages=[re.sub(r"hide\(\".+\"\)", "HIDDEN", command) for command in custom_commands], prefix="```md\n", suffix="```")
+            await self.bot.paginator(ctx.reply, ctx, pages=[re.sub(r"hide\(\".+\"\)", "HIDDEN", command) for command in custom_commands], prefix="```py\n", suffix="```")
 
             return_text = ""
 

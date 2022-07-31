@@ -1,0 +1,22 @@
+lastfm_username = lastfm_user.username
+scrobbles = lastfm_user.scrobbles
+
+current_track = tracks.0
+previous_track = tracks.1
+
+current_title = current_track.title
+current_artist = current_track.artist
+current_album = current_track.album
+
+previous_title = previous_track.title
+previous_artist = previous_track.artist
+previous_album = previous_track.album
+
+return "**Obecnie**:
+" + current_title + "
+" + "Przez **" + current_artist + "** | _" + current_album + "_
+
+**Poprzednie**:
+" + previous_title + "
+" + "Przez **" + previous_artist + "** | _" + previous_album + "_
+`" + lastfm_username + " posiada łącznie " + scrobbles + " scrobbli`

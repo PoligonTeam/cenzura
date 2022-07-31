@@ -22,125 +22,18 @@ from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from models import LastFM
 from config import LASTFM_API_KEY, LASTFM_API_SECRET, LASTFM_API_URL, MUSIXMATCH
-import urllib.parse, hashlib, asyncio
+import urllib.parse, hashlib, asyncio, os
 
 class Fm(commands.Cog):
     name = "Muzyka"
 
     def __init__(self, bot):
         self.bot = bot
-        self.templates = {
-            "embedfull": """username = user.username
+        self.templates = {}
 
-lastfm_username = lastfm_user.username
-scrobbles = lastfm_user.scrobbles
-
-current_track = tracks.0
-previous_track = tracks.1
-
-current_title = current_track.title
-curret_track_url = current_track.url
-current_artist = current_track.artist
-current_album = current_track.album
-
-previous_title = previous_track.title
-previous_track_url = previous_track.url
-previous_artist = previous_track.artist
-previous_album = previous_track.album
-
-embed_color = hex("b22487")
-author_name = "Ostatnie utwory dla " + username + ":"
-author_url = "https://www.last.fm/user/" + lastfm_username
-current_value = "[" + current_title + "](" + curret_track_url + ")
-Przez **" + current_artist + "** | _" + current_album + "_"
-previous_value = "[" + previous_title + "](" + previous_track_url + ")
-Przez **" + previous_artist + "** | _" + previous_album + "_"
-footer_text = lastfm_username + " posiada łącznie " + scrobbles + " scrobbli"
-
-nowplaying == false {
-    timestamp = current_track.timestamp
-    date = from_timestamp(timestamp, "%Y/%m/%d %H:%M")
-    footer_text = footer_text + " | Ostatni scrobble: " + date
-}
-
-embed = Embed(color: embed_color)
-
-Embed.set_author(embed, name: author_name, url: author_url, icon_url: user.avatar_url)
-Embed.set_thumbnail(embed, url: current_track.image)
-Embed.add_field(embed, name: "Obecnie:", value: current_value)
-Embed.add_field(embed, name: "Poprzednie:", value: previous_value)
-Embed.set_footer(embed, text: footer_text)
-
-return embed""",
-            "embedmini": """username = user.username
-
-lastfm_username = lastfm_user.username
-scrobbles = lastfm_user.scrobbles
-
-current_track = tracks.0
-
-current_title = current_track.title
-curret_track_url = current_track.url
-current_artist = current_track.artist
-current_album = current_track.album
-
-embed_color = hex("b22487")
-author_name = "Ostatnie utwory dla " + username + ":"
-author_url = "https://www.last.fm/user/" + lastfm_username
-current_description = "[" + current_title + "](" + curret_track_url + ")
-Przez **" + current_artist + "** | _" + current_album + "_"
-footer_text = lastfm_username + " posiada łącznie " + scrobbles + " scrobbli"
-
-nowplaying == false {
-    timestamp = current_track.timestamp
-    date = from_timestamp(timestamp, "%Y/%m/%d %H:%M")
-    footer_text = footer_text + " | Ostatni scrobble: " + date
-}
-
-embed = Embed(description: current_description, color: embed_color)
-
-Embed.set_author(embed, name: author_name, url: author_url, icon_url: user.avatar_url)
-Embed.set_thumbnail(embed, url: current_track.image)
-Embed.set_footer(embed, text: footer_text)
-
-return embed""",
-            "textfull": """lastfm_username = lastfm_user.username
-scrobbles = lastfm_user.scrobbles
-
-current_track = tracks.0
-previous_track = tracks.1
-
-current_title = current_track.title
-current_artist = current_track.artist
-current_album = current_track.album
-
-previous_title = previous_track.title
-previous_artist = previous_track.artist
-previous_album = previous_track.album
-
-return "**Obecnie**:
-" + current_title + "
-" + "Przez **" + current_artist + "** | _" + current_album + "_
-
-**Poprzednie**:
-" + previous_title + "
-" + "Przez **" + previous_artist + "** | _" + previous_album + "_
-`" + lastfm_username + " posiada łącznie " + scrobbles + " scrobbli`""",
-            "textmini": """lastfm_username = lastfm_user.username
-scrobbles = lastfm_user.scrobbles
-
-current_track = tracks.0
-
-current_title = current_track.title
-current_artist = current_track.artist
-current_album = current_track.album
-
-return "**Obecnie**:
-" + current_title + "
-" + "Przez **" + current_artist + "** | _" + current_album + "_
-
-`" + lastfm_username + " posiada łącznie " + scrobbles + " scrobbli`"""
-        }
+        for filename in os.listdir("./cogs/templates/lastfm"):
+            with open("./cogs/templates/lastfm/" + filename, "r") as file:
+                self.templates[filename.split(".")[0]] = file.read()
 
     def sign(self, method, token):
         string = "api_key" + LASTFM_API_KEY + "method" + method + "token" + token + LASTFM_API_SECRET
@@ -260,9 +153,13 @@ return "**Obecnie**:
     @commands.command(description="Ustawianie skryptu dla komendy lastfm", usage="(skrypt)", aliases=["fms", "fmset"])
     async def fmscript(self, ctx, *, script):
         query = LastFM.filter(user_id=ctx.author.id)
+        lastfm_user = await query.first()
 
-        if await query.first() is None:
+        if lastfm_user is None:
             return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+
+        if script == "get_code()":
+            return await self.bot.paginator(ctx.reply, ctx, lastfm_user.script, prefix="```py\n", suffix="```")
 
         await query.update(script=script)
         await ctx.reply("Skrypt został ustawiony")
@@ -299,7 +196,6 @@ return "**Obecnie**:
 
                         async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&artist={artist}&username={lastfm_user.username}&api_key={LASTFM_API_KEY}&format=json") as response:
                             data = await response.json()
-
                             artist_url = data["artist"]["url"]
 
                             lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, data["artist"]["stats"]["userplaycount"]))
