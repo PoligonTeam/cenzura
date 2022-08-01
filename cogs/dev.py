@@ -17,6 +17,7 @@ limitations under the License.
 import lib
 from lib import commands, types
 from lib.permissions import Permissions
+from typing import Union
 import ast, inspect, copy, datetime
 
 class Dev(commands.Cog):
@@ -127,9 +128,19 @@ class Dev(commands.Cog):
 
         await ctx.reply("\n".join("\N{WHITE HEAVY CHECK MARK} `%s`" % extension_name for extension_name in unloaded))
 
-    @commands.command(description="cenzura to bot, bot to cenzura", usage="(użytkownik) (komenda) [argumenty]")
+    @commands.command(description="cenzura to bot, bot to cenzura", usage="[użytkownik] (komenda) [argumenty]")
     @commands.is_owner
-    async def su(self, ctx, member: types.Member, command, *, args = None):
+    async def su(self, ctx, member: Union[types.Member, str], command = None, *, args = None):
+        if isinstance(member, str):
+            if command is not None:
+                _args = command
+                if args is not None:
+                    _args += " " + args
+                args = _args
+
+            command = member
+            member = ctx.member
+
         fake_member = copy.deepcopy(member)
         fake_permissions = Permissions.all()
         fake_message = copy.deepcopy(ctx.message)

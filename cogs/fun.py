@@ -87,16 +87,14 @@ class Fun(commands.Cog):
 
         await ctx.reply(f"**{user.username}** + **{user2.username}** = **{user.username[:len(user.username) // 2].lower()}{user2.username[len(user2.username) // 2:].lower()}**\nIch miłość jest równa **{percent}%**!", files=[("ship.png", image.getvalue())])
 
-    @commands.command(description="pies", aliases=["pies", "sterzi", "ars", "mesik", "6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"])
+    @commands.command(description="pies", aliases=["pies", "ars", "6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"])
     async def dog(self, ctx):
         alias = ctx.message.content.split()[0][len(await self.bot.get_prefix(self.bot, ctx.message)):]
 
-        if alias in ("sterzi", "mesik"):
-            return await ctx.reply("to pies")
-        elif alias in ("6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"):
-            return await ctx.reply("to pies, ten niżej to też pies", files=[("dog.png", open("./assets/images/6vz.png", "rb")), ("dog2.png", open("./assets/images/6vz2.png", "rb"))])
+        if alias in ("6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"):
+            return await ctx.reply("niżej to pies", files=[("dog.png", open("./assets/images/6vz.png", "rb")), ("dog2.png", open("./assets/images/6vz2.png", "rb"))])
         elif alias == "ars":
-            return await ctx.reply("to pies, ten niżej to też pies", files=[("dog.jpg", open("./assets/images/ars.jpg", "rb"))])
+            return await ctx.reply("niżej to pies", files=[("dog.jpg", open("./assets/images/ars.jpg", "rb"))])
 
         resp = await self.bot.http.session.get("https://some-random-api.ml/img/dog")
         resp_data = await resp.json()
@@ -112,8 +110,13 @@ class Fun(commands.Cog):
 
         await ctx.reply(files=[("dog." + extension, content)])
 
-    @commands.command(description="kot", aliases=["kot"])
+    @commands.command(description="kot", aliases=["kot", "mesik", "<@563718132863074324>", "<@!563718132863074324>"])
     async def cat(self, ctx):
+        alias = ctx.message.content.split()[0][len(await self.bot.get_prefix(self.bot, ctx.message)):]
+
+        if alias in ("mesik", "<@563718132863074324>", "<@!563718132863074324>"):
+            return await ctx.reply("niżej to kot", files=[("cat.jpg", open("./assets/images/mesik.jpg", "rb")), ("cat2.png", open("./assets/images/mesik2.jpg", "rb"))])
+
         image = await self.bot.http.session.get("https://cataas.com/cat" + ("/gif" if random.random() > .5 else ""))
         content = await image.content.read()
 
