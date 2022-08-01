@@ -22,9 +22,9 @@ from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from models import LastFM
 from config import LASTFM_API_KEY, LASTFM_API_SECRET, LASTFM_API_URL, MUSIXMATCH
-import urllib.parse, hashlib, datetime, asyncio, os
+import hashlib, datetime, asyncio, os
 
-class Fm(commands.Cog):
+class Music(commands.Cog):
     name = "Muzyka"
 
     def __init__(self, bot):
@@ -339,4 +339,4 @@ class Fm(commands.Cog):
         await self.bot.paginator(ctx.reply, ctx, lyrics, prefix="```md\n", suffix="```", buttons=True)
 
 def setup(bot):
-    bot.load_cog(Fm(bot))
+    bot.load_cog(Music(bot))
