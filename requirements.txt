@@ -9,3 +9,4 @@ psutil
 pyfiglet
 playwright
 lavalink
+yt-dlp

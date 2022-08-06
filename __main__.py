@@ -55,7 +55,7 @@ class StreamHandler(io.StringIO):
         if self.path:
             self.file.write(content)
 
-        self.stream.write(content)      
+        self.stream.write(content)
 
 def main():
     stream = sys.stdout
