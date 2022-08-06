@@ -142,7 +142,7 @@ class Other(commands.Cog):
                     return
 
                 fake_message = copy.deepcopy(message)
-                fake_message.content = (await self.bot.get_prefix(self.bot, message)) + message.content[len(prefix):]
+                fake_message.content = (await self.bot.get_prefix(self.bot, message))[-1] + message.content[len(prefix):]
 
                 return await self.bot.process_commands(fake_message)
 
@@ -329,73 +329,74 @@ class Other(commands.Cog):
         }
 
         async def command_function(ctx, args = None):
-            if args is not None:
-                args = args[0]
-                values = list(command_arguments.values())
-                _break = False
+            async with lib.Typing(ctx.message):
+                if args is not None:
+                    args = args[0]
+                    values = list(command_arguments.values())
+                    _break = False
 
-                for index, item in enumerate(args):
-                    _type = values[index]
+                    for index, item in enumerate(args):
+                        _type = values[index]
 
-                    if _type is str and index + 1 >= len(values):
-                        item = " ".join(args[index:])
-                        _break = True
+                        if _type is str and index + 1 >= len(values):
+                            item = " ".join(args[index:])
+                            _break = True
 
-                    if _type in (types.User, types.Channel, types.Role):
-                        result = _type.from_arg(ctx, item)
-                        if isinstance(result, CoroutineType):
-                            result = await result
+                        if _type in (types.User, types.Channel, types.Role):
+                            result = _type.from_arg(ctx, item)
+                            if isinstance(result, CoroutineType):
+                                result = await result
 
-                        args[index] = convert(_=result)["_"]
-                        continue
+                            args[index] = convert(_=result)["_"]
+                            continue
 
-                    args[index] = _type(item)
+                        args[index] = _type(item)
 
-                    if _break is True:
-                        break
+                        if _break is True:
+                            break
 
-                args = dict(zip(command_arguments.keys(), args))
+                    args = dict(zip(command_arguments.keys(), args))
 
-            result = await run(
-                code,
-                builtins = {
-                    **self.builtins,
-                    **{
-                        "set_command_name": self.void,
-                        "set_command_description": self.void,
-                        "set_command_usage": self.void,
-                        "set_command_aliases": self.void,
-                        "set_command_arguments": self.void,
-                        "get_command_code": self.void,
-                        "get_commands": self.void,
-                        "delete_command": self.void,
-                        "hide": lambda item: item
-                    }
-                },
-                variables = {
-                    **convert(
-                        guild = ctx.guild,
-                        channel = ctx.channel,
-                        author = ctx.author
-                    ),
-                    **{
-                        "str": "str",
-                        "int": "int",
-                        "Channel": "channel",
-                        "Role": "role",
-                        "User": "user"
+                result = await run(
+                    code,
+                    builtins = {
+                        **self.builtins,
+                        **{
+                            "set_command_name": self.void,
+                            "set_command_description": self.void,
+                            "set_command_usage": self.void,
+                            "set_command_aliases": self.void,
+                            "set_command_arguments": self.void,
+                            "get_command_code": self.void,
+                            "get_commands": self.void,
+                            "delete_command": self.void,
+                            "hide": lambda item: item
+                        }
                     },
-                    **(
-                        args if args is not None else {}
-                    )
-                }
-            )
+                    variables = {
+                        **convert(
+                            guild = ctx.guild,
+                            channel = ctx.channel,
+                            author = ctx.author
+                        ),
+                        **{
+                            "str": "str",
+                            "int": "int",
+                            "Channel": "channel",
+                            "Role": "role",
+                            "User": "user"
+                        },
+                        **(
+                            args if args is not None else {}
+                        )
+                    }
+                )
 
-            if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], lib.Embed):
-                return await ctx.reply(result[0], embed=result[1])
+                if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], lib.Embed):
+                    return await ctx.reply(result[0], embed=result[1])
 
-            if isinstance(result, lib.Embed):
-                return await ctx.reply(embed=result)
+                if isinstance(result, lib.Embed):
+                    return await ctx.reply(embed=result)
 
             await self.bot.paginator(ctx.reply, ctx, result, replace=False)
 

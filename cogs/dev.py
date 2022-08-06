@@ -165,7 +165,7 @@ class Dev(commands.Cog):
 
         fake_message.author = fake_member.user
         fake_message.member = fake_member
-        fake_message.content = await self.bot.get_prefix(self.bot, ctx.message) + command
+        fake_message.content = (await self.bot.get_prefix(self.bot, ctx.message))[-1] + command
 
         if args is not None:
             fake_message.content += " " + args

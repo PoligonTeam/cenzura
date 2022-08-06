@@ -89,7 +89,7 @@ class Fun(commands.Cog):
 
     @commands.command(description="pies", aliases=["pies", "ars", "6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"])
     async def dog(self, ctx):
-        alias = ctx.message.content.split()[0][len(await self.bot.get_prefix(self.bot, ctx.message)):]
+        alias = ctx.message.content.split()[0][len((await self.bot.get_prefix(self.bot, ctx.message))[-1]):]
 
         if alias in ("6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"):
             return await ctx.reply("niżej to pies", files=[("dog.png", open("./assets/images/6vz.png", "rb")), ("dog2.png", open("./assets/images/6vz2.png", "rb"))])
@@ -112,7 +112,7 @@ class Fun(commands.Cog):
 
     @commands.command(description="kot", aliases=["kot", "mesik", "<@563718132863074324>", "<@!563718132863074324>"])
     async def cat(self, ctx):
-        alias = ctx.message.content.split()[0][len(await self.bot.get_prefix(self.bot, ctx.message)):]
+        alias = ctx.message.content.split()[0][len((await self.bot.get_prefix(self.bot, ctx.message))[-1]):]
 
         if alias in ("mesik", "<@563718132863074324>", "<@!563718132863074324>"):
             return await ctx.reply("niżej to kot", files=[("cat.jpg", open("./assets/images/mesik.jpg", "rb")), ("cat2.png", open("./assets/images/mesik2.jpg", "rb"))])

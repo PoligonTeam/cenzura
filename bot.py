@@ -70,13 +70,16 @@ class Bot(commands.Bot):
             print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - start_time:.2f}s)")
 
     async def get_prefix(self, _, message):
+        prefixes = ["<@{}>", "<@!{}>", "<@{}> ", "<@!{}> "]
+        prefixes = [prefix.format(self.gateway.bot_user.id) for prefix in prefixes]
+
         if hasattr(message.guild, "prefix"):
-            return message.guild.prefix or config.PREFIX
+            return prefixes + [message.guild.prefix or config.PREFIX]
 
         db_guild = await Guilds.get(guild_id=message.guild.id)
         message.guild.prefix = db_guild.prefix
 
-        return message.guild.prefix or config.PREFIX
+        return prefixes + [message.guild.prefix or config.PREFIX]
 
     async def create_psql_connection(self):
         logging.getLogger("tortoise").setLevel(logging.WARNING)

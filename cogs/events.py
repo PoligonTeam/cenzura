@@ -39,7 +39,8 @@ class Events(commands.Cog):
             return
 
         if message.guild.me and message.guild.me.user in message.mentions and not message.message_reference and len(message.content.split()) == 1:
-            return await message.reply(f"Prefix na tym serwerze to `{await self.bot.get_prefix(None, message)}`")
+            if message.content in (await self.bot.get_prefix(self.bot, message))[:4]:
+                return await message.reply(f"Prefix na tym serwerze to `{(await self.bot.get_prefix(self.bot, message))[-1]}`")
 
 def setup(bot):
     bot.load_cog(Events(bot))
