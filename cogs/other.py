@@ -34,9 +34,9 @@ class CustomCommands(commands.Cog):
 class Other(commands.Cog):
     name = "Inne"
 
-    def __init__(self, bot):
+    def __init__(self, bot, custom_commands_cog):
         self.bot = bot
-        self.custom_commands_cog = CustomCommands()
+        self.custom_commands_cog = custom_commands_cog
         self.builtins = {
             "Embed": lib.Embed,
             "get": lambda *args, **kwargs: self.request("GET", *args, **kwargs),
@@ -428,6 +428,5 @@ class Other(commands.Cog):
         await ctx.reply(text + " komende")
 
 def setup(bot):
-    other = Other(bot)
-    bot.load_cog(other.custom_commands_cog)
-    bot.load_cog(other)
+    bot.load_cog(custom_commands_cog := CustomCommands())
+    bot.load_cog(Other(bot, custom_commands_cog))
