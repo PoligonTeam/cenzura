@@ -136,7 +136,7 @@ class Other(commands.Cog):
         for prefix in self.custom_commands_cog.prefixes:
             if prefix is not None and message.content.startswith(prefix):
                 command_name = message.content.split(" ")[0][len(prefix):]
-                command = self.bot.get_command(command_name, guild=message.guild)
+                command = self.bot.get_command(command_name, guild_id=message.guild.id)
 
                 if not command or ("prefix" in command.other and not command.other["prefix"] == prefix):
                     return
@@ -220,7 +220,7 @@ class Other(commands.Cog):
         async def get_command_code(name):
             nonlocal return_text
 
-            command = self.bot.get_command(name, guild=ctx.guild)
+            command = self.bot.get_command(name, guild_id=ctx.guild.id)
 
             if not command or not "code" in command.other or not command.guild.id == ctx.guild.id:
                 raise lib.CommandNotFound()
@@ -239,7 +239,7 @@ class Other(commands.Cog):
         def delete_command(name):
             nonlocal return_text
 
-            command = self.bot.get_command(ctx.guild.id + "_" + name, guild=ctx.guild)
+            command = self.bot.get_command(ctx.guild.id + "_" + name, guild_id=ctx.guild.id)
 
             custom_commands.remove(command.other["code"])
             self.bot.remove_command(command)
@@ -296,10 +296,10 @@ class Other(commands.Cog):
         if command_name is None:
             return await ctx.reply("Nie ustawiono nazwy komendy")
 
-        command_object = self.bot.get_command(command_name, guild=ctx.guild)
+        command_object = self.bot.get_command(command_name, guild_id=ctx.guild.id)
 
         for alias in command_aliases:
-            _command = self.bot.get_command(alias, guild=ctx.guild)
+            _command = self.bot.get_command(alias, guild_id=ctx.guild.id)
             if _command is not None and not _command.name == ctx.guild.id + "_" + command_name:
                 return await ctx.reply("Alias `%s` jest już używany w bocie" % alias)
 
@@ -320,7 +320,7 @@ class Other(commands.Cog):
             "usage": command_usage,
             "aliases": [command_name] + command_aliases,
             "cog": self.custom_commands_cog,
-            "guild": ctx.guild,
+            "guild_id": ctx.guild.id,
             "other": {
                 "prefix": command_prefix,
                 "display_name": command_name,

@@ -29,7 +29,7 @@ class Command:
         self.enabled = kwargs.get("enabled", True)
         self.hidden = kwargs.get("hidden", False)
         self.aliases = kwargs.get("aliases", [])
-        self.guild = kwargs.get("guild", None)
+        self.guild_id = kwargs.get("guild_id", None)
         self.other = kwargs.get("other", {})
         self.callback = kwargs.get("callback")
 

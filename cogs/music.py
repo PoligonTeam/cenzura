@@ -524,7 +524,7 @@ class Music(commands.Cog):
                             if elements:
                                 source = "Musixmatch"
                                 lyrics = "\n".join([element.get_text() for element in elements])
-                    
+
                 if lyrics is None:
                     async with session.get(f"https://api.genius.com/search?q={name}&access_token={GENIUS}") as response:
                         data = await response.json()

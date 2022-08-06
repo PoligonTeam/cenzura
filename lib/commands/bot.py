@@ -87,13 +87,13 @@ class Bot(Client):
 
         return decorator
 
-    def get_command(self, command, guild = None):
+    def get_command(self, command, guild_id = None):
         commands = self.commands
 
-        if guild:
-            commands = [command for command in commands if command.guild and command.guild.id == guild.id]
+        if guild_id is not None:
+            commands = [command for command in commands if command.guild_id and command.guild_id == guild_id]
 
-        index = get_index(commands, command, key=lambda c: c.name)
+        index = get_index(commands, command, key=lambda command: command.name)
 
         if index is None:
             for command_object_index, command_object in enumerate(commands):
@@ -107,7 +107,7 @@ class Bot(Client):
 
     def remove_command(self, command: Union[Command, str]):
         if isinstance(command, str):
-            index = get_index(self.commands, command, key=lambda c: c.name)
+            index = get_index(self.commands, command, key=lambda command: command.name)
 
             if index is None:
                 raise CommandNotFound(command)
@@ -144,7 +144,7 @@ class Bot(Client):
         cog.on_load()
 
     def get_cog(self, cog):
-        index = get_index(self.cogs, cog, key=lambda c: c.name)
+        index = get_index(self.cogs, cog, key=lambda cog: cog.name)
 
         if index is None:
             return
@@ -153,7 +153,7 @@ class Bot(Client):
 
     def unload_cog(self, cog: Union[Cog, str]):
         if isinstance(cog, str):
-            index = get_index(self.cogs, cog, key=lambda c: c.__class__.__name__)
+            index = get_index(self.cogs, cog, key=lambda cog: cog.__class__.__name__)
 
             if index is None:
                 raise CogNotFound(cog)
@@ -192,7 +192,7 @@ class Bot(Client):
         self.extensions.append(extension)
 
     def get_extension(self, extension):
-        index = get_index(self.extensions, extension, key=lambda c: c.__name__)
+        index = get_index(self.extensions, extension, key=lambda command: command.__name__)
 
         if index is None:
             return
@@ -201,7 +201,7 @@ class Bot(Client):
 
     def unload_extension(self, name):
         name = importlib.util.resolve_name(name, None)
-        index = get_index(self.extensions, name, key=lambda e: e.__name__)
+        index = get_index(self.extensions, name, key=lambda extension: extension.__name__)
 
         if index is None:
             raise ExtensionNotLoaded(name)
@@ -240,8 +240,8 @@ class Bot(Client):
         command_object = self.get_command(command)
         skip_arguments = 1
 
-        if command_object and command_object.guild and not context.guild.id == command_object.guild.id:
-            command_object = self.get_command(command, guild=context.guild)
+        if command_object and command_object.guild_id and not context.guild.id == command_object.guild_id:
+            command_object = self.get_command(command, guild_id=context.guild.id)
 
         if command_object is None:
             error = CommandNotFound(f"{command} was not found")
