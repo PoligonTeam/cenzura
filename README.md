@@ -72,10 +72,13 @@ cenzurabot is a multifunctional discord bot that is very cool
 ### Built With
 
 * [Python](https://python.org/)
+* [PostgreSQL](https://www.postgresql.org/)
 * [Aiohttp](https://aiohttp.org/)
 * [Asyncpg](https://github.com/MagicStack/asyncpg)
 * [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/)
 * [Httpx](https://www.python-httpx.org/)
+* [Lavalink](https://github.com/freyacodes/Lavalink)
+* [Lavalink.py](https://github.com/Devoxin/Lavalink.py)
 * [Pillow](https://python-pillow.org/)
 * [Playwright](https://playwright.dev/python/)
 * [Psutil](https://github.com/giampaolo/psutil)

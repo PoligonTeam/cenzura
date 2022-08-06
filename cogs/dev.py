@@ -101,7 +101,7 @@ class Dev(commands.Cog):
 
             loaded.append(extension)
 
-        await ctx.reply("\n".join("\N{WHITE HEAVY CHECK MARK} `%s`" % extension_name for extension_name in loaded))
+        await ctx.reply("\n".join("\N{INBOX TRAY} `%s`" % extension_name for extension_name in loaded))
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
     @commands.is_owner
@@ -114,7 +114,7 @@ class Dev(commands.Cog):
 
             reloaded.append(extension)
 
-        await ctx.reply("\n".join("\N{WHITE HEAVY CHECK MARK} `%s`" % extension_name for extension_name in reloaded))
+        await ctx.reply("\n".join("\N{CLOCKWISE RIGHTWARDS AND LEFTWARDS OPEN CIRCLE ARROWS} `%s`" % extension_name for extension_name in reloaded))
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
     @commands.is_owner
@@ -126,7 +126,7 @@ class Dev(commands.Cog):
 
             unloaded.append(extension)
 
-        await ctx.reply("\n".join("\N{WHITE HEAVY CHECK MARK} `%s`" % extension_name for extension_name in unloaded))
+        await ctx.reply("\n".join("\N{OUTBOX TRAY} `%s`" % extension_name for extension_name in unloaded))
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="[użytkownik] (komenda) [argumenty]")
     @commands.is_owner

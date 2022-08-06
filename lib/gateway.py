@@ -22,7 +22,7 @@ from .types import Guild, User, Presence
 from . import eventhandlers
 from types import CoroutineType
 from typing import Union
-import time
+import time, copy
 
 class Heartbeat:
     def __init__(self, gateway, heartbeat_interval):
@@ -184,6 +184,8 @@ class Gateway:
                     await self.dispatch("ready")
 
         elif isinstance(event_name, str) and isinstance(data, dict):
+            copy_data = copy.deepcopy(data)
+
             if not self.dispatched_ready and event_name == "GUILD_CREATE":
                 await eventhandlers.guild_create(self, data)
 
@@ -206,6 +208,7 @@ class Gateway:
                 parsed_data = ()
 
             if self.dispatched_ready:
+                await self.dispatch("raw_" + event_name.lower(), copy_data)
                 await self.dispatch(event_name.lower(), *parsed_data)
 
     async def set_presence(self, presence: Presence):
@@ -216,6 +219,18 @@ class Gateway:
         for guild in self.guilds:
             if guild.id == guild_id:
                 return guild
+
+    def get_channel(self, channel_id):
+        for guild in self.guilds:
+            for channel in guild.channels:
+                if channel.id == channel_id:
+                    return channel
+
+    def get_guild_by_channel_id(self, channel_id):
+        for guild in self.guilds:
+            for channel in guild.channels:
+                if channel.id == channel_id:
+                    return guild
 
     async def fetch_user(self, user_id):
         return await self.http.request(Route("GET", "users", user_id))

@@ -423,3 +423,19 @@ async def message_reaction_remove_emoji(gateway, reaction):
         message = gateway.messages[index]
 
     return guild, channel, message, emoji
+
+async def voice_state_update(gateway, voice_state):
+    guild = None
+    channel = None
+    member = None
+
+    if voice_state["channel_id"] is not None:
+        guild = gateway.get_guild_by_channel_id(voice_state["channel_id"])
+        channel = guild.get_channel(voice_state["channel_id"])
+        member = await guild.get_member(voice_state["user_id"])
+        _voice_state = VoiceState.from_raw(gateway, voice_state)
+        _voice_state.guild = guild
+        _voice_state.channel = channel
+        member.voice_state = _voice_state
+
+    return guild, channel, member

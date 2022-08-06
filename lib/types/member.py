@@ -22,6 +22,7 @@ from ..permissions import Permissions
 from .user import User
 from .role import Role
 from .presence import Presence
+from .voice import VoiceState
 from datetime import datetime
 
 @modified_dataclass
@@ -41,6 +42,7 @@ class Member:
     hoisted_role: Role = None
     communication_disabled_until: datetime = None
     presence: Presence = None
+    voice_state: VoiceState = None
 
     def __str__(self):
         return "<Member user={!r} roles={!r} presence={!r}>".format(self.user, self.roles, self.presence)
@@ -67,5 +69,7 @@ class Member:
                 if role.hoist is True:
                     member["hoisted_role"] = role
                     break
+
+        member["voice_state"] = VoiceState(*[None] * 7)
 
         return cls(**member)

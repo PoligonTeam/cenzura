@@ -18,7 +18,6 @@ import lib
 from lib import commands, types, HTTPException
 from cenzurascript import run
 from utils import convert
-from typing import Union
 from models import Guilds
 
 class Admin(commands.Cog):
@@ -110,6 +109,7 @@ class Admin(commands.Cog):
             return await ctx.reply(f"Prefix jest za długi (`{len(prefix)}/5`)")
 
         await Guilds.filter(guild_id=ctx.guild.id).update(prefix=prefix)
+        ctx.guild.prefix = prefix
 
         await ctx.reply("Ustawiono prefix")
 

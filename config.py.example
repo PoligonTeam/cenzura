@@ -32,8 +32,13 @@ DB_CONFIG = {
     }
 }
 
+LAVALINK_IP = "152.70.188.50"
+LAVALINK_PORT = 6969
+LAVALINK_PASSWORD = "kochamstupki6vza"
+
 LASTFM_API_URL = "http://ws.audioscrobbler.com/2.0/"
 LASTFM_API_KEY = "dawjkldjawkldjawkljdkalwjdklaj"
 LASTFM_API_SECRET = "dawkjdklwajdkljawkdljwakdjawkd"
 
 MUSIXMATCH = "ahdjkwhdjkawhdjkwha"
+GENIUS = "lubie stupki mesika2"

@@ -18,7 +18,7 @@ import lib
 from lib import commands, types
 from tortoise import Tortoise
 from models import Guilds
-import re, os, time, config
+import re, os, time, config, logging
 
 class FakeCtx:
     def __init__(self, guild, channel, member):
@@ -70,10 +70,17 @@ class Bot(commands.Bot):
             print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - start_time:.2f}s)")
 
     async def get_prefix(self, _, message):
-        guild = await Guilds.get(guild_id=message.guild.id)
-        return guild.prefix or config.PREFIX
+        if hasattr(message.guild, "prefix"):
+            return message.guild.prefix or config.PREFIX
+
+        db_guild = await Guilds.get(guild_id=message.guild.id)
+        message.guild.prefix = db_guild.prefix
+
+        return message.guild.prefix or config.PREFIX
 
     async def create_psql_connection(self):
+        logging.getLogger("tortoise").setLevel(logging.WARNING)
+
         await Tortoise.init(config=config.DB_CONFIG, modules={"models": ["app.models"]})
         await Tortoise.generate_schemas()
 

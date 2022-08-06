@@ -22,7 +22,7 @@ from types import CoroutineType
 from httpx import AsyncClient, Timeout
 from json.decoder import JSONDecodeError
 from models import Guilds
-import re, random, datetime, config
+import re, random, datetime, copy, config
 
 class CustomCommands(commands.Cog):
     name = "Komendy serwerowe"
@@ -128,23 +128,23 @@ class Other(commands.Cog):
 
         await self.bot.paginator(ctx.reply, ctx, result, prefix=prefix_suffix, suffix=prefix_suffix)
 
-    # @commands.Listener
-    # async def on_message_create(self, message):
-    #     if message.author.bot:
-    #         return
+    @commands.Listener
+    async def on_message_create(self, message):
+        if message.author.bot:
+            return
 
-    #     for prefix in self.custom_commands_cog.prefixes:
-    #         if message.content.startswith(prefix):
-    #             command_name = message.content.split(" ")[0][len(prefix):]
-    #             command = self.bot.get_command(command_name, guild=message.guild)
+        for prefix in self.custom_commands_cog.prefixes:
+            if prefix is not None and message.content.startswith(prefix):
+                command_name = message.content.split(" ")[0][len(prefix):]
+                command = self.bot.get_command(command_name, guild=message.guild)
 
-    #             if not command:
-    #                 return
+                if not command or ("prefix" in command.other and not command.other["prefix"] == prefix):
+                    return
 
-    #             fake_message = types.Message(**message.__dict__)
-    #             fake_message.content = (await self.bot.get_prefix(self.bot, message)) + message.content[len(prefix):]
+                fake_message = copy.deepcopy(message)
+                fake_message.content = (await self.bot.get_prefix(self.bot, message)) + message.content[len(prefix):]
 
-    #             await self.bot.listeners[0](fake_message)
+                return await self.bot.process_commands(fake_message)
 
     @commands.command(description="Tworzenie komendy serwerowej", usage="(kod)", aliases=["cc", "createcommand"])
     @commands.has_permissions("manage_guild")
@@ -412,14 +412,11 @@ class Other(commands.Cog):
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
         #LIMIT DO INTOW W CS
-        #LIB.COMMANDS.EVENTHANDLERS
-        #ZROBIC ZEBY PO PREFIXIE DALO SIE ZNALESC KOMENDE W ON MESSAGE CREATE PRZY OKAZJI TO NAPRAWIC
         #NAPRAWIC LIB.EVENTHANDLERS W NIEKTORYCH MIEJSCACH
         #HTTP PROXY
         #NAPRAWIC RETURNY W IFACH
         #COS W PEWNYM RODZAJU BAZA DANYCH
         #HANDLOWANIE PRAWIE WSZYSTKICH ERROROW W PARSER.PY
-        #VOICESTATE
 
         self.custom_commands_cog.commands.append(command)
         self.bot.commands.append(command)

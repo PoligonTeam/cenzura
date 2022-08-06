@@ -15,25 +15,22 @@ limitations under the License.
 """
 
 from dataclasses import modified_dataclass
-from .guild import Guild
 from .channel import Channel
-from .member import Member
 from datetime import datetime
 
 @modified_dataclass
 class VoiceState:
-    guild: Guild
-    channel: Channel
     session_id: str
     deaf: bool
     mute: bool
     self_deaf: bool
     self_mute: bool
-    self_stream: bool
     self_video: bool
-    supress: bool
-    request_timestamp: datetime
-    member: Member = None
+    suppress: bool
+    guild = None
+    channel: Channel = None
+    self_stream: bool = None
+    request_timestamp: datetime = None
 
     __CHANGE_KEYS__ = (
         (
@@ -43,14 +40,14 @@ class VoiceState:
     )
 
     def __str__(self):
-        return "<VoiceState guild={!r} channel={!r} member={!r} deaf={!r} mute={!r} self_deaf={!r} self_mute={!r} self_stream={!r} self_video={!r} supress={!r} request_timestamp={!r}>".format(self.id, self.name, self.owner)
+        return "<VoiceState guild={!r} channel={!r} deaf={!r} mute={!r} self_deaf={!r} self_mute={!r} self_stream={!r} self_video={!r} suppress={!r} request_timestamp={!r}>".format(self.guild, self.channel, self.deaf, self.mute, self.self_deaf, self.self_mute, self.self_stream, self.self_video, self.suppress, self.request_timestamp)
 
     def __repr__(self):
-        return "<VoiceState guild={!r} channel={!r} mmeber={!r} deaf={!r} mute={!r} self_deaf={!r} self_mute={!r} self_stream={!r} self_video={!r} supress={!r} request_timestamp={!r}>".format(self.id, self.name, self.owner)
+        return "<VoiceState guild={!r} channel={!r} deaf={!r} mute={!r} self_deaf={!r} self_mute={!r} self_stream={!r} self_video={!r} suppress={!r} request_timestamp={!r}>".format(self.guild, self.channel, self.deaf, self.mute, self.self_deaf, self.self_mute, self.self_stream, self.self_video, self.suppress, self.request_timestamp)
 
     @classmethod
     def from_raw(cls, gateway, voice_state):
-        voice_state["guild"] = gateway.get_guild(voice_state["guild"])
-        voice_state["channel"] = voice_state["guild"].get_channel(voice_state["channel"])
+        if voice_state["request_timestamp"] is not None:
+            voice_state["request_timestamp"] = datetime.fromisoformat(voice_state["request_timestamp"])
 
         return cls(**voice_state)

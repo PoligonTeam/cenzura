@@ -136,7 +136,7 @@ class Presence:
         return "<Presence status={!r} client_status={!r} activities={!r}>".format(self.status, self.client_status, self.activities)
 
     def to_dict(self):
-        presence = {key: value for key, value in self.__dict__.items() if not value is None}
+        presence = {key: value for key, value in self.__dict__.items() if value is not None}
 
         for key, value in presence.items():
             if isinstance(value, Enum):
@@ -145,7 +145,7 @@ class Presence:
         activities = []
 
         for activity in presence["activities"]:
-            activity = {key: value for key, value in activity.__dict__.items() if not value is None}
+            activity = {key: value for key, value in activity.__dict__.items() if value is not None}
 
             for key, value in activity.items():
                 if isinstance(value, Enum):

@@ -664,7 +664,7 @@ class Fun(commands.Cog):
                 definition = await fetch("https://dictionary.cambridge.org/pl/dictionary/spanish-english/" + word, "div", {"class": "def"}, r"[\w,. ]+")
 
             case "urban":
-                definition = await fetch("https://www.urbandictionary.com/define.php?term=" + word, "div", {"class": "meaning mb-4"}, r".+")
+                definition = await fetch("https://www.urbandictionary.com/define.php?term=" + word, "div", {"class": "meaning"}, r".+")
 
         await ctx.reply(definition)
 

@@ -141,6 +141,8 @@ class Bot(Client):
 
         self.cogs.append(cog)
 
+        cog.on_load()
+
     def get_cog(self, cog):
         index = get_index(self.cogs, cog, key=lambda c: c.name)
 

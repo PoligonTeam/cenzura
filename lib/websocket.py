@@ -39,7 +39,8 @@ class WebSocket:
         self.inflator = zlib.decompressobj()
 
         async for message in self.ws:
-            if message.type in (aiohttp.WSMsgType.error, aiohttp.WSMsgType.closed): break
+            if message.type in (aiohttp.WSMsgType.error, aiohttp.WSMsgType.closed):
+                break
 
             if message.type is aiohttp.WSMsgType.binary:
                 self.buffer.extend(message.data)
