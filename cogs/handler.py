@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import lib
-from lib import commands
+import femcord
+from femcord import commands
 import traceback, random
 
 class ErrorHandler(commands.Cog):
     hidden = True
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: commands.Bot = bot
 
     @commands.Listener
     async def on_error(self, ctx, error):

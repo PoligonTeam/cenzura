@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import lib
-from lib import commands, types, HTTPException
-from cenzurascript import run
+import femcord
+from femcord import commands, types, HTTPException
+from femscript import run
 from utils import convert, table
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
@@ -25,11 +25,9 @@ from config import GENIUS, LAVALINK_IP, LAVALINK_PORT, LAVALINK_PASSWORD, LASTFM
 import hashlib, datetime, asyncio, lavalink, re, os, logging
 
 youtube_pattern = re.compile(
-    (
-        r'(https?://)?(www\.)?'
-        '(youtube|youtu|youtube-nocookie)\.(com|be)/'
-        '(watch\?v=|embed/|v/|.+\?v=)?([^&=%\?]{11})'
-    )
+    "(https?://)?(www\.)?"
+    "(youtube|youtu|youtube-nocookie)\.(com|be)/"
+    "(watch\?v=|embed/|v/|.+\?v=)?([^&=%\?]{11})"
 )
 
 soundcloud_pattern = re.compile(
@@ -53,7 +51,7 @@ class Music(commands.Cog):
             self.client.add_node(LAVALINK_IP, LAVALINK_PORT, LAVALINK_PASSWORD, "eu", None, 10, "default_node", -1)
 
     def connect(self, guild, channel, *, mute = False, deaf = False):
-        return self.bot.gateway.ws.send(lib.enums.Opcodes.VOICE_STATE_UPDATE, {
+        return self.bot.gateway.ws.send(femcord.enums.Opcodes.VOICE_STATE_UPDATE, {
             "guild_id": guild.id,
             "channel_id": channel.id if channel else None,
             "self_mute": mute,
@@ -291,7 +289,7 @@ class Music(commands.Cog):
 
             return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
 
-        async with lib.Typing(ctx.message):
+        async with femcord.Typing(ctx.message):
             async with ClientSession() as session:
                 async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&user={lastfm.username}&limit=2&extended=1&api_key={LASTFM_API_KEY}&format=json") as response:
                     if not response.status == 200:
@@ -362,7 +360,7 @@ class Music(commands.Cog):
                     result = await run(
                         lastfm.script,
                         builtins = {
-                            "Embed": lib.Embed,
+                            "Embed": femcord.Embed,
                             "table": table
                         },
                         variables = {
@@ -373,7 +371,7 @@ class Music(commands.Cog):
                         }
                     )
 
-                    if isinstance(result, lib.Embed):
+                    if isinstance(result, femcord.Embed):
                         return await ctx.reply(embed=result)
 
                     await ctx.reply(result)
@@ -398,7 +396,7 @@ class Music(commands.Cog):
         await query.update(script=script)
         await ctx.reply("Skrypt został ustawiony")
 
-    @commands.command(description="Wybieranie szablonu dla komendy lastfm", usage="(szablon)", aliases=["fmmode"], other={"embed": lib.Embed(description="\nSzablony: `embedfull`, `embedmini`, `textfull`, `textmini`")})
+    @commands.command(description="Wybieranie szablonu dla komendy lastfm", usage="(szablon)", aliases=["fmmode"], other={"embed": femcord.Embed(description="\nSzablony: `embedfull`, `embedmini`, `textfull`, `textmini`")})
     async def fmtemplate(self, ctx, template):
         if not template in self.templates:
             return await ctx.reply("Nie ma takiego szablonu")
@@ -417,7 +415,7 @@ class Music(commands.Cog):
 
         lastfm_user = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == ctx.author.id][0]
 
-        async with lib.Typing(ctx.message):
+        async with femcord.Typing(ctx.message):
             async with ClientSession() as session:
                 async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&username={lastfm_user.username}&limit=1&extended=1&api_key={LASTFM_API_KEY}&format=json") as response:
                     data = await response.json()
@@ -459,13 +457,13 @@ class Music(commands.Cog):
 
                         description += f"{index} [{member.user.username}](https://www.last.fm/user/{lastfm_user.username}) - **{scrobbles}** odtworzeń\n"
 
-                    embed = lib.Embed(title="Użytkownicy którzy znają " + artist_name + ":", url=artist_url, description=description, color=self.bot.embed_color)
+                    embed = femcord.Embed(title="Użytkownicy którzy znają " + artist_name + ":", url=artist_url, description=description, color=self.bot.embed_color)
 
                     await ctx.reply(embed=embed)
 
     @commands.command(description="Pokazuje tekst piosenki", usage="[nazwa]")
     async def lyrics(self, ctx, *, name = None):
-        async with lib.Typing(ctx.message):
+        async with femcord.Typing(ctx.message):
             async with ClientSession() as session:
                 if name == r"%radio":
                     async with session.get("https://radio.poligon.lgbt/api/live/nowplaying/station_1") as response:
@@ -476,7 +474,7 @@ class Music(commands.Cog):
 
                 if name is None:
                     activities = ctx.member.presence.activities
-                    index = lib.utils.get_index(activities, "Spotify", key=lambda activity: activity.name)
+                    index = femcord.utils.get_index(activities, "Spotify", key=lambda activity: activity.name)
 
                     if index is not None:
                         activity = activities[index]
@@ -553,7 +551,7 @@ class Music(commands.Cog):
 
                 lyrics = f"# SOURCE: {source}\n" \
                          f"# ARTIST NAME: {artist_name}\n" \
-                         f"# TRACK NAME: {track_name}\n" \
+                         f"# TRACK NAME: {track_name}\n\n" \
                        + lyrics
 
         await self.bot.paginator(ctx.reply, ctx, lyrics, prefix="```md\n", suffix="```", buttons=True)

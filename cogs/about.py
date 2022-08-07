@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import lib
-from lib import commands
+import femcord
+from femcord import commands
 import psutil
 from datetime import datetime
 
@@ -23,7 +23,7 @@ class About(commands.Cog):
     name = "O bocie"
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: commands.Bot = bot
         self.process = psutil.Process()
 
     def get_ping_text(self):
@@ -52,7 +52,7 @@ class About(commands.Cog):
                       self.get_ping_text() + "\n\n" \
                       f"Uptime: `{diff.days} dni, {diff.days * 24 + diff.seconds // 3600} godzin, {(diff.seconds % 3600) // 60} minut, {diff.seconds % 60} sekund`\n\n"
 
-        await ctx.reply(embed=lib.Embed(title="Statystyki bota:", description=description, color=self.bot.embed_color))
+        await ctx.reply(embed=femcord.Embed(title="Statystyki bota:", description=description, color=self.bot.embed_color))
 
 def setup(bot):
     bot.load_cog(About(bot))

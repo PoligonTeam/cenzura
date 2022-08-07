@@ -243,6 +243,10 @@ class Bot(Client):
         if command_object and command_object.guild_id and not context.guild.id == command_object.guild_id:
             command_object = self.get_command(command, guild_id=context.guild.id)
 
+        while command_object and arguments and command_object.type is CommandTypes.GROUP:
+            command_object = command_object.get_subcommand(arguments[0])
+            arguments = arguments[1:]
+
         if command_object is None:
             error = CommandNotFound(f"{command} was not found")
             context.arguments = arguments
@@ -251,10 +255,6 @@ class Bot(Client):
                 raise error
 
             return await self.gateway.dispatch("error", context, error)
-
-        while command_object and arguments and command_object.type is CommandTypes.GROUP:
-            command_object = command_object.get_subcommand(arguments[0])
-            arguments = arguments[1:]
 
         if command_object.cog is not None:
             skip_arguments += 1

@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import lib
-from lib import commands
-from lib.types import Emoji
+import femcord
+from femcord import commands
+from femcord.types import Emoji
 from korrumzthegame import Renderer
 from typing import Union
 import random
@@ -25,7 +25,7 @@ class Games(commands.Cog):
     name = "Gry"
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: commands.Bot = bot
         self.interactions = []
         self.sessions = {}
 

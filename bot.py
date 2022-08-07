@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import lib
-from lib import commands, types
+import femcord
+from femcord import commands, types
 from tortoise import Tortoise
 from models import Guilds
 import re, os, time, config, logging
@@ -35,7 +35,7 @@ class FakeCtx:
 
 class Bot(commands.Bot):
     def __init__(self, *, start_time: float):
-        super().__init__(command_prefix=self.get_prefix, intents=lib.Intents.all(), owners=config.OWNERS)
+        super().__init__(command_prefix=self.get_prefix, intents=femcord.Intents.all(), owners=config.OWNERS)
 
         self.embed_color = 0xb22487
         self.user_agent = "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.3) AppleWebkit/538.1 (KHTML, like Gecko) SamsungBrowser/1.0 TV Safari/538.1"
@@ -65,7 +65,7 @@ class Bot(commands.Bot):
 
                     await customcommand_command(fake_ctx, code=custom_command)
 
-            await self.gateway.set_presence(lib.Presence(lib.StatusTypes.DND, activities=[lib.Activity(name="\u200b", type=lib.ActivityTypes.WATCHING)]))
+            await self.gateway.set_presence(femcord.Presence(femcord.StatusTypes.DND, activities=[femcord.Activity(name="\u200b", type=femcord.ActivityTypes.WATCHING)]))
 
             print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - start_time:.2f}s)")
 
@@ -76,7 +76,7 @@ class Bot(commands.Bot):
         if hasattr(message.guild, "prefix"):
             return prefixes + [message.guild.prefix or config.PREFIX]
 
-        db_guild = await Guilds.get(guild_id=message.guild.id)
+        db_guild = await Guilds.filter(guild_id=message.guild.id).first()
         message.guild.prefix = db_guild.prefix
 
         return prefixes + [message.guild.prefix or config.PREFIX]
@@ -121,13 +121,13 @@ class Bot(commands.Bot):
             page = pages.index(pages[page])
 
         def get_components(disabled: bool = False):
-            return lib.Components(
-                lib.Row(
-                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
-                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="previous", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING TRIANGLE}")),
-                    lib.Button(f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=lib.ButtonStyles.DANGER),
-                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="next", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING TRIANGLE}")),
-                    lib.Button(style=lib.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
+            return femcord.Components(
+                femcord.Row(
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="previous", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING TRIANGLE}")),
+                    femcord.Button(f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=femcord.ButtonStyles.DANGER),
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="next", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING TRIANGLE}")),
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
                 )
             )
 
@@ -154,7 +154,7 @@ class Bot(commands.Bot):
                 canceled = True
                 return await message.delete()
 
-            await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, pages[page], components=get_components(disabled=canceled), **kwargs)
+            await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, pages[page], components=get_components(disabled=canceled), **kwargs)
 
             if not canceled:
                 await self.wait_for("interaction_create", change_page, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=timeout, on_timeout=on_timeout)

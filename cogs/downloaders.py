@@ -1,5 +1,21 @@
-import lib
-from lib import commands
+"""
+Copyright 2022 PoligonTeam
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
+
+import femcord
+from femcord import commands
 from yt_dlp import YoutubeDL
 import re
 
@@ -9,7 +25,7 @@ class Downloaders(commands.Cog):
     name = "Downloadery"
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: commands.Bot = bot
 
     @commands.command()
     async def tiktok(self, ctx, *, url):
@@ -19,7 +35,7 @@ class Downloaders(commands.Cog):
         with YoutubeDL({"quiet": True}) as ydl:
             info = ydl.extract_info(url, download=False)
 
-            embed = lib.Embed(title="TikTok")
+            embed = femcord.Embed(title="TikTok")
             embed.add_field(name="Tytuł", value=f"[{info['title']}]({info['webpage_url']})", inline=True)
             embed.add_field(name="Nazwa twórcy", value=f"[{info['uploader']}]({info['uploader_url']})", inline=True)
             embed.add_field(name="\u200b", value="\u200b", inline=True)

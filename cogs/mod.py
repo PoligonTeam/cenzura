@@ -14,17 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import lib
-from lib import commands, types, HTTPException
-from cenzurascript import run
-from utils import convert
+import femcord
+from femcord import commands, types, HTTPException
 from models import Guilds
+import datetime, re
 
 class Admin(commands.Cog):
     name = "Moderacyjne"
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: commands.Bot = bot
 
     @commands.command(description="Wyrzuca użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("kick_members")
@@ -116,7 +115,64 @@ class Admin(commands.Cog):
     @set.command(description="Ustawia wiadomość powitalną", usage="(kod)", aliases=["welcome", "welcomemsg"])
     @commands.has_permissions("manage_guild")
     async def welcomemessage(self, ctx, *, code):
-        pass
+        query = Guilds.filter(guild_id=ctx.guild.id)
+        guild_db = await query.first()
+
+        if code == "get_code()":
+            return await self.bot.paginator(ctx.reply, ctx, guild_db.welcome_message, prefix="```py\n", suffix="```")
+        elif code == "emit()":
+            events = self.bot.get_cog("Events")
+            return await events.on_guild_member_add(ctx.guild, ctx.member)
+
+        if (match := re.match(r"(<#)?(\d+)>? ([\s\S]+)", code)) is not None:
+            channel_id = match.group(2)
+            message = match.group(3)
+
+            code = f"set_channel(\"{channel_id}\")\n\n" \
+                   f"message = \"{message}\"\n\n" \
+                    "return str.format(message, guild: guild, user: user)"
+
+        code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
+               f"# GUILD: {ctx.guild.id}\n" \
+               f"# CHANNEL: {ctx.channel.id}\n" \
+               f"# AUTHOR: {ctx.author.id}\n\n" \
+             + code
+
+        await query.update(welcome_message=code)
+        ctx.guild.welcome_message = code
+
+        await ctx.reply("Ustawiono wiadomość powitalną")
+
+    @set.command(description="Ustawia wiadomość pożegnalną", usage="(kod)", aliases=["leave", "leavemsg"])
+    @commands.has_permissions("manage_guild")
+    async def leavemessage(self, ctx, *, code):
+        query = Guilds.filter(guild_id=ctx.guild.id)
+        guild_db = await query.first()
+
+        if code == "get_code()":
+            return await self.bot.paginator(ctx.reply, ctx, guild_db.leave_message, prefix="```py\n", suffix="```")
+        elif code == "emit()":
+            events = self.bot.get_cog("Events")
+            return await events.on_guild_member_remove(ctx.guild, ctx.author)
+
+        if (match := re.match(r"(<#)?(\d+)>? ([\s\S]+)", code)) is not None:
+            channel_id = match.group(2)
+            message = match.group(3)
+
+            code = f"set_channel(\"{channel_id}\")\n\n" \
+                   f"message = \"{message}\"\n\n" \
+                    "return str.format(message, guild: guild, user: user)"
+
+        code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
+               f"# GUILD: {ctx.guild.id}\n" \
+               f"# CHANNEL: {ctx.channel.id}\n" \
+               f"# AUTHOR: {ctx.author.id}\n\n" \
+             + code
+
+        await query.update(leave_message=code)
+        ctx.guild.leave_message = code
+
+        await ctx.reply("Ustawiono wiadomość pożegnalną")
 
 def setup(bot):
     bot.load_cog(Admin(bot))

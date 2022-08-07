@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import lib
-from lib import commands, types
-from cenzurascript import Lexer, Parser, run
-from utils import convert, table
+import femcord
+from femcord import commands, types
+from femscript import Lexer, Parser, run
+from utils import *
 from types import CoroutineType
-from httpx import AsyncClient, Timeout
-from json.decoder import JSONDecodeError
 from models import Guilds
-import re, random, datetime, copy, config
+import re, datetime, copy
 
 class CustomCommands(commands.Cog):
     name = "Komendy serwerowe"
@@ -35,66 +33,15 @@ class Other(commands.Cog):
     name = "Inne"
 
     def __init__(self, bot, custom_commands_cog):
-        self.bot = bot
+        self.bot: commands.Bot = bot
         self.custom_commands_cog = custom_commands_cog
-        self.builtins = {
-            "Embed": lib.Embed,
-            "get": lambda *args, **kwargs: self.request("GET", *args, **kwargs),
-            "post": lambda *args, **kwargs: self.request("POST", *args, **kwargs),
-            "patch": lambda *args, **kwargs: self.request("PATCH", *args, **kwargs),
-            "put": lambda *args, **kwargs: self.request("PUT", *args, **kwargs),
-            "delete": lambda *args, **kwargs: self.request("DELETE", *args, **kwargs),
-            "execute_webhook": self.execute_webhook,
-            "table": table
-        }
-        self.void = lambda *args, **kwargs: False
-
-    async def request(self, method, url, *, headers = None, data = None, proxy = None):
-        proxy_address = random.choice(list(config.PROXIES.values()))
-
-        if proxy and proxy in config.PROXIES:
-            proxy_address = config.PROXIES[proxy]
-
-        proxy = config.PROXY_TEMPLATE.format(proxy_address)
-
-        proxies = {
-            "https://": proxy,
-            "http://": proxy
-        }
-
-        async with AsyncClient(proxies=proxies, timeout=Timeout(60)) as session:
-            response = await session.request(method, url, headers=headers, json=data)
-
-            try:
-                json = response.json()
-            except JSONDecodeError:
-                json = {}
-
-            return {
-                "text": response.text,
-                "json": json
-            }
-
-    async def execute_webhook(self, webhook_id, webhook_token, *, username = None, avatar_url = None, content = None, embed: lib.Embed = None):
-        data = {}
-
-        if username:
-            data["username"] = username
-        if avatar_url:
-            data["avatar_url"] = avatar_url
-        if content:
-            data["content"] = content
-        if embed:
-            data["embeds"] = [embed.__dict__]
-
-        await self.request("POST", lib.http.URL + "/webhooks/" + webhook_id + "/" + webhook_token, data=data)
 
     @commands.command(description="pisaju skrypt", usage="(kod)", aliases=["cs", "cscript"])
     async def cenzurascript(self, ctx, *, code):
         result = await run(
             code,
             builtins = {
-                **self.builtins,
+                **builtins,
                 **(
                     {
                         "send": ctx.send,
@@ -113,10 +60,10 @@ class Other(commands.Cog):
             )
         )
 
-        if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], lib.Embed):
+        if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], femcord.Embed):
             return await ctx.reply(result[0], embed=result[1])
 
-        if isinstance(result, lib.Embed):
+        if isinstance(result, femcord.Embed):
             return await ctx.reply(embed=result)
 
         result = str(result)
@@ -223,7 +170,7 @@ class Other(commands.Cog):
             command = self.bot.get_command(name, guild_id=ctx.guild.id)
 
             if not command or not "code" in command.other or not command.guild.id == ctx.guild.id:
-                raise lib.CommandNotFound()
+                raise femcord.CommandNotFound()
 
             await self.bot.paginator(ctx.reply, ctx, re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]), prefix="```py\n", suffix="```")
 
@@ -250,24 +197,22 @@ class Other(commands.Cog):
         parser = Parser(
             lexer,
             builtins = {
-                **self.builtins,
-                **{
-                    "set_command_name": set_command_name,
-                    "set_command_description": set_command_description,
-                    "set_command_usage": set_command_usage,
-                    "set_command_aliases": set_command_aliases,
-                    "set_command_arguments": set_command_arguments,
-                    "get_command_code": get_command_code,
-                    "get_commands": get_commands,
-                    "delete_command": delete_command,
-                    "get": lambda *args, **kwargs: {"text": "", "json": {}},
-                    "post": lambda *args, **kwargs: {"text": "", "json": {}},
-                    "patch": lambda *args, **kwargs: {"text": "", "json": {}},
-                    "put": lambda *args, **kwargs: {"text": "", "json": {}},
-                    "delete": lambda *args, **kwargs: {"text": "", "json": {}},
-                    "execute_webhook": self.void,
-                    "hide": lambda item: item
-                }
+                **builtins,
+                "set_command_name": set_command_name,
+                "set_command_description": set_command_description,
+                "set_command_usage": set_command_usage,
+                "set_command_aliases": set_command_aliases,
+                "set_command_arguments": set_command_arguments,
+                "get_command_code": get_command_code,
+                "get_commands": get_commands,
+                "delete_command": delete_command,
+                "get": lambda *args, **kwargs: {"text": "", "json": {}},
+                "post": lambda *args, **kwargs: {"text": "", "json": {}},
+                "patch": lambda *args, **kwargs: {"text": "", "json": {}},
+                "put": lambda *args, **kwargs: {"text": "", "json": {}},
+                "delete": lambda *args, **kwargs: {"text": "", "json": {}},
+                "execute_webhook": void,
+                "hide": lambda item: item
             },
             variables = {
                 **convert(
@@ -275,13 +220,11 @@ class Other(commands.Cog):
                     channel = ctx.channel,
                     author = ctx.author
                 ),
-                **{
-                    "str": "str",
-                    "int": "int",
-                    "Channel": "channel",
-                    "Role": "role",
-                    "User": "user"
-                }
+                "str": "str",
+                "int": "int",
+                "Channel": "channel",
+                "Role": "role",
+                "User": "user"
             }
         )
         await parser.parse()
@@ -329,7 +272,7 @@ class Other(commands.Cog):
         }
 
         async def command_function(ctx, args = None):
-            async with lib.Typing(ctx.message):
+            async with femcord.Typing(ctx.message):
                 if args is not None:
                     args = args[0]
                     values = list(command_arguments.values())
@@ -360,18 +303,16 @@ class Other(commands.Cog):
                 result = await run(
                     code,
                     builtins = {
-                        **self.builtins,
-                        **{
-                            "set_command_name": self.void,
-                            "set_command_description": self.void,
-                            "set_command_usage": self.void,
-                            "set_command_aliases": self.void,
-                            "set_command_arguments": self.void,
-                            "get_command_code": self.void,
-                            "get_commands": self.void,
-                            "delete_command": self.void,
-                            "hide": lambda item: item
-                        }
+                        **builtins,
+                        "set_command_name": void,
+                        "set_command_description": void,
+                        "set_command_usage": void,
+                        "set_command_aliases": void,
+                        "set_command_arguments": void,
+                        "get_command_code": void,
+                        "get_commands": void,
+                        "delete_command": void,
+                        "hide": lambda item: item
                     },
                     variables = {
                         **convert(
@@ -379,23 +320,21 @@ class Other(commands.Cog):
                             channel = ctx.channel,
                             author = ctx.author
                         ),
-                        **{
-                            "str": "str",
-                            "int": "int",
-                            "Channel": "channel",
-                            "Role": "role",
-                            "User": "user"
-                        },
+                        "str": "str",
+                        "int": "int",
+                        "Channel": "channel",
+                        "Role": "role",
+                        "User": "user",
                         **(
                             args if args is not None else {}
                         )
                     }
                 )
 
-                if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], lib.Embed):
+                if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], femcord.Embed):
                     return await ctx.reply(result[0], embed=result[1])
 
-                if isinstance(result, lib.Embed):
+                if isinstance(result, femcord.Embed):
                     return await ctx.reply(embed=result)
 
             await self.bot.paginator(ctx.reply, ctx, result, replace=False)

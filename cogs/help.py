@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import lib
-from lib import commands
-from lib.permissions import Permissions
+import femcord
+from femcord import commands
+from femcord.permissions import Permissions
 
 permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles")
 
@@ -29,11 +29,11 @@ class Help(commands.Cog):
     hidden = True
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: commands.Bot = bot
         self.interactions = []
 
     def get_help_embed(self, command):
-        embed = lib.Embed(title="Pomoc:", color=self.bot.embed_color)
+        embed = femcord.Embed(title="Pomoc:", color=self.bot.embed_color)
         embed.add_field(name=command.other.get("display_name", False) or command.name + ":", value="> " + ", ".join("`" + (subcommand.other.get("display_name", False) or subcommand.name) + "`" for subcommand in command.subcommands if not (subcommand.hidden and subcommand.enabled)))
         embed.add_field(name="\u200b", value=f"\[ [Dodaj bota]({BOTINVITE}) \] "
                                              f"\[ [Support]({SUPPORT}) \] "
@@ -45,7 +45,7 @@ class Help(commands.Cog):
     @commands.Listener
     async def on_interaction_create(self, interaction):
         if ("help", interaction.member.user.id, interaction.channel.id, interaction.message.id) in self.interactions:
-            embed = lib.Embed(title="Pomoc:", color=self.bot.embed_color)
+            embed = femcord.Embed(title="Pomoc:", color=self.bot.embed_color)
 
             if interaction.data.custom_id == "cog":
                 selected_command = None
@@ -90,24 +90,24 @@ class Help(commands.Cog):
                 if "embed" in selected_command.other:
                     embed += selected_command.other["embed"]
 
-            components = lib.Components(
-                lib.Row(
-                    lib.SelectMenu(
+            components = femcord.Components(
+                femcord.Row(
+                    femcord.SelectMenu(
                         custom_id = "cog",
                         placeholder = "",
-                        options = [lib.Option(cog.name, cog.name, default=True if selected_cog == cog else False) for cog in self.bot.cogs if cog.commands and not cog.hidden]
+                        options = [femcord.Option(cog.name, cog.name, default=True if selected_cog == cog else False) for cog in self.bot.cogs if cog.commands and not cog.hidden]
                     )
                 ),
-                lib.Row(
-                    lib.SelectMenu(
+                femcord.Row(
+                    femcord.SelectMenu(
                         custom_id = "command",
                         placeholder = "Wybierz komende",
-                        options = [lib.Option(command.other.get("display_name", False) or command.name, command.name, default=True if selected_command == command else False) for command in selected_cog.commands if not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)]
+                        options = [femcord.Option(command.other.get("display_name", False) or command.name, command.name, default=True if selected_command == command else False) for command in selected_cog.commands if not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)]
                     )
                 )
             )
 
-            await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=components)
+            await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=components)
 
     @commands.command(description="Pokazuje pomoc", usage="[komenda]", aliases=["pomoc", "hlep", "hepl"])
     async def help(self, ctx, *, command = None):
@@ -144,7 +144,7 @@ class Help(commands.Cog):
             if command.aliases != []:
                 description += "Aliasy: %s" % ", ".join("`" + alias + "`" for alias in command.aliases)
 
-            embed = lib.Embed(title="Pomoc:", description=description, color=self.bot.embed_color)
+            embed = femcord.Embed(title="Pomoc:", description=description, color=self.bot.embed_color)
             embed.set_footer(text="() - obowiązkowe, [] - opcjonalne")
 
             if "embed" in command.other:
@@ -152,12 +152,12 @@ class Help(commands.Cog):
 
             return await ctx.send(embed=embed)
 
-        components = lib.Components(
-            lib.Row(
-                lib.SelectMenu(
+        components = femcord.Components(
+            femcord.Row(
+                femcord.SelectMenu(
                     custom_id = "cog",
                     placeholder = "Wybierz moduł",
-                    options = [lib.Option(cog.name, cog.name) for cog in self.bot.cogs if cog.commands and not cog.hidden]
+                    options = [femcord.Option(cog.name, cog.name) for cog in self.bot.cogs if cog.commands and not cog.hidden]
                 )
             )
         )
@@ -165,18 +165,18 @@ class Help(commands.Cog):
         selected_cog = self.bot.get_cog(components.components[0]["components"][0]["options"][0]["value"])
 
         components.add_row(
-            lib.Row(
-                lib.SelectMenu(
+            femcord.Row(
+                femcord.SelectMenu(
                     custom_id = "command",
                     placeholder = "Wybierz komende",
-                    options = [lib.Option(command.other.get("display_name", False) or command.name, command.name) for command in selected_cog.commands if not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)]
+                    options = [femcord.Option(command.other.get("display_name", False) or command.name, command.name) for command in selected_cog.commands if not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)]
                 )
             )
         )
 
         components.components[0]["components"][0]["options"][0]["default"] = True
 
-        embed = lib.Embed(title="Pomoc:", color=self.bot.embed_color)
+        embed = femcord.Embed(title="Pomoc:", color=self.bot.embed_color)
         embed.add_field(name=selected_cog.name + ":", value="> " + ", ".join("`" + (command.other.get("display_name", False) or command.name) + "`" for command in selected_cog.commands if not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)))
         embed.add_field(name="\u200b", value=f"\[ [Dodaj bota]({BOTINVITE}) \] "
                                              f"\[ [Support]({SUPPORT}) \] "

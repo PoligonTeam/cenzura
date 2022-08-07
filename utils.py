@@ -14,8 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from lib import types
-from cenzurascript import Dict
+import femcord
+from femcord import types
+from femscript import Dict
+from httpx import AsyncClient, Timeout
+from json.decoder import JSONDecodeError
+import random, config
 
 CHARS = (("\u200b", ("0", "1", "2", "3")), ("\u200c", ("4", "5", "6", "7")), ("\u200d", ("8", "9", "A", "B")), ("\u200e", ("C", "D", "E", "F")))
 SEPARATOR = "\u200f"
@@ -121,3 +125,57 @@ def table(names, rows):
     text += "+" + ("-" * (spaces + 1) + "+") * len(names) + "\n"
 
     return text
+
+async def request(method, url, *, headers = None, data = None, proxy = None):
+    proxy_address = random.choice(list(config.PROXIES.values()))
+
+    if proxy and proxy in config.PROXIES:
+        proxy_address = config.PROXIES[proxy]
+
+    proxy = config.PROXY_TEMPLATE.format(proxy_address)
+
+    proxies = {
+        "https://": proxy,
+        "http://": proxy
+    }
+
+    async with AsyncClient(proxies=proxies, timeout=Timeout(60)) as session:
+        response = await session.request(method, url, headers=headers, json=data)
+
+        try:
+            json = response.json()
+        except JSONDecodeError:
+            json = {}
+
+        return {
+            "text": response.text,
+            "json": json
+        }
+
+async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_url = None, content = None, embed: femcord.Embed = None):
+    data = {}
+
+    if username:
+        data["username"] = username
+    if avatar_url:
+        data["avatar_url"] = avatar_url
+    if content:
+        data["content"] = content
+    if embed:
+        data["embeds"] = [embed.__dict__]
+
+    await self.request("POST", femcord.http.URL + "/webhooks/" + webhook_id + "/" + webhook_token, data=data)
+
+def void(*args, **kwargs):
+    return False
+
+builtins = {
+    "Embed": femcord.Embed,
+    "get": lambda *args, **kwargs: request("GET", *args, **kwargs),
+    "post": lambda *args, **kwargs: request("POST", *args, **kwargs),
+    "patch": lambda *args, **kwargs: request("PATCH", *args, **kwargs),
+    "put": lambda *args, **kwargs: request("PUT", *args, **kwargs),
+    "delete": lambda *args, **kwargs: request("DELETE", *args, **kwargs),
+    "execute_webhook": execute_webhook,
+    "table": table
+}

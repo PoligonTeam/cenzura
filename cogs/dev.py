@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import lib
-from lib import commands, types
-from lib.permissions import Permissions
+import femcord
+from femcord import commands, types
+from femcord.permissions import Permissions
 from typing import Union
 import ast, inspect, copy, datetime
 
@@ -24,7 +24,7 @@ class Dev(commands.Cog):
     hidden = True
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: commands.Bot = bot
 
     def insert_returns(self, body):
         if isinstance(body[-1], ast.Expr):
@@ -55,13 +55,13 @@ class Dev(commands.Cog):
     @commands.is_owner
     async def eval(self, ctx, *, code):
         result = await self._eval(code, {
-            "lib": lib,
+            "femcord": femcord,
             "ctx": ctx,
             "bot": self.bot,
             "src": inspect.getsource
         })
 
-        if isinstance(result, lib.Embed):
+        if isinstance(result, femcord.Embed):
             return await ctx.reply(embed=result)
 
         result = str(result)
