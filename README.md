@@ -1,5 +1,11 @@
 <div id="top"></div>
 
+<div align="center">
+
+[![forthebadge](https://cdn.poligon.lgbt/whRxrFJaBx.svg)](https://forthebadge.com)
+[![forthebadge](https://forthebadge.com/images/badges/it-works-why.svg)](https://forthebadge.com)
+[![forthebadge](https://forthebadge.com/images/badges/fuck-it-ship-it.svg)](https://forthebadge.com)
+[![forthebadge](https://forthebadge.com/images/badges/open-source.svg)](https://forthebadge.com)
 
 [![Codefactor][codefactor-shield]][codefactor-url]
 [![Contributors][contributors-shield]][contributors-url]
@@ -7,6 +13,8 @@
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![Apache-2.0 License][license-shield]][license-url]
+
+</div>
 
 <!-- PROJECT LOGO -->
 <br />
