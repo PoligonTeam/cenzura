@@ -37,7 +37,7 @@ class Other(commands.Cog):
         self.custom_commands_cog = custom_commands_cog
 
     @commands.command(description="pisaju skrypt", usage="(kod)", aliases=["cs", "cscript"])
-    async def cenzurascript(self, ctx, *, code):
+    async def cenzurascript(self, ctx: commands.Context, *, code):
         result = await run(
             code,
             builtins = {
@@ -95,7 +95,7 @@ class Other(commands.Cog):
 
     @commands.command(description="Tworzenie komendy serwerowej", usage="(kod)", aliases=["cc", "createcommand"])
     @commands.has_permissions("manage_guild")
-    async def customcommand(self, ctx, *, code):
+    async def customcommand(self, ctx: commands.Context, *, code):
         guild = Guilds.get(guild_id=ctx.guild.id)
         custom_commands = (await guild).custom_commands
 

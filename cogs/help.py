@@ -110,7 +110,7 @@ class Help(commands.Cog):
             await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=components)
 
     @commands.command(description="Pokazuje pomoc", usage="[komenda]", aliases=["pomoc", "hlep", "hepl"])
-    async def help(self, ctx, *, command = None):
+    async def help(self, ctx: commands.Context, *, command = None):
         if command is not None:
             command = command.split(" ")
             command_object = self.bot.get_command(command[0])

@@ -17,6 +17,7 @@ limitations under the License.
 import femcord
 from femcord import commands, types, HTTPException
 from models import Guilds
+from typing import Union
 import datetime, re
 
 class Admin(commands.Cog):
@@ -27,7 +28,7 @@ class Admin(commands.Cog):
 
     @commands.command(description="Wyrzuca użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("kick_members")
-    async def kick(self, ctx, member: types.Member, *, reason = "nie podano powodu"):
+    async def kick(self, ctx: commands.Context, member: types.Member, *, reason = "nie podano powodu"):
         if ctx.member.roles[-1].position <= member.roles[-1].position:
             return await ctx.reply("Nie możesz wyrzucić użytkownika równego lub wyższego od ciebie")
 
@@ -45,7 +46,7 @@ class Admin(commands.Cog):
 
     @commands.command(description="Banuje użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("ban_members")
-    async def ban(self, ctx, member: types.Member, *, reason = "nie podano powodu"):
+    async def ban(self, ctx: commands.Context, member: types.Member, *, reason = "nie podano powodu"):
         if ctx.member.roles[-1].position <= member.roles[-1].position:
             return await ctx.reply("Nie możesz zbanować użytkownika równego lub wyższego od ciebie")
 
@@ -63,7 +64,7 @@ class Admin(commands.Cog):
 
     @commands.command(description="Odbanowuje użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("ban_members")
-    async def unban(self, ctx, user: types.User, *, reason = "nie podano powodu"):
+    async def unban(self, ctx: commands.Context, user: types.User, *, reason = "nie podano powodu"):
         if not ctx.guild.me.permissions.has("ban_members"):
             return await ctx.reply("Bot nie ma uprawnień (`ban_members`)")
 
@@ -78,7 +79,7 @@ class Admin(commands.Cog):
 
     @commands.command(description="Usuwa wiadomości na kanale", usage="(limit) [użytkownik]", aliases=["purge"])
     @commands.has_permissions("manage_messages")
-    async def clear(self, ctx, limit: int, user: types.User = None):
+    async def clear(self, ctx: commands.Context, limit: int, user: types.User = None):
         if not ctx.guild.me.permissions.has("manage_messages"):
             return await ctx.reply("Bot nie ma uprawnień (`manage_messages`)")
 
@@ -95,7 +96,7 @@ class Admin(commands.Cog):
         await ctx.reply(f"Usunięto `{limit}` wiadomości")
 
     @commands.group(description="Pomoc komendy set", aliases=["ustaw"])
-    async def set(self, ctx):
+    async def set(self, ctx: commands.Context):
         cog = self.bot.get_cog("Help")
         embed = cog.get_help_embed(ctx.command)
 
@@ -103,7 +104,7 @@ class Admin(commands.Cog):
 
     @set.command(description="Ustawia prefix", usage="(prefix)")
     @commands.has_permissions("manage_guild")
-    async def prefix(self, ctx, prefix):
+    async def prefix(self, ctx: commands.Context, prefix):
         if len(prefix) > 5:
             return await ctx.reply(f"Prefix jest za długi (`{len(prefix)}/5`)")
 
@@ -112,11 +113,17 @@ class Admin(commands.Cog):
 
         await ctx.reply("Ustawiono prefix")
 
-    @set.command(description="Ustawia wiadomość powitalną", usage="(kod)", aliases=["welcome", "welcomemsg"])
+    @set.command(description="Ustawia wiadomość powitalną", usage="[kod]", aliases=["welcome", "welcomemsg"])
     @commands.has_permissions("manage_guild")
-    async def welcomemessage(self, ctx, *, code):
+    async def welcomemessage(self, ctx: commands.Context, *, code = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
         guild_db = await query.first()
+
+        if code is None:
+            await query.update(welcome_message="")
+            ctx.guild.welcome_message = ""
+
+            return await ctx.reply("Wyłączono wiadomość powitalną")
 
         if code == "get_code()":
             return await self.bot.paginator(ctx.reply, ctx, guild_db.welcome_message, prefix="```py\n", suffix="```")
@@ -143,11 +150,17 @@ class Admin(commands.Cog):
 
         await ctx.reply("Ustawiono wiadomość powitalną")
 
-    @set.command(description="Ustawia wiadomość pożegnalną", usage="(kod)", aliases=["leave", "leavemsg"])
+    @set.command(description="Ustawia wiadomość pożegnalną", usage="[kod]", aliases=["leave", "leavemsg"])
     @commands.has_permissions("manage_guild")
-    async def leavemessage(self, ctx, *, code):
+    async def leavemessage(self, ctx: commands.Context, *, code = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
         guild_db = await query.first()
+
+        if code is None:
+            await query.update(leave_message="")
+            ctx.guild.leave_message = ""
+
+            return await ctx.reply("Wyłączono wiadomość pożegnalną")
 
         if code == "get_code()":
             return await self.bot.paginator(ctx.reply, ctx, guild_db.leave_message, prefix="```py\n", suffix="```")
@@ -173,6 +186,25 @@ class Admin(commands.Cog):
         ctx.guild.leave_message = code
 
         await ctx.reply("Ustawiono wiadomość pożegnalną")
+
+    @set.command(description="Ustawia autorole", usage="[rola]")
+    @commands.has_permissions("manage_guild", "manage_roles")
+    async def autorole(self, ctx: commands.Context, role: Union[types.Role, str] = None):
+        query = Guilds.filter(guild_id=ctx.guild.id)
+
+        if role is None:
+            await query.update(autorole="")
+            ctx.guild.autorole = ""
+
+            return await ctx.reply("Wyłączono autorole")
+
+        if ctx.member.roles[-1].position < role.position:
+            return await ctx.reply("Nie możesz ustawić roli która jest wyższa od ciebie")
+
+        await query.update(autorole=role.id)
+        ctx.guild.autorole = role.id
+
+        await ctx.reply("Ustawiono autorole")
 
 def setup(bot):
     bot.load_cog(Admin(bot))

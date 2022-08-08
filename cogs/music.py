@@ -86,7 +86,7 @@ class Music(commands.Cog):
         })
 
     @commands.command()
-    async def join(self, ctx, mute: int = 0, deaf: int = 0):
+    async def join(self, ctx: commands.Context, mute: int = 0, deaf: int = 0):
         channel = ctx.member.voice_state.channel
 
         if channel is None:
@@ -99,13 +99,13 @@ class Music(commands.Cog):
         await ctx.reply("Dołączyłem na kanał głosowy")
 
     @commands.command()
-    async def leave(self, ctx):
+    async def leave(self, ctx: commands.Context):
         await self.connect(ctx.guild, None)
 
         await ctx.reply("Wyszedłem z kanału głosowego")
 
     @commands.command()
-    async def bassboost(self, ctx):
+    async def bassboost(self, ctx: commands.Context):
         player = self.get_player(ctx.guild)
 
         if player is None:
@@ -120,7 +120,7 @@ class Music(commands.Cog):
         await ctx.reply("włączyłem bassboost")
 
     @commands.command()
-    async def play(self, ctx, *, query):
+    async def play(self, ctx: commands.Context, *, query):
         player = self.get_player(ctx.guild)
 
         if player is None:
@@ -154,7 +154,7 @@ class Music(commands.Cog):
             await ctx.reply("Dodano do kolejki `" + track.title + "`")
 
     @commands.command()
-    async def resume(self, ctx):
+    async def resume(self, ctx: commands.Context):
         player = self.get_player(ctx.guild)
 
         if (player is None) or player.is_playing is False:
@@ -167,7 +167,7 @@ class Music(commands.Cog):
         await ctx.reply("Wznowiłem muzykę")
 
     @commands.command()
-    async def pause(self, ctx):
+    async def pause(self, ctx: commands.Context):
         player = self.get_player(ctx.guild)
 
         if (player is None) or player.is_playing is False:
@@ -180,7 +180,7 @@ class Music(commands.Cog):
         await ctx.reply("Wstrzymałem muzykę")
 
     @commands.command()
-    async def skip(self, ctx):
+    async def skip(self, ctx: commands.Context):
         player = self.get_player(ctx.guild)
 
         if not player:
@@ -191,7 +191,7 @@ class Music(commands.Cog):
             await ctx.reply("Pominięto utwór")
 
     @commands.command()
-    async def volume(self, ctx, volume: float):
+    async def volume(self, ctx: commands.Context, volume: float):
         player = self.get_player(ctx.guild)
 
         if player is None:
@@ -205,7 +205,7 @@ class Music(commands.Cog):
         await ctx.reply(f"Zmieniono głośność na {volume:.1f}%")
 
     @commands.command()
-    async def queue(self, ctx):
+    async def queue(self, ctx: commands.Context):
         player = self.get_player(ctx.guild)
 
         if player is None:
@@ -219,7 +219,7 @@ class Music(commands.Cog):
         await ctx.reply(text or "nie ma nic")
 
     @commands.command(aliases=["np"])
-    async def nowplaying(self, ctx):
+    async def nowplaying(self, ctx: commands.Context):
         player = self.get_player(ctx.guild)
 
         if not player:
@@ -238,7 +238,7 @@ class Music(commands.Cog):
         await ctx.reply(f"Gram teraz: `{player.current.title}`")
 
     @commands.command(description="Łączenie konta LastFM do bota")
-    async def login(self, ctx):
+    async def login(self, ctx: commands.Context):
         async with ClientSession() as session:
             async with session.get(LASTFM_API_URL + f"?method=auth.getToken&api_key={LASTFM_API_KEY}&format=json") as response:
                 data = await response.json()
@@ -278,7 +278,7 @@ class Music(commands.Cog):
                         return await message.edit("Pomyślnie połączono konto `" + data["name"] + "`")
 
     @commands.command(description="Statystyki konta LastFM", usage="[użytkownik]", aliases=["fmstats", "fm"])
-    async def lastfm(self, ctx, *, user: types.User = None):
+    async def lastfm(self, ctx: commands.Context, *, user: types.User = None):
         user = user or ctx.author
 
         lastfm = await LastFM.filter(user_id=user.id).first()
@@ -377,7 +377,7 @@ class Music(commands.Cog):
                     await ctx.reply(result)
 
     @commands.command(description="Ustawianie skryptu dla komendy lastfm", usage="(skrypt)", aliases=["fms", "fmset"])
-    async def fmscript(self, ctx, *, script):
+    async def fmscript(self, ctx: commands.Context, *, script):
         query = LastFM.filter(user_id=ctx.author.id)
         lastfm_user = await query.first()
 
@@ -397,14 +397,14 @@ class Music(commands.Cog):
         await ctx.reply("Skrypt został ustawiony")
 
     @commands.command(description="Wybieranie szablonu dla komendy lastfm", usage="(szablon)", aliases=["fmmode"], other={"embed": femcord.Embed(description="\nSzablony: `embedfull`, `embedmini`, `textfull`, `textmini`")})
-    async def fmtemplate(self, ctx, template):
+    async def fmtemplate(self, ctx: commands.Context, template):
         if not template in self.templates:
             return await ctx.reply("Nie ma takiego szablonu")
 
         await self.fmscript(ctx, script=self.templates[template])
 
     @commands.command(description="Użytkownicy którzy znają artyste", aliases=["wk"])
-    async def whoknows(self, ctx):
+    async def whoknows(self, ctx: commands.Context):
         lastfm_users = await LastFM.all()
 
         if not ctx.author.id in [lastfm_user.user_id for lastfm_user in lastfm_users]:
@@ -462,7 +462,7 @@ class Music(commands.Cog):
                     await ctx.reply(embed=embed)
 
     @commands.command(description="Pokazuje tekst piosenki", usage="[nazwa]")
-    async def lyrics(self, ctx, *, name = None):
+    async def lyrics(self, ctx: commands.Context, *, name = None):
         async with femcord.Typing(ctx.message):
             async with ClientSession() as session:
                 if name == r"%radio":

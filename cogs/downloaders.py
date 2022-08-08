@@ -28,7 +28,7 @@ class Downloaders(commands.Cog):
         self.bot: commands.Bot = bot
 
     @commands.command()
-    async def tiktok(self, ctx, *, url):
+    async def tiktok(self, ctx: commands.Context, *, url):
         # if not tiktok_pattern.match(url):
         #     return await ctx.reply("to nie jest film tiktok")
 

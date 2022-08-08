@@ -56,7 +56,7 @@ class Games(commands.Cog):
     #         await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, "", embed=embed, files=[("image.png", renderer.get_image())], other={"attachments": []})
 
     # @commands.command(description="https://korrumzthegame.wtf", usage="[nazwa] [numer_avataru_1-20]", aliases=["ktg"])
-    # async def korrumzthegame(self, ctx, username: Union[int, str] = None, avatar: int = None):
+    # async def korrumzthegame(self, ctx: commands.Context, username: Union[int, str] = None, avatar: int = None):
     #     if ("korrumzthegame", ctx.author.id) in self.sessions:
     #         guild_id, channel_id, message_id = self.sessions[("korrumzthegame", ctx.author.id)][0]
     #         return await ctx.reply(f"Pierw musisz zamknąć poprzednią sesje (<https://discord.com/channels/{guild_id}/{channel_id}/{message_id}>)")

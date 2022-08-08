@@ -25,7 +25,7 @@ class ErrorHandler(commands.Cog):
         self.bot: commands.Bot = bot
 
     @commands.Listener
-    async def on_error(self, ctx, error):
+    async def on_error(self, ctx: commands.Context, error):
         if isinstance(error, commands.CommandNotFound):
             return await ctx.reply("Nie znaleziono takiej komendy")
 

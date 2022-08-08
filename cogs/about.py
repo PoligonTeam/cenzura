@@ -36,11 +36,11 @@ class About(commands.Cog):
         return text
 
     @commands.command(description="pong")
-    async def ping(self, ctx):
+    async def ping(self, ctx: commands.Context):
         await ctx.reply(self.get_ping_text())
 
     @commands.command(description="Statystyki bota", aliases=["stats", "botinfo"])
-    async def botstats(self, ctx):
+    async def botstats(self, ctx: commands.Context):
         diff = datetime.now() - self.bot.started_at
         memory = psutil.virtual_memory()
 

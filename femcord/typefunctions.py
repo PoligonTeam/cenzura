@@ -121,11 +121,11 @@ def set_functions(client):
 
     @client.func_for(Member)
     async def add_role(self: Member, role: Role):
-        return await client.http.add_role(self.guild_id, self.id, role.id)
+        return await client.http.add_role(self.guild_id, self.user.id, role.id)
 
     @client.func_for(Member)
     async def remove_role(self: Member, role: Role):
-        return await client.http.remove_role(self.guild_id, self.id, role.id)
+        return await client.http.remove_role(self.guild_id, self.user.id, role.id)
 
     @client.func_for(Guild)
     async def unban(self: Guild, member_id, reason = None):

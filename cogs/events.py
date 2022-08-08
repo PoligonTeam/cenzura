@@ -71,6 +71,9 @@ class Events(commands.Cog):
             else:
                 await channel.send(result)
 
+        if guild.autorole:
+            await member.add_role(guild.get_role(guild.autorole))
+
     @commands.Listener
     async def on_guild_member_remove(self, guild, user):
         if not hasattr(guild, "leave_message"):

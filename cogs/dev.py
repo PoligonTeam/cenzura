@@ -53,7 +53,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(kod)")
     @commands.is_owner
-    async def eval(self, ctx, *, code):
+    async def eval(self, ctx: commands.Context, *, code):
         result = await self._eval(code, {
             "femcord": femcord,
             "ctx": ctx,
@@ -77,7 +77,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(komenda)", aliases=["src"])
     @commands.is_owner
-    async def source(self, ctx, *, command):
+    async def source(self, ctx: commands.Context, *, command):
         command = command.split(" ")
         command_object = self.bot.get_command(command[0])
 
@@ -93,7 +93,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
     @commands.is_owner
-    async def load(self, ctx, extensions):
+    async def load(self, ctx: commands.Context, extensions):
         loaded = []
 
         for extension in extensions.split():
@@ -105,7 +105,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
     @commands.is_owner
-    async def reload(self, ctx, extensions):
+    async def reload(self, ctx: commands.Context, extensions):
         reloaded = []
 
         for extension in extensions.split():
@@ -118,7 +118,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
     @commands.is_owner
-    async def unload(self, ctx, extensions):
+    async def unload(self, ctx: commands.Context, extensions):
         unloaded = []
 
         for extension in extensions.split():
@@ -130,7 +130,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="[użytkownik] (komenda) [argumenty]")
     @commands.is_owner
-    async def su(self, ctx, member: Union[types.Member, str], command = None, *, args = None):
+    async def su(self, ctx: commands.Context, member: Union[types.Member, str], command = None, *, args = None):
         if isinstance(member, str):
             if command is not None:
                 _args = command

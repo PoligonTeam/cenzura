@@ -9,7 +9,7 @@ class Typing:
         return self.message.channel.start_typing()
 
     async def do_typing(self):
-        while True:
+        for _ in range(12):
             await asyncio.sleep(5)
             await self.send()
 
