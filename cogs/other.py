@@ -36,8 +36,8 @@ class Other(commands.Cog):
         self.bot: commands.Bot = bot
         self.custom_commands_cog = custom_commands_cog
 
-    @commands.command(description="pisaju skrypt", usage="(kod)", aliases=["cs", "cscript"])
-    async def cenzurascript(self, ctx: commands.Context, *, code):
+    @commands.command(description="pisaju skrypt", usage="(kod)", aliases=["fs", "fscript", "cs", "cscript"])
+    async def femscript(self, ctx: commands.Context, *, code):
         result = await run(
             code,
             builtins = {
@@ -169,7 +169,7 @@ class Other(commands.Cog):
 
             command = self.bot.get_command(name, guild_id=ctx.guild.id)
 
-            if not command or not "code" in command.other or not command.guild.id == ctx.guild.id:
+            if not command or not "code" in command.other or not command.guild_id == ctx.guild.id:
                 raise femcord.CommandNotFound()
 
             await self.bot.paginator(ctx.reply, ctx, re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]), prefix="```py\n", suffix="```")

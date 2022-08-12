@@ -17,7 +17,7 @@ limitations under the License.
 import femcord
 from femcord import commands, types, HTTPException
 from femscript import run
-from utils import convert, table
+from utils import *
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from models import LastFM
@@ -232,10 +232,15 @@ class Music(commands.Cog):
             async with ClientSession() as session:
                 async with session.get("https://radio.poligon.lgbt/api/live/nowplaying/station_1") as response:
                     data = await response.json()
+                    now_playing = data["now_playing"]
+                    playing_next = data["playing_next"]
 
-                    return await ctx.reply(f"Gram teraz: `{data['now_playing']['song']['text']}`\nPotem będę grał: `{data['playing_next']['song']['text']}`")
+                    return await ctx.reply(f"Gram teraz: `{now_playing['song']['text']}` {(now_playing['elapsed'] % 3600) // 60}:{now_playing['elapsed'] % 60:02d}/{(now_playing['duration'] % 3600) // 60}:{now_playing['duration'] % 60:02d}\nPotem będę grał: `{playing_next['song']['text']}`")
 
-        await ctx.reply(f"Gram teraz: `{player.current.title}`")
+        position = int(player.position / 1000)
+        duration = int(player.current.duration / 1000)
+
+        await ctx.reply(f"Gram teraz: `{player.current.title}` {(position % 3600) // 60}:{position % 60:02d}/{(duration % 3600) // 60}:{duration % 60:02d}")
 
     @commands.command(description="Łączenie konta LastFM do bota")
     async def login(self, ctx: commands.Context):
@@ -276,6 +281,43 @@ class Music(commands.Cog):
                         await query(user_id=ctx.author.id, username=data["name"], token=data["key"], script=self.templates["embedmini"])
 
                         return await message.edit("Pomyślnie połączono konto `" + data["name"] + "`")
+
+    @commands.command(description="Informacje o obecnie grającej piosence", usage="[użytkownik]", aliases=["ti", "track", "trackstats"])
+    async def trackinfo(self, ctx: commands.Context, *, user: types.User = None):
+        user = user or ctx.author
+
+        lastfm = await LastFM.filter(user_id=user.id).first()
+
+        if lastfm is None:
+            if ctx.author is user:
+                return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+
+            return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
+
+        async with femcord.Typing(ctx.message):
+            async with ClientSession() as session:
+                async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&user={lastfm.username}&limit=2&api_key={LASTFM_API_KEY}&format=json") as response:
+                    if not response.status == 200:
+                        return await ctx.reply("Takie konto LastFM nie istnieje")
+
+                    data = await response.json()
+                    data = data["recenttracks"]["track"][0]
+                    track_name = data["name"]
+                    artist_name = data["artist"]["#text"]
+
+                    async with session.get(LASTFM_API_URL + f"?method=track.getInfo&username={lastfm.username}&artist={artist_name}&track={track_name}&api_key={LASTFM_API_KEY}&format=json") as response:
+                        data = await response.json()
+                        track = data["track"]
+
+                        embed = femcord.Embed(title=f"Informacje o utworze", url=track["url"], color=self.bot.embed_color)
+                        embed.add_field(name="Wykonawca", value=track["artist"]["name"], inline=True)
+                        embed.add_field(name="Nazwa utworu", value=track["name"], inline=True)
+                        embed.add_field(name="\u200b", value="\u200b", inline=True)
+                        embed.add_field(name="Gatunki", value="\n".join(["- " + genere["name"].title() for genere in track["toptags"]["tag"]]))
+
+                        embed.set_thumbnail(url=track["album"]["image"][-1]["#text"])
+
+                        await ctx.reply(embed=embed)
 
     @commands.command(description="Statystyki konta LastFM", usage="[użytkownik]", aliases=["fmstats", "fm"])
     async def lastfm(self, ctx: commands.Context, *, user: types.User = None):
@@ -359,10 +401,7 @@ class Music(commands.Cog):
 
                     result = await run(
                         lastfm.script,
-                        builtins = {
-                            "Embed": femcord.Embed,
-                            "table": table
-                        },
+                        builtins = builtins,
                         variables = {
                             **convert(
                                 user = user

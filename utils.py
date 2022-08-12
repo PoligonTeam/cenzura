@@ -149,7 +149,7 @@ async def request(method, url, *, headers = None, data = None, proxy = None):
 
         return {
             "text": response.text,
-            "json": json
+            "json": Dict(**json)
         }
 
 async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_url = None, content = None, embed: femcord.Embed = None):
@@ -164,7 +164,7 @@ async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_
     if embed:
         data["embeds"] = [embed.__dict__]
 
-    await self.request("POST", femcord.http.URL + "/webhooks/" + webhook_id + "/" + webhook_token, data=data)
+    await request("POST", femcord.http.URL + "/webhooks/" + webhook_id + "/" + webhook_token, data=data)
 
 def void(*args, **kwargs):
     return False

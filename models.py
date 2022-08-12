@@ -15,7 +15,7 @@ limitations under the License.
 """
 
 from tortoise.models import Model
-from tortoise.fields import Field, IntField, TextField
+from tortoise.fields import Field, IntField, TextField, JSONField
 import json
 
 class TextArray(Field):
@@ -40,6 +40,7 @@ class Guilds(Model):
     leave_message = TextField()
     autorole = TextField()
     custom_commands = TextArray()
+    permissions = JSONField()
 
 class LastFM(Model):
     id = IntField(pk=True)

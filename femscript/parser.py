@@ -16,7 +16,7 @@ limitations under the License.
 
 from .lexer import Lexer, Tokens, Keywords, Types, Token
 from types import CoroutineType
-import random, datetime, re, string
+import random, datetime, re, string, json
 
 class List(list):
     def __init__(self, *args):
@@ -32,6 +32,9 @@ class Dict(dict):
     def __init__(self, **kwargs):
         super().__init__(kwargs)
 
+    def __str__(self):
+        return json.dumps(self, indent=4, default=str)
+
     def __getattribute__(self, name):
         if name in self:
             return self[name]
@@ -45,13 +48,13 @@ class Dict(dict):
         return self[item] if item in self else None
 
     def items(self):
-        return [(k, self[k]) for k in self]
+        return [(key, self[key]) for key in self]
 
     def keys(self):
-        return [k for k, _ in self.items()]
+        return [key for key, _ in self.items()]
 
     def values(self):
-        return [v for _, v in self.items()]
+        return [value for _, value in self.items()]
 
 def _len(obj):
     if not hasattr(obj, "__len__"):
@@ -66,40 +69,36 @@ class Parser:
         self.position = 0
         self.builtins = {
             **builtins,
-            **{
-                "str": str,
-                "int": int,
-                "list": List,
-                "dict": Dict,
-                "len": _len,
-                "hex": lambda hexadecimal: int(hexadecimal, 16),
-                "bin": lambda binary: int(binary, 2),
-                "chr": chr,
-                "ord": ord,
-                "random_int": random.randint,
-                "random_str": lambda *args: random.choice(args[0] if len(args) == 1 else args),
-                "match": lambda pattern, string: not not re.match(pattern, string),
-                "find": lambda pattern, string, index = 0: (re.findall(pattern, string) or [False])[index],
-                "find_all": lambda pattern, string, join_string = "": join_string.join(re.findall(pattern, string)) or False,
-                "now": lambda format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.now().strftime(format),
-                "timestamp": lambda: int(datetime.datetime.now().timestamp()),
-                "from_timestamp": lambda timestamp, format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.fromtimestamp(timestamp).strftime(format)
-            }
+            "str": str,
+            "int": int,
+            "list": List,
+            "dict": Dict,
+            "len": _len,
+            "hex": lambda hexadecimal: int(hexadecimal, 16),
+            "bin": lambda binary: int(binary, 2),
+            "chr": chr,
+            "ord": ord,
+            "random_int": random.randint,
+            "random_str": lambda *args: random.choice(args[0] if len(args) == 1 else args),
+            "match": lambda pattern, string: not not re.match(pattern, string),
+            "find": lambda pattern, string, index = 0: (re.findall(pattern, string) or [False])[index],
+            "find_all": lambda pattern, string, join_string = "": join_string.join(re.findall(pattern, string)) or False,
+            "now": lambda format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.now().strftime(format),
+            "timestamp": lambda: int(datetime.datetime.now().timestamp()),
+            "from_timestamp": lambda timestamp, format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.fromtimestamp(timestamp).strftime(format)
         }
         self.variables = {
             **variables,
-            **{
-                "string": {
-                    "whitespace": string.whitespace,
-                    "ascii_lowercase": string.ascii_lowercase,
-                    "ascii_uppercase": string.ascii_uppercase,
-                    "ascii_letters": string.ascii_letters,
-                    "digits": string.digits,
-                    "hexdigits": string.hexdigits,
-                    "octdigits": string.octdigits,
-                    "punctuation": string.punctuation,
-                    "printable": string.printable,
-                }
+            "string": {
+                "whitespace": string.whitespace,
+                "ascii_lowercase": string.ascii_lowercase,
+                "ascii_uppercase": string.ascii_uppercase,
+                "ascii_letters": string.ascii_letters,
+                "digits": string.digits,
+                "hexdigits": string.hexdigits,
+                "octdigits": string.octdigits,
+                "punctuation": string.punctuation,
+                "printable": string.printable,
             }
         }
 

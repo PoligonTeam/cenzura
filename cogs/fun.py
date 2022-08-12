@@ -18,12 +18,13 @@ import femcord
 from femcord import commands, types, InvalidArgument, HTTPException
 from femcord.http import Route
 from femcord.utils import get_index
+from aiohttp import ClientSession
+from bs4 import BeautifulSoup
+from config import WEATHER_API_KEY
+from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from pyfiglet import Figlet
-from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
 from typing import Union
-from datetime import datetime
 from utils import *
 import io, random, urllib.parse, json, re
 
@@ -533,77 +534,6 @@ class Fun(commands.Cog):
 
         await ctx.reply(embed=embed)
 
-    @commands.command(description="Robi screenshot strony", aliases=["ss"])
-    async def screenshot(self, ctx: commands.Context, url, delay: int):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
-
-        async with femcord.Typing(ctx.message):
-            if not url.startswith("local:"):
-                result = re.match(r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,69}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)", url)
-
-                if not result:
-                    return await ctx.reply("Podałeś nieprawidłowy adres url")
-
-            async with async_playwright() as p:
-                browser = await p.firefox.launch()
-                page = await browser.new_page()
-                url = url.replace("local:", "file://")
-
-                try:
-                    await page.goto(url)
-                    await page.main_frame.wait_for_timeout(delay)
-                    screenshot_bytes = await page.screenshot()
-                except Exception:
-                    screenshot_bytes = open("./assets/images/attacl.png", "rb").read()
-
-                await browser.close()
-
-                image = io.BytesIO(screenshot_bytes)
-                components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl")))
-
-            message = await ctx.reply(files=[("image.png", image)], components=components)
-
-            async def curl(interaction):
-                await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
-                await self.bot.paginator(message.edit, ctx, (await (await self.bot.http.session.get(url)).content.read()).decode(), embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
-
-            async def on_timeout():
-                components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))
-                await message.edit(components=components)
-
-            await self.bot.wait_for("interaction_create", curl, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
-
-    @commands.command(description="Nagrywa filmik ze strony", aliases=["recban", "record"])
-    async def rec(self, ctx: commands.Context, url):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
-
-        if not url.startswith("local:"):
-            result = re.match(r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,69}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)", url)
-
-            if not result:
-                return await ctx.reply("Podałeś nieprawidłowy adres url")
-
-        async with async_playwright() as p:
-            browser = await p.firefox.launch()
-            context = await browser.new_context(
-                record_video_dir="videos/",
-                record_video_size={"width": 1920, "height": 1080},
-                viewport={"width": 1920, "height": 1080}
-            )
-            page = await context.new_page()
-            url = url.replace("local:", "file://")
-
-            await page.goto(url)
-            await page.main_frame.wait_for_timeout(5000)
-
-            await context.close()
-
-            await ctx.reply(files=[("video.webm", open(await page.video.path(), "rb"))])
-
-            await browser.close()
-
     @commands.command(description="Informacje o koncie TruckersMP", usage="(nazwa)", aliases=["tmp", "ets2", "ets"], other={"embed": femcord.Embed(description="\nNazwa: `steamid64`, `nazwa steam`")})
     async def truckersmp(self, ctx: commands.Context, *, _id):
         if not re.match(r"^\d+$", _id):
@@ -669,6 +599,45 @@ class Fun(commands.Cog):
                 definition = await fetch("https://www.urbandictionary.com/define.php?term=" + word, "div", {"class": "meaning"}, r".+")
 
         await ctx.reply(definition)
+
+    @commands.command(description="pogoda", aliases=["pogoda", "pogoda.onet.pl", "wp.pl"])
+    async def weather(self, ctx: commands.Context, *, city):
+        async with ClientSession() as session:
+            json = [
+                {
+                    "name": "getSunV3LocationSearchUrlConfig",
+                    "params": {
+                        "query": city,
+                        "language": "en-US",
+                        "locationType": "locale"
+                    }
+                }
+            ]
+
+            async with session.post("https://weather.com/api/v1/p/redux-dal", json=json) as response:
+                data = await response.json()
+                data = data["dal"]["getSunV3LocationSearchUrlConfig"]["language:en-US;locationType:locale;query:" + city]
+
+                if not data["status"] == 200:
+                    return await ctx.reply("Nie znaleziono takiego miasta")
+
+                station = data["data"]["location"]["pwsId"][0]
+
+                async with session.get(f"https://api.weather.com/v2/pws/observations/current?apiKey={WEATHER_API_KEY}&units=m&stationId={station}&numericPrecision=decimal&format=json") as response:
+                    data = await response.json()
+                    data = data["observations"][0]
+
+                    embed = femcord.Embed(title=f"Pogoda dla {city}", color=self.bot.embed_color)
+                    embed.add_field(name="Temperatura:", value=f"{data['metric']['temp']}°C", inline=True)
+                    embed.add_field(name="Indeks UV:", value=f"{data['uv']}", inline=True)
+                    embed.add_field(name="\u200b", value="\u200b", inline=True)
+                    embed.add_field(name="Ciśnienie:", value=f"{data['metric']['pressure']} hPa", inline=True)
+                    embed.add_field(name="Wilgotność:", value=f"{data['humidity']}%", inline=True)
+                    embed.add_field(name="\u200b", value="\u200b", inline=True)
+                    embed.add_field(name="Kierunek wiatru:", value=f"{data['winddir']}°", inline=True)
+                    embed.add_field(name="Prędkość wiatru:", value=f"{data['metric']['windSpeed']} km/h", inline=True)
+
+                    await ctx.reply(embed=embed)
 
     @commands.command(description="zgadnij kto to", aliases=["who", "ktoto", "coto"])
     async def whois(self, ctx: commands.Context):

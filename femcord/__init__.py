@@ -14,9 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+__title__ = "femcord"
+__author__ = "PoligonTeam"
 __license__ = "Apache License"
 __copyright__ = "Copyright 2022 PoligonTeam"
+__version__ = "0.6.9a"
 __pronouns__ = "they/them"
+__hotel__ = "trivago"
 
 __import__("warnings").filterwarnings("ignore")
 
