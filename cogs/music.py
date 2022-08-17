@@ -401,6 +401,7 @@ class Music(commands.Cog):
 
                     result = await run(
                         lastfm.script,
+                        modules = modules,
                         builtins = builtins,
                         variables = {
                             **convert(

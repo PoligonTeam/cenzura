@@ -45,9 +45,10 @@ class Tokens(Enum, metaclass=EnumMeta):
     NEWLINE = "\n"
 
 class Keywords(Enum, metaclass=EnumMeta):
+    IMPORT = "import"
+    RETURN = "return"
     AND = "and"
     OR = "or"
-    RETURN = "return"
 
 class Types(Enum, metaclass=EnumMeta):
     VAR = "var"

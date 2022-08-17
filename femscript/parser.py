@@ -63,10 +63,46 @@ def _len(obj):
     return len(obj)
 
 class Parser:
-    def __init__(self, lexer: Lexer, *, builtins = {}, variables = {}):
+    def __init__(self, lexer: Lexer, *, modules = {}, builtins = {}, variables = {}):
         self.lexer = lexer
         self.tokens = self.lexer.make_tokens()
         self.position = 0
+        self.modules = {
+            **modules,
+            "random": {
+                "builtins": {
+                    "random_int": random.randint,
+                    "random_str": lambda *args: random.choice(args[0] if len(args) == 1 else args)
+                }
+            },
+            "regex": {
+                "builtins": {
+                    "match": lambda pattern, string: not not re.match(pattern, string),
+                    "find": lambda pattern, string, index = 0: (re.findall(pattern, string) or [False])[index],
+                    "find_all": lambda pattern, string, join_string = "": join_string.join(re.findall(pattern, string)) or False
+                }
+            },
+            "date": {
+                "builtins": {
+                    "now": lambda format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.now().strftime(format),
+                    "timestamp": lambda: int(datetime.datetime.now().timestamp()),
+                    "from_timestamp": lambda timestamp, format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.fromtimestamp(timestamp).strftime(format)
+                }
+            },
+            "string": {
+                "variables": {
+                    "whitespace": string.whitespace,
+                    "ascii_lowercase": string.ascii_lowercase,
+                    "ascii_uppercase": string.ascii_uppercase,
+                    "ascii_letters": string.ascii_letters,
+                    "digits": string.digits,
+                    "hexdigits": string.hexdigits,
+                    "octdigits": string.octdigits,
+                    "punctuation": string.punctuation,
+                    "printable": string.printable
+                }
+            }
+        }
         self.builtins = {
             **builtins,
             "str": str,
@@ -77,30 +113,9 @@ class Parser:
             "hex": lambda hexadecimal: int(hexadecimal, 16),
             "bin": lambda binary: int(binary, 2),
             "chr": chr,
-            "ord": ord,
-            "random_int": random.randint,
-            "random_str": lambda *args: random.choice(args[0] if len(args) == 1 else args),
-            "match": lambda pattern, string: not not re.match(pattern, string),
-            "find": lambda pattern, string, index = 0: (re.findall(pattern, string) or [False])[index],
-            "find_all": lambda pattern, string, join_string = "": join_string.join(re.findall(pattern, string)) or False,
-            "now": lambda format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.now().strftime(format),
-            "timestamp": lambda: int(datetime.datetime.now().timestamp()),
-            "from_timestamp": lambda timestamp, format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.fromtimestamp(timestamp).strftime(format)
+            "ord": ord
         }
-        self.variables = {
-            **variables,
-            "string": {
-                "whitespace": string.whitespace,
-                "ascii_lowercase": string.ascii_lowercase,
-                "ascii_uppercase": string.ascii_uppercase,
-                "ascii_letters": string.ascii_letters,
-                "digits": string.digits,
-                "hexdigits": string.hexdigits,
-                "octdigits": string.octdigits,
-                "punctuation": string.punctuation,
-                "printable": string.printable,
-            }
-        }
+        self.variables = variables
 
     def convert(self, position, var = True):
         if var and self.tokens[position].type is Types.VAR:
@@ -197,12 +212,12 @@ class Parser:
                             self.position += 1
                         continue
             elif current_token.value in Keywords:
-                if current_token is Keywords.AND:
-                    self.set(Token(Types.BOOL, "true" if self.convert(self.position - 1) and self.convert(self.position + 1) else "false"))
-                    continue
-                elif current_token is Keywords.OR:
-                    self.set(Token(Types.BOOL, "true" if self.convert(self.position - 1) or self.convert(self.position + 1) else "false"))
-                    continue
+                if current_token is Keywords.IMPORT:
+                    module = self.modules[self.tokens[self.position + 1].value]
+                    if "builtins" in module:
+                        self.builtins = {**module["builtins"], **self.builtins}
+                    if "variables" in module:
+                        self.variables = {**module["variables"], **self.variables}
                 elif current_token is Keywords.RETURN:
                     if self.position + 2 < len(self.tokens):
                         self.position += 1
@@ -210,6 +225,12 @@ class Parser:
 
                     result = self.convert(self.position + 1)
                     break
+                elif current_token is Keywords.AND:
+                    self.set(Token(Types.BOOL, "true" if self.convert(self.position - 1) and self.convert(self.position + 1) else "false"))
+                    continue
+                elif current_token is Keywords.OR:
+                    self.set(Token(Types.BOOL, "true" if self.convert(self.position - 1) or self.convert(self.position + 1) else "false"))
+                    continue
             elif isinstance(current_token.value, (str, int, bool, list, tuple)) and current_token.value in self.builtins:
                 args = []
                 kwargs = {}

@@ -54,6 +54,7 @@ class Events(commands.Cog):
 
             result = await run(
                 guild.welcome_message,
+                modules = modules,
                 builtins = {
                     **builtins,
                     "set_channel": set_channel
@@ -93,6 +94,7 @@ class Events(commands.Cog):
 
             result = await run(
                 guild.leave_message,
+                modules = modules,
                 builtins = {
                     **builtins,
                     "set_channel": set_channel

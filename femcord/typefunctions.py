@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from numpy import isin
 from .http import Route
 from .types import *
 from .embed import Embed

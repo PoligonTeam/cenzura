@@ -16,16 +16,20 @@ limitations under the License.
 
 import femcord
 from femcord import commands, types
+from femcord.permissions import Permissions
 from tortoise import Tortoise
 from models import Guilds
-import re, os, time, config, logging
+import re, os, time, config, copy, datetime, logging
 
 class FakeCtx:
-    def __init__(self, guild, channel, member):
+    def __init__(self, guild, channel, member, su_role):
         self.guild = guild
         self.channel = channel
-        self.member = member
-        self.author = member.user
+        self.member = copy.deepcopy(member)
+        self.author = self.member.user
+
+        self.member.roles.append(su_role)
+        self.member.permissions = su_role.permissions
 
     async def send(self, *args, **kwargs):
         pass
@@ -39,6 +43,20 @@ class Bot(commands.Bot):
 
         self.embed_color = 0xb22487
         self.user_agent = "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.3) AppleWebkit/538.1 (KHTML, like Gecko) SamsungBrowser/1.0 TV Safari/538.1"
+
+        self.su_role = types.Role(
+            id = "su",
+            name = "su",
+            color = 0xffffff,
+            hoist = True,
+            icon = None,
+            unicode_emoji = None,
+            position = float("inf"),
+            permissions = Permissions.all(),
+            managed = False,
+            mentionable = False,
+            created_at = datetime.datetime.now()
+        )
 
         for filename in os.listdir("./cogs"):
             if filename[-3:] == ".py":
@@ -61,7 +79,7 @@ class Bot(commands.Bot):
 
                 for custom_command in db_guild.custom_commands:
                     channel_id, author_id = re.findall(r"# \w+: (\d+)", custom_command)[2:4]
-                    fake_ctx = FakeCtx(guild, guild.get_channel(channel_id), await guild.get_member(author_id))
+                    fake_ctx = FakeCtx(guild, guild.get_channel(channel_id), await guild.get_member(author_id), self.su_role)
 
                     await customcommand_command(fake_ctx, code=custom_command)
 

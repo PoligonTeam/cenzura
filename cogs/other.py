@@ -40,6 +40,7 @@ class Other(commands.Cog):
     async def femscript(self, ctx: commands.Context, *, code):
         result = await run(
             code,
+            modules = modules,
             builtins = {
                 **builtins,
                 **(
@@ -196,6 +197,19 @@ class Other(commands.Cog):
         lexer = Lexer(code)
         parser = Parser(
             lexer,
+            modules = {
+                **modules,
+                "requests": {
+                    "builtins": {
+                        "request": lambda *args, **kwargs: {"text": "", "json": {}},
+                        "get": lambda *args, **kwargs: {"text": "", "json": {}},
+                        "post": lambda *args, **kwargs: {"text": "", "json": {}},
+                        "patch": lambda *args, **kwargs: {"text": "", "json": {}},
+                        "put": lambda *args, **kwargs: {"text": "", "json": {}},
+                        "delete": lambda *args, **kwargs: {"text": "", "json": {}}
+                    }
+                }
+            },
             builtins = {
                 **builtins,
                 "set_command_name": set_command_name,
@@ -206,12 +220,6 @@ class Other(commands.Cog):
                 "get_command_code": get_command_code,
                 "get_commands": get_commands,
                 "delete_command": delete_command,
-                "get": lambda *args, **kwargs: {"text": "", "json": {}},
-                "post": lambda *args, **kwargs: {"text": "", "json": {}},
-                "patch": lambda *args, **kwargs: {"text": "", "json": {}},
-                "put": lambda *args, **kwargs: {"text": "", "json": {}},
-                "delete": lambda *args, **kwargs: {"text": "", "json": {}},
-                "execute_webhook": void,
                 "hide": lambda item: item
             },
             variables = {
@@ -302,6 +310,7 @@ class Other(commands.Cog):
 
                 result = await run(
                     code,
+                    modules = modules,
                     builtins = {
                         **builtins,
                         "set_command_name": void,
@@ -351,6 +360,10 @@ class Other(commands.Cog):
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
+        #MOZLIWOSC SLUCHANIA LOGOW
+        #CUSTOMOWE PERMISJE
+        #DODAC LOOPY DO FEMSCRIPT
+        #OGRANICZYC RPS DO 16
         #LIMIT DO INTOW W CS
         #NAPRAWIC LIB.EVENTHANDLERS W NIEKTORYCH MIEJSCACH
         #HTTP PROXY

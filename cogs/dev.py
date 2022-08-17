@@ -16,9 +16,8 @@ limitations under the License.
 
 import femcord
 from femcord import commands, types
-from femcord.permissions import Permissions
 from typing import Union
-import ast, inspect, copy, datetime
+import ast, inspect, copy
 
 class Dev(commands.Cog):
     hidden = True
@@ -142,26 +141,11 @@ class Dev(commands.Cog):
             member = ctx.member
 
         fake_member = copy.deepcopy(member)
-        fake_permissions = Permissions.all()
         fake_message = copy.deepcopy(ctx.message)
 
-        su_role = types.Role(
-            id = "su",
-            name = "su",
-            color = 0xffffff,
-            hoist = True,
-            icon = None,
-            unicode_emoji = None,
-            position = float("inf"),
-            permissions = fake_permissions,
-            managed = False,
-            mentionable = False,
-            created_at = datetime.datetime.now()
-        )
-
-        fake_member.roles.append(su_role)
-        fake_member.hoisted_role = su_role
-        fake_member.permissions = fake_permissions
+        fake_member.roles.append(self.bot.su_role)
+        fake_member.hoisted_role = self.bot.su_role
+        fake_member.permissions = self.bot.su_role.permissions
 
         fake_message.author = fake_member.user
         fake_message.member = fake_member
