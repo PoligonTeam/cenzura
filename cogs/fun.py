@@ -394,6 +394,7 @@ class Fun(commands.Cog):
         item_list = json.loads(raw_item_list)["mods"]["itemList"]["content"]
 
         random_product = random.choice(item_list)
+
         await ctx.reply(f"\"{random_product['title']['displayTitle']}\"\nhttps://aliexpress.com/item/{random_product['productId']}.html\n\n*z aliexpress.com*")
 
     @commands.command(description="shopee wyszukiwarka", usage="(produkt)", aliases=["shopenis", "fakeali", "alisexpress"])

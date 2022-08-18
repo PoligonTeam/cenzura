@@ -360,7 +360,6 @@ class Other(commands.Cog):
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
-        #MOZLIWOSC SLUCHANIA LOGOW
         #CUSTOMOWE PERMISJE
         #DODAC LOOPY DO FEMSCRIPT
         #OGRANICZYC RPS DO 16

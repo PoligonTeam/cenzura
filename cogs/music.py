@@ -114,10 +114,10 @@ class Music(commands.Cog):
 
         if any(player.equalizer) is True:
             await player.reset_equalizer()
-            return await ctx.reply("wyłączyłem bassboost")
+            return await ctx.reply("Wyłączyłem bassboost")
 
         await player.set_gains((0, 0.15), (1, 0.20))
-        await ctx.reply("włączyłem bassboost")
+        await ctx.reply("Włączyłem bassboost")
 
     @commands.command()
     async def play(self, ctx: commands.Context, *, query):
