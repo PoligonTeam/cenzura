@@ -464,6 +464,9 @@ class Music(commands.Cog):
                     artist_name = artist["name"]
                     artist_url = artist["url"]
 
+                    async with session.get(artist_url) as response:
+                        artist_thumbnail = re.search(r"<meta property=\"og:image\"[ ]+content=\"([\w/:.]+)\" data-replaceable-head-tag>", await response.text()).group(1)
+
                     async def get_scrobbles(lastfm_user):
                         nonlocal lastfm_scrobbles, artist_url
 
@@ -503,6 +506,7 @@ class Music(commands.Cog):
                         description += f"{index} [{member.user.username}](https://www.last.fm/user/{lastfm_user.username}) - **{scrobbles}** odtworzeń\n"
 
                     embed = femcord.Embed(title="Użytkownicy którzy znają " + artist_name + ":", url=artist_url, description=description, color=self.bot.embed_color)
+                    embed.set_thumbnail(url=artist_thumbnail)
 
                     await ctx.reply(embed=embed)
 
