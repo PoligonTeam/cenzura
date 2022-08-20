@@ -57,7 +57,7 @@ class WebSocket:
                 s = data.get("s")
                 t = data.get("t")
 
-                logging.debug(f"op: {Opcodes(op).name}, data: {None if not isinstance(data, dict) else data}, sequence number: {s}, event name: {t}")
+                logging.debug(f"op: {Opcodes(op).name}, data: {None if not isinstance(data, dict) else d}, sequence number: {s}, event name: {t}")
 
                 await self.gateway.on_message(Opcodes(op), d, s, t)
 

@@ -470,7 +470,12 @@ class Music(commands.Cog):
                         async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&artist={artist_name}&username={lastfm_user.username}&api_key={LASTFM_API_KEY}&format=json") as response:
                             data = await response.json()
 
-                            lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, data["artist"]["stats"]["userplaycount"]))
+                            userplaycount = "0"
+
+                            if "userplaycount" in data["artist"]["stats"]:
+                                userplaycount = data["artist"]["stats"]["userplaycount"]
+
+                            lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, userplaycount))
 
                     for lastfm_user in lastfm_users:
                         self.bot.loop.create_task(get_scrobbles(lastfm_user))
