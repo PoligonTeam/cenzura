@@ -123,6 +123,8 @@ class ChannelTypes(Enum):
     GUILD_PUBLIC_THREAD = 11
     GUILD_PRIVATE_THREAD = 12
     GUILD_STAGE_VOICE = 13
+    GUILD_DIRECTORY = 14
+    GUILD_FORUM = 15
 
 class MessageTypes(Enum):
     NONE = None

@@ -19,6 +19,8 @@ from femcord import commands
 import socket
 
 class SmartHome(commands.Cog):
+    hidden = True
+
     def __init__(self, bot):
         self.bot: commands.Bot = bot
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

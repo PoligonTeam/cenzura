@@ -40,6 +40,7 @@ class Guilds(Model):
     leave_message = TextField()
     autorole = TextField()
     custom_commands = TextArray()
+    database = JSONField()
     permissions = JSONField()
 
 class LastFM(Model):

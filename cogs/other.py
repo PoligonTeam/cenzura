@@ -40,7 +40,7 @@ class Other(commands.Cog):
     async def femscript(self, ctx: commands.Context, *, code):
         result = await run(
             code,
-            modules = modules,
+            modules = await get_modules(ctx.guild),
             builtins = {
                 **builtins,
                 **(
@@ -198,7 +198,7 @@ class Other(commands.Cog):
         parser = Parser(
             lexer,
             modules = {
-                **modules,
+                **await get_modules(ctx.guild),
                 "requests": {
                     "builtins": {
                         "request": lambda *args, **kwargs: {"text": "", "json": {}},
@@ -310,7 +310,7 @@ class Other(commands.Cog):
 
                 result = await run(
                     code,
-                    modules = modules,
+                    modules = await get_modules(ctx),
                     builtins = {
                         **builtins,
                         "set_command_name": void,
@@ -368,7 +368,6 @@ class Other(commands.Cog):
         #NAPRAWIC LIB.EVENTHANDLERS W NIEKTORYCH MIEJSCACH
         #HTTP PROXY
         #NAPRAWIC RETURNY W IFACH
-        #COS W PEWNYM RODZAJU BAZA DANYCH
         #HANDLOWANIE PRAWIE WSZYSTKICH ERROROW W PARSER.PY
 
         self.custom_commands_cog.commands.append(command)

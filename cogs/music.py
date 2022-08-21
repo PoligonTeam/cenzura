@@ -401,7 +401,7 @@ class Music(commands.Cog):
 
                     result = await run(
                         lastfm.script,
-                        modules = modules,
+                        modules = await get_modules(ctx.guild),
                         builtins = builtins,
                         variables = {
                             **convert(

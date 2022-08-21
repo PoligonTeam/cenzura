@@ -19,6 +19,7 @@ from femcord import types
 from femscript import Dict
 from httpx import AsyncClient, Timeout
 from json.decoder import JSONDecodeError
+from models import Guilds
 import random, config
 
 CHARS = (("\u200b", ("0", "1", "2", "3")), ("\u200c", ("4", "5", "6", "7")), ("\u200d", ("8", "9", "A", "B")), ("\u200e", ("C", "D", "E", "F")))
@@ -169,26 +170,49 @@ async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_
 def void(*args, **kwargs):
     return False
 
-modules = {
-    "requests": {
-        "builtins": {
-            "request": request,
-            "get": lambda *args, **kwargs: request("GET", *args, **kwargs),
-            "post": lambda *args, **kwargs: request("POST", *args, **kwargs),
-            "patch": lambda *args, **kwargs: request("PATCH", *args, **kwargs),
-            "put": lambda *args, **kwargs: request("PUT", *args, **kwargs),
-            "delete": lambda *args, **kwargs: request("DELETE", *args, **kwargs)
-        }
-    },
-    "config": {
-        "variables": {
-            "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.GwLPiR.TVQ0ToYHvIAWlep2fPw0jZPFZdKVTltZbajw8I",
-            "config": {
-                "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.GwLPiR.TVQ0ToYHvIAWlep2fPw0jZPFZdKVTltZbajw8I"
+async def get_modules(guild):
+    query = Guilds.filter(guild_id=guild.id)
+    db_guild = await query.first()
+
+    database = db_guild.database
+
+    async def update(key, value):
+        database[key] = value
+        await query.update(database=database)
+        return value
+
+    async def delete(key):
+        database.pop(key)
+        await query.update(database=database)
+
+    return {
+        "requests": {
+            "builtins": {
+                "request": request,
+                "get": lambda *args, **kwargs: request("GET", *args, **kwargs),
+                "post": lambda *args, **kwargs: request("POST", *args, **kwargs),
+                "patch": lambda *args, **kwargs: request("PATCH", *args, **kwargs),
+                "put": lambda *args, **kwargs: request("PUT", *args, **kwargs),
+                "delete": lambda *args, **kwargs: request("DELETE", *args, **kwargs)
+            }
+        },
+        "database": {
+            "builtins": {
+                "get_all": lambda: Dict(**database),
+                "update": update,
+                "delete": delete
+            },
+            "variables": database
+        },
+        "config": {
+            "variables": {
+                "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.GwLPiR.TVQ0ToYHvIAWlep2fPw0jZPFZdKVTltZbajw8I",
+                "config": {
+                    "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.GwLPiR.TVQ0ToYHvIAWlep2fPw0jZPFZdKVTltZbajw8I"
+                }
             }
         }
     }
-}
 
 builtins = {
     "Embed": femcord.Embed,
