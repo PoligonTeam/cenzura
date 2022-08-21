@@ -40,7 +40,18 @@ class Other(commands.Cog):
     async def femscript(self, ctx: commands.Context, *, code):
         result = await run(
             code,
-            modules = await get_modules(ctx.guild),
+            modules = {
+                **await get_modules(ctx.guild),
+                **(
+                    {
+                        "database": {}
+                    }
+                    if not ctx.member.permissions.has("manage_guild") else
+                    {
+
+                    }
+                )
+            },
             builtins = {
                 **builtins,
                 **(
