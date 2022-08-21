@@ -310,7 +310,7 @@ class Other(commands.Cog):
 
                 result = await run(
                     code,
-                    modules = await get_modules(ctx),
+                    modules = await get_modules(ctx.guild),
                     builtins = {
                         **builtins,
                         "set_command_name": void,
