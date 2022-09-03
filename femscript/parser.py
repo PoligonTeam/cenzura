@@ -25,8 +25,14 @@ class List(list):
     def has(self, item):
         return item in self
 
-    def get(self, item):
-        return self[item] if item in self else None
+    def get(self, index):
+        return self[index] if index < len(self) else False
+
+    def remove(self, item):
+        if item in self:
+            self.remove(item)
+            return True
+        return False
 
 class Dict(dict):
     def __init__(self, **kwargs):
@@ -55,6 +61,12 @@ class Dict(dict):
 
     def values(self):
         return [value for _, value in self.items()]
+
+    def remove(self, item):
+        if item in self:
+            self.pop(item)
+            return True
+        return False
 
 def _len(obj):
     if not hasattr(obj, "__len__"):
@@ -113,7 +125,8 @@ class Parser:
             "hex": lambda hexadecimal: int(hexadecimal, 16),
             "bin": lambda binary: int(binary, 2),
             "chr": chr,
-            "ord": ord
+            "ord": ord,
+            "contains": lambda _object, item: item in _object
         }
         self.variables = variables
 
@@ -231,7 +244,7 @@ class Parser:
                 elif current_token is Keywords.OR:
                     self.set(Token(Types.BOOL, "true" if self.convert(self.position - 1) or self.convert(self.position + 1) else "false"))
                     continue
-            elif isinstance(current_token.value, (str, int, bool, list, tuple)) and current_token.value in self.builtins:
+            elif isinstance(current_token.value, str) and current_token.value in self.builtins:
                 args = []
                 kwargs = {}
                 close_position = None
@@ -296,7 +309,7 @@ class Parser:
 
                     self.position = 0
                     continue
-            elif isinstance(current_token.value, (str, int, bool, list, tuple)) and current_token.value in self.variables and self.tokens[self.position + 1] is Tokens.DOT:
+            elif isinstance(current_token.value, str) and current_token.value in self.variables and self.tokens[self.position + 1] is Tokens.DOT:
                 _object = False
                 item = self.convert(self.position + 2, False)
 

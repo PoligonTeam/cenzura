@@ -115,7 +115,7 @@ def main():
     -l  or --logging             enable logging
     -lt or --logterminal         prints logs to a specified terminal
     -p  or --path                saves logs to a specified path
-    -bl or --blacklist           for example "^[\\d\\s:,-]+\\[DEBUG:.+\\].(sent.)?op:.HEARTBEAT.+$" or "^.+event.name:.PRESENCE_UPDATE$"
+    -bl or --blacklist           for example "^[\\d\\s:,-]+\\[DEBUG:.+\\].(sent.)?op:.(HEARTBEAT|PRESENCE_UPDATE).+$" or "^.+event.name:.PRESENCE_UPDATE$"
     -sp or --serverport          tcp server port
     -c  or --clients             maximum number of clients
     -t  or --token               bot token

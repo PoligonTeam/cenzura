@@ -17,9 +17,13 @@ limitations under the License.
 import femcord
 from femcord import commands, types
 from femcord.permissions import Permissions
+from femscript import run
 from tortoise import Tortoise
+from utils import modules, builtins
+from types import CoroutineType
 from models import Guilds
-import re, os, time, config, copy, datetime, logging
+from datetime import datetime
+import asyncio, random, re, os, time, config, copy, logging
 
 class FakeCtx:
     def __init__(self, guild, channel, member, su_role):
@@ -37,9 +41,34 @@ class FakeCtx:
     async def reply(self, *args, **kwargs):
         pass
 
+class Schedule:
+    def __init__(self, task, interval, *, name = None, args = (), kwargs = {}, times = float("inf")):
+        self.task = task if isinstance(task, CoroutineType) else asyncio.coroutine(task)
+        self.interval = interval
+        self.timestamp = time.time() + interval
+        self.name = name
+        self.args = args
+        self.kwargs = kwargs
+        self.times = times
+        self.calls = 0
+
+    def __call__(self):
+        self.timestamp += self.interval
+        self.calls += 1
+
+        return self.task(*self.args, **self.kwargs)
+
 class Bot(commands.Bot):
     def __init__(self, *, start_time: float):
         super().__init__(command_prefix=self.get_prefix, intents=femcord.Intents.all(), owners=config.OWNERS)
+
+        self.start_time = start_time
+        self.presences = None
+        self.presence_update_interval = None
+        self.random_presence = False
+        self.presence_index = 0
+        self.presence_indexes = []
+        self.schedules = []
 
         self.embed_color = 0xb22487
         self.user_agent = "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.3) AppleWebkit/538.1 (KHTML, like Gecko) SamsungBrowser/1.0 TV Safari/538.1"
@@ -55,7 +84,7 @@ class Bot(commands.Bot):
             permissions = Permissions.all(),
             managed = False,
             mentionable = False,
-            created_at = datetime.datetime.now()
+            created_at = datetime.now()
         )
 
         for filename in os.listdir("./cogs"):
@@ -64,28 +93,100 @@ class Bot(commands.Bot):
 
                 print("loaded %s" % filename)
 
-        @self.event
-        async def on_ready():
-            customcommand_command = self.get_command("customcommand")
+        self.event(self.on_ready)
+        self.loop.run_until_complete(self.async_init())
 
-            for guild in self.gateway.guilds:
-                db_guild = await Guilds.filter(guild_id=guild.id).first()
+    async def on_ready(self):
+        customcommand_command = self.get_command("customcommand")
 
-                if db_guild is None:
-                    db_guild = await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[])
+        for guild in self.gateway.guilds:
+            db_guild = await Guilds.filter(guild_id=guild.id).first()
 
-                if db_guild.custom_commands:
-                    guild.owner = await guild.get_member(guild.owner)
+            if db_guild is None:
+                db_guild = await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[])
 
-                for custom_command in db_guild.custom_commands:
-                    channel_id, author_id = re.findall(r"# \w+: (\d+)", custom_command)[2:4]
-                    fake_ctx = FakeCtx(guild, guild.get_channel(channel_id), await guild.get_member(author_id), self.su_role)
+            if db_guild.custom_commands:
+                guild.owner = await guild.get_member(guild.owner)
 
-                    await customcommand_command(fake_ctx, code=custom_command)
+            for custom_command in db_guild.custom_commands:
+                channel_id, author_id = re.findall(r"# \w+: (\d+)", custom_command)[2:4]
+                fake_ctx = FakeCtx(guild, guild.get_channel(channel_id), await guild.get_member(author_id), self.su_role)
 
-            await self.gateway.set_presence(femcord.Presence(femcord.StatusTypes.DND, activities=[femcord.Activity(name="\u200b", type=femcord.ActivityTypes.WATCHING)]))
+                await customcommand_command(fake_ctx, code=custom_command)
 
-            print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - start_time:.2f}s)")
+        await self.create_schedule(self.update_presences, "10m", name="update_presences")()
+
+        print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - self.start_time:.2f}s)")
+
+    async def async_init(self):
+        logging.getLogger("tortoise").setLevel(logging.WARNING)
+
+        await Tortoise.init(config=config.DB_CONFIG, modules={"models": ["app.models"]})
+        await Tortoise.generate_schemas()
+
+        print("connected to database")
+
+        self.loop.create_task(self.scheduler())
+
+        print("created scheduler")
+
+    async def update_presences(self):
+        with open("presences.cscript", "r") as file:
+            code = file.read()
+
+            self.presences = []
+
+            def set_update_interval(interval):
+                self.presence_update_interval = interval
+
+            def set_random_presence(value):
+                self.random_presence = value
+
+            def add_presence(name, *, status_type = femcord.StatusTypes.ONLINE, activity_type = femcord.ActivityTypes.PLAYING):
+                self.presences.append(presence := femcord.Presence(status_type, activities=[femcord.Activity(name=name, type=activity_type)]))
+                return presence
+
+            await run(
+                code,
+                modules = modules,
+                builtins = {
+                    **builtins,
+                    "set_update_interval": set_update_interval,
+                    "set_random_presence": set_random_presence,
+                    "add_presence": add_presence
+                },
+                variables = {
+                    "StatusTypes": femcord.StatusTypes,
+                    "ActivityTypes": femcord.ActivityTypes
+                }
+            )
+
+        if not (schedule := self.get_schedules("update_presence")):
+            return await self.create_schedule(self.update_presence, self.presence_update_interval, name="update_presence")()
+
+        self.cancel_schedule(schedule[0])
+        await self.create_schedule(self.update_presence, self.presence_update_interval, name="update_presence")()
+
+    async def update_presence(self):
+        while not self.presences:
+            await asyncio.sleep(1)
+
+        if self.random_presence is True:
+            while self.presence_index in self.presence_indexes:
+                self.presence_index = random.randint(0, len(self.presences) - 1)
+
+            self.presence_indexes.append(self.presence_index)
+
+            if len(self.presence_indexes) >= len(self.presences):
+                self.presence_indexes = [self.presence_index]
+
+        await self.gateway.set_presence(self.presences[self.presence_index])
+
+        if self.random_presence is False:
+            self.presence_index += 1
+
+            if self.presence_index >= len(self.presences):
+                self.presence_index = 0
 
     async def get_prefix(self, _, message):
         prefixes = ["<@{}>", "<@!{}>", "<@{}> ", "<@!{}> "]
@@ -99,13 +200,49 @@ class Bot(commands.Bot):
 
         return prefixes + [message.guild.prefix or config.PREFIX]
 
-    async def create_psql_connection(self):
-        logging.getLogger("tortoise").setLevel(logging.WARNING)
+    async def scheduler(self):
+        while True:
+            for schedule in self.schedules:
+                if schedule.timestamp <= time.time():
+                    self.loop.create_task(schedule())
 
-        await Tortoise.init(config=config.DB_CONFIG, modules={"models": ["app.models"]})
-        await Tortoise.generate_schemas()
+                    if schedule.calls >= schedule.times:
+                        self.schedules.remove(schedule)
 
-        print("connected to database")
+            await asyncio.sleep(1)
+
+    def get_schedules(self, name = None, *, check = None):
+        schedules = []
+
+        for schedule in self.schedules:
+            if (name and schedule.name == name) or (check and check(schedule)):
+                schedules.append(schedule)
+
+        return schedules
+
+    def create_schedule(self, task, interval, *args, **kwargs):
+        if isinstance(interval, datetime):
+            interval = (interval - datetime.now()).total_seconds()
+            times = 1
+        elif isinstance(interval, str):
+            interval = sum(int(unit[:-1]) * {"s": 1, "m": 60, "h": 3600, "d": 86400}[unit[-1]] for unit in re.findall(r"\d+[smhd]", interval))
+
+        schedule = Schedule(task, interval, *args, **kwargs)
+        self.schedules.append(schedule)
+
+        return schedule
+
+    def cancel_schedule(self, schedule = None, *, name = None, check = None):
+        if schedule is not None:
+            return self.schedules.remove(schedule)
+
+        schedules = self.get_schedules(name=name, check=check)
+
+        for schedule in schedules:
+            self.schedules.remove(schedule)
+
+    def clear_schedules(self):
+        self.schedules.clear()
 
     async def paginator(self, function, ctx, content: str = None, **kwargs):
         pages = kwargs.pop("pages", None)
@@ -184,10 +321,6 @@ class Bot(commands.Bot):
             await message.edit(pages[page], components=get_components(disabled=canceled), **kwargs)
 
         await self.wait_for("interaction_create", change_page, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=timeout, on_timeout=on_timeout)
-
-    def run(self, token, *, bot: bool = True):
-        self.loop.run_until_complete(self.create_psql_connection())
-        super().run(token, bot=bot)
 
 if __name__ == "__main__":
     Bot().run(config.TOKEN)

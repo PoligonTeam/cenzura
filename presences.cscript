@@ -1,0 +1,16 @@
+set_update_interval("10s")
+# set_random_presence(true)
+
+import random
+
+u200b = hex("200b")
+blank = chr(u200b)
+
+number = random_int(1, 100)
+number = str(number)
+
+add_presence("poligon.lgbt", status_type: StatusTypes.DND, activity_type: ActivityTypes.WATCHING)
+add_presence("fortnite", status_type: StatusTypes.DND, activity_type: ActivityTypes.PLAYING)
+add_presence("senis", status_type: StatusTypes.DND, activity_type: ActivityTypes.LISTENING)
+add_presence(blank, status_type: StatusTypes.DND, activity_type: ActivityTypes.PLAYING)
+add_presence(number, status_type: StatusTypes.DND, activity_type: ActivityTypes.PLAYING)

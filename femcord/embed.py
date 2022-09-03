@@ -90,3 +90,6 @@ class Embed:
         })
 
         return self
+
+    def add_blank_field(self, *, inline: bool = True):
+        return self.add_field(name="\u200b", value="\u200b", inline=inline)

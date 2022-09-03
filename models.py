@@ -42,6 +42,7 @@ class Guilds(Model):
     custom_commands = TextArray()
     database = JSONField()
     permissions = JSONField()
+    loops = TextArray()
 
 class LastFM(Model):
     id = IntField(pk=True)

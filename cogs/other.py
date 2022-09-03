@@ -184,14 +184,14 @@ class Other(commands.Cog):
             if not command or not "code" in command.other or not command.guild_id == ctx.guild.id:
                 raise femcord.CommandNotFound()
 
-            await self.bot.paginator(ctx.reply, ctx, re.sub(r"hide\(\".+\"\)", "HIDDEN", command.other["code"]), prefix="```py\n", suffix="```")
+            await self.bot.paginator(ctx.reply, ctx, command.other["code"], prefix="```py\n", suffix="```")
 
             return_text = ""
 
         async def get_commands():
             nonlocal return_text
 
-            await self.bot.paginator(ctx.reply, ctx, pages=[re.sub(r"hide\(\".+\"\)", "HIDDEN", command) for command in custom_commands], prefix="```py\n", suffix="```")
+            await self.bot.paginator(ctx.reply, ctx, pages=custom_commands, prefix="```py\n", suffix="```")
 
             return_text = ""
 
@@ -230,8 +230,7 @@ class Other(commands.Cog):
                 "set_command_arguments": set_command_arguments,
                 "get_command_code": get_command_code,
                 "get_commands": get_commands,
-                "delete_command": delete_command,
-                "hide": lambda item: item
+                "delete_command": delete_command
             },
             variables = {
                 **convert(
@@ -331,8 +330,7 @@ class Other(commands.Cog):
                         "set_command_arguments": void,
                         "get_command_code": void,
                         "get_commands": void,
-                        "delete_command": void,
-                        "hide": lambda item: item
+                        "delete_command": void
                     },
                     variables = {
                         **convert(
@@ -371,6 +369,12 @@ class Other(commands.Cog):
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
+        #DODAC ANOTACJE DO WSZYSTKIEGO
+        #UZYWAC ADD_BLANK_FIELD
+        #NAPRAWIC RELOADOWANIE COGOW
+        #PRZEPISAC UTILS.TABLE
+        #LEPSZA WERYFIKACJA NA POLIGONIE
+        #STICKERY DO SEND
         #AUTOPATCH DO DISCORD VOICE
         #CUSTOMOWE PERMISJE
         #DODAC LOOPY DO FEMSCRIPT

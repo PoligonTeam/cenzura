@@ -170,6 +170,24 @@ async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_
 def void(*args, **kwargs):
     return False
 
+modules = {
+    "requests": {
+        "builtins": {
+            "request": request,
+            "get": lambda *args, **kwargs: request("GET", *args, **kwargs),
+            "post": lambda *args, **kwargs: request("POST", *args, **kwargs),
+            "patch": lambda *args, **kwargs: request("PATCH", *args, **kwargs),
+            "put": lambda *args, **kwargs: request("PUT", *args, **kwargs),
+            "delete": lambda *args, **kwargs: request("DELETE", *args, **kwargs)
+        }
+    }
+}
+builtins = {
+    "Embed": femcord.Embed,
+    "execute_webhook": execute_webhook,
+    "table": table
+}
+
 async def get_modules(guild):
     query = Guilds.filter(guild_id=guild.id)
     db_guild = await query.first()
@@ -186,36 +204,14 @@ async def get_modules(guild):
         await query.update(database=database)
 
     return {
-        "requests": {
-            "builtins": {
-                "request": request,
-                "get": lambda *args, **kwargs: request("GET", *args, **kwargs),
-                "post": lambda *args, **kwargs: request("POST", *args, **kwargs),
-                "patch": lambda *args, **kwargs: request("PATCH", *args, **kwargs),
-                "put": lambda *args, **kwargs: request("PUT", *args, **kwargs),
-                "delete": lambda *args, **kwargs: request("DELETE", *args, **kwargs)
-            }
-        },
+        **modules,
         "database": {
             "builtins": {
                 "get_all": lambda: Dict(**database),
+                "get": lambda key: database.get(key, False),
                 "update": update,
                 "delete": delete
             },
             "variables": database
-        },
-        "config": {
-            "variables": {
-                "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.GwLPiR.TVQ0ToYHvIAWlep2fPw0jZPFZdKVTltZbajw8I",
-                "config": {
-                    "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.GwLPiR.TVQ0ToYHvIAWlep2fPw0jZPFZdKVTltZbajw8I"
-                }
-            }
         }
     }
-
-builtins = {
-    "Embed": femcord.Embed,
-    "execute_webhook": execute_webhook,
-    "table": table
-}

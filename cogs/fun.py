@@ -20,12 +20,13 @@ from femcord.http import Route
 from femcord.utils import get_index
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
-from config import WEATHER_API_KEY
 from datetime import datetime
+from dateutil import parser
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from pyfiglet import Figlet
 from typing import Union
 from utils import *
+from config import WEATHER_API_KEY
 import io, random, urllib.parse, json, re
 
 class Fun(commands.Cog):
@@ -52,6 +53,14 @@ class Fun(commands.Cog):
         self.interactions = []
         self.results = {}
         self.urls = {}
+
+    @commands.Listener
+    async def on_ready(self):
+        async with ClientSession() as session:
+            async with session.get("https://data.iana.org/rdap/dns.json") as response:
+                data = await response.json()
+
+                self.rdap_services = data["services"]
 
     @commands.command(description="arwatar", usage="[użytkownik]")
     async def avatar(self, ctx: commands.Context, user: types.User = None):
@@ -544,15 +553,15 @@ class Fun(commands.Cog):
                 soup = BeautifulSoup(await response.content.read(), "lxml")
                 _id = json.loads(soup.find_all("script", {"type": "text/javascript"}, text=re.compile("g_rgProfileData"))[0].string.splitlines()[1][20:-1])["steamid"]
             except json.decoder.JSONDecodeError:
-                return await ctx.send("Nie znaleziono takiego konta steam")
+                return await ctx.reply("Nie znaleziono takiego konta steam")
 
         response = await self.bot.http.session.get("https://api.truckersmp.com/v2/player/" + _id)
         response = await response.json()
 
         if response["error"]:
-            return await ctx.send("Nie znaleziono takiego konta TruckersMP")
+            return await ctx.reply("Nie znaleziono takiego konta TruckersMP")
 
-        response = response["responseonse"]
+        response = response["response"]
 
         embed = femcord.Embed(title=f"Informacje o {response['name']}:", color=self.bot.embed_color)
         embed.set_thumbnail(url=response["avatar"])
@@ -640,8 +649,47 @@ class Fun(commands.Cog):
 
                     await ctx.reply(embed=embed)
 
-    @commands.command(description="zgadnij kto to", aliases=["who", "ktoto", "coto"])
-    async def whois(self, ctx: commands.Context):
+    @commands.command(description="wyszukuje informacje o domenie", usage="(domena)", aliases=["domain", "domena", "domaininfo", "domenainfo"])
+    async def whois(self, ctx: commands.Context, domain):
+        tld = domain.split(".")[-1]
+
+        rdap_service = None
+
+        for service in self.rdap_services:
+            if tld in service[0]:
+                rdap_service = service[1][0]
+                break
+
+        assert rdap_service is not None, "Nie znaleziono takiej domeny"
+
+        async with ClientSession() as session:
+            async with session.get(rdap_service + "domain/" + domain) as response:
+                assert response.status == 200, "Nie znaleziono takiej domeny"
+
+                data = await response.json()
+
+                nameservers = data["nameservers"]
+                events = data["events"]
+                entities = data["entities"]
+                registrant = entities[0].get("remarks")
+                registrar = entities[-1]["vcardArray"][1][1][3]
+
+                events = sorted(parser.isoparse(event["eventDate"]) for event in events)
+
+                embed = femcord.Embed(title=f"Informacje o domenie {domain}:", color=self.bot.embed_color)
+                embed.add_field(name="Rejestrator:", value=registrar, inline=False)
+                if registrant is not None:
+                    embed.add_field(name="Abonent:", value=registrant[0]["title"], inline=False)
+                embed.add_field(name="Utworzona:", value=femcord.types.t @ events[0], inline=True)
+                embed.add_field(name="Ostatnia modyfikacja:", value=femcord.types.t @ events[1], inline=True)
+                embed.add_field(name="Koniec okresu rozliczeniowego:", value=femcord.types.t @ events[2], inline=True)
+
+                embed.add_field(name="Serwery DNS:", value=", ".join(nameserver["ldhName"] for nameserver in nameservers), inline=False)
+
+                await ctx.reply(embed=embed)
+
+    @commands.command(description="zgadnij kto to", aliases=["ktoto", "coto"])
+    async def who(self, ctx: commands.Context):
         members = []
 
         members_with_pfp = [member for member in ctx.guild.members if member.user.avatar]
