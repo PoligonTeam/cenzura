@@ -3,12 +3,29 @@ set_update_interval("10s")
 
 import random
 
+guilds = gateway.guilds
+guilds = len(guilds)
+guilds = str(guilds_count)
+
+guilds == "" {
+    guilds = "-1"
+}
+
+users = gateway.users
+users = len(users)
+users = str(users)
+
+guilds_text = guilds + " serwerów"
+users_text = users + " użytkowników"
+
 u200b = hex("200b")
 blank = chr(u200b)
 
 number = random_int(1, 100)
 number = str(number)
 
+add_presence(guilds_text, status_type: StatusTypes.DND, activity_type: ActivityTypes.WATCHING)
+add_presence(users_text, status_type: StatusTypes.DND, activity_type: ActivityTypes.LISTENING)
 add_presence("poligon.lgbt", status_type: StatusTypes.DND, activity_type: ActivityTypes.WATCHING)
 add_presence("fortnite", status_type: StatusTypes.DND, activity_type: ActivityTypes.PLAYING)
 add_presence("senis", status_type: StatusTypes.DND, activity_type: ActivityTypes.LISTENING)

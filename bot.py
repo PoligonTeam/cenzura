@@ -156,6 +156,7 @@ class Bot(commands.Bot):
                     "add_presence": add_presence
                 },
                 variables = {
+                    "gateway": self.gateway,
                     "StatusTypes": femcord.StatusTypes,
                     "ActivityTypes": femcord.ActivityTypes
                 }
