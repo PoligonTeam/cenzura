@@ -51,8 +51,10 @@ class Dev(commands.Cog):
         return await eval("penis()", env)
 
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(kod)")
-    @commands.is_owner
     async def eval(self, ctx: commands.Context, *, code):
+        if not ctx.author.id in self.bot.owners:
+            return await self.bot.get_command("femscript")(ctx, code=code)
+
         result = await self._eval(code, {
             "femcord": femcord,
             "ctx": ctx,

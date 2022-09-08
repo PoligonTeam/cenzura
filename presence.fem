@@ -5,11 +5,7 @@ import random
 
 guilds = gateway.guilds
 guilds = len(guilds)
-guilds = str(guilds_count)
-
-guilds == "" {
-    guilds = "-1"
-}
+guilds = str(guilds)
 
 users = gateway.users
 users = len(users)

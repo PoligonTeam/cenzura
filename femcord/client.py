@@ -21,38 +21,39 @@ from .intents import Intents
 from .types import *
 from .typefunctions import set_functions
 from datetime import datetime
+from typing import Callable, List, Type
 
 class Client:
     def __init__(self, *, intents: Intents = Intents.default(), messages_limit: int = 1000, last_latencies_limit: int = 100):
         self.loop = asyncio.get_event_loop()
-        self.token = None
-        self.intents = intents
+        self.token: str = None
+        self.intents: Intents = intents
         self.http: Http = None
         self.gateway: Gateway = None
-        self.listeners = []
-        self.waiting_for = []
-        self.messages_limit = messages_limit
-        self.last_latencies_limit = last_latencies_limit
-        self.started_at = datetime.now()
+        self.listeners: List[Callable] = []
+        self.waiting_for: List[Callable] = []
+        self.messages_limit: int = messages_limit
+        self.last_latencies_limit: List[int] = last_latencies_limit
+        self.started_at: datetime = datetime.now()
 
-    def event(self, func):
-        self.listeners.append(func)
+    def event(self, function: Callable):
+        self.listeners.append(function)
 
-    async def wait_for(self, name, func, key, *, timeout: int = None, on_timeout = None):
-        self.waiting_for.append((name, func, key))
+    async def wait_for(self, name: str, function: Callable, key: int, *, timeout: int = None, on_timeout: Callable = None):
+        self.waiting_for.append((name, function, key))
 
         if timeout is not None:
             await asyncio.sleep(timeout)
 
-            if (name, func, key) in self.waiting_for:
-                self.waiting_for.remove((name, func, key))
+            if (name, function, key) in self.waiting_for:
+                self.waiting_for.remove((name, function, key))
 
                 if on_timeout is not None:
                     await on_timeout()
 
-    def run(self, token, *, bot: bool = True):
-        self.token = token
-        self.bot = bot
+    def run(self, token: str, *, bot: bool = True):
+        self.token: str = token
+        self.bot: bool = bot
 
         self.loop.create_task(Http(self))
         self.loop.create_task(Gateway(self))
@@ -67,5 +68,5 @@ class Client:
             self.gateway.heartbeat.stop()
 
     @classmethod
-    def func_for(cls, _type):
-        return lambda func: setattr(_type, func.__name__, func)
+    def func_for(cls, _type: Type):
+        return lambda function: setattr(_type, function.__name__, function)

@@ -17,11 +17,11 @@ limitations under the License.
 from .errors import *
 from functools import wraps
 
-def check(check_func, *, error=CheckFailure):
+def check(check_function, *, error=CheckFailure):
     def decorator(func):
         @wraps(func)
         def wrapper(self, ctx, *args, **kwargs):
-            if not check_func(self, ctx):
+            if not check_function(self, ctx):
                 raise error(f"Check failed for {func.__name__}")
 
             return func(self, ctx, *args, **kwargs)
@@ -31,26 +31,26 @@ def check(check_func, *, error=CheckFailure):
     return decorator
 
 def is_owner(func):
-    def check_func(self, ctx):
+    def check_function(self, ctx):
         return ctx.author.id in self.bot.owners
 
-    return check(check_func, error=NotOwner)(func)
+    return check(check_function, error=NotOwner)(func)
 
 def is_nsfw(func):
-    def check_func(self, ctx):
+    def check_function(self, ctx):
         return ctx.channel.nsfw
 
-    return check(check_func, error=NotNsfw)(func)
+    return check(check_function, error=NotNsfw)(func)
 
 def has_permissions(*permissions):
     def decorator(func):
-        def check_func(self, ctx):
+        def check_function(self, ctx):
             for permission in permissions:
                 if not ctx.member.permissions.has(permission):
                     return False
 
                 return True
 
-        return check(check_func, error=NoPermission)(func)
+        return check(check_function, error=NoPermission)(func)
 
     return decorator

@@ -53,6 +53,10 @@ class Dict(dict):
     def get(self, item):
         return self[item] if item in self else None
 
+    def set(self, key, value):
+        self[key] = value
+        return True
+
     def items(self):
         return [(key, self[key]) for key in self]
 
@@ -84,7 +88,7 @@ class Parser:
             "random": {
                 "builtins": {
                     "random_int": random.randint,
-                    "random_str": lambda *args: random.choice(args[0] if len(args) == 1 else args)
+                    "random_choice": lambda *args: random.choice(args[0] if len(args) == 1 else args)
                 }
             },
             "regex": {

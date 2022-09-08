@@ -14,23 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import asyncio, sys, traceback
+import asyncio
 from .websocket import WebSocket
-from .http import Route
+from .http import Route, Http
+from .intents import Intents
 from .enums import Opcodes
-from .types import Guild, User, Presence
+from .types import Guild, Channel, User, Message, Presence
 from . import eventhandlers
 from types import CoroutineType
-from typing import Union
-import time, copy
+from typing import TypeVar, Callable, Union, List
+import sys, traceback, time, copy
+
+Gateway = TypeVar("Gateway")
 
 class Heartbeat:
-    def __init__(self, gateway, heartbeat_interval):
+    def __init__(self, gateway: Gateway, heartbeat_interval: float):
         self.loop = asyncio.get_event_loop()
-        self.gateway = gateway
-        self.heartbeat_interval = heartbeat_interval
-        self.heartbeat_task = None
-        self.time = None
+        self.gateway: Gateway = gateway
+        self.heartbeat_interval: float = heartbeat_interval
+        self.heartbeat_task: Callable = None
+        self.time: float = None
 
     def send(self):
         return self.gateway.ws.send(Opcodes.HEARTBEAT, self.gateway.sequence_number)
@@ -58,39 +61,39 @@ class Gateway:
     async def __init__(self, client):
         client.gateway = self
         self.loop = asyncio.get_event_loop()
-        self.http = client.http
-        self.intents = client.intents
-        self.token = client.token
-        self.bot = client.bot
+        self.http: Http = client.http
+        self.intents: Intents = client.intents
+        self.token: str = client.token
+        self.bot: bool = client.bot
         self.heartbeat: Heartbeat = None
-        self.latency = None
-        self.last_latencies = []
-        self.last_latencies_limit = client.last_latencies_limit
-        self.session_id = None
-        self.sequence_number = None
-        self.listeners = client.listeners
-        self.waiting_for = client.waiting_for
+        self.latency: int = None
+        self.last_latencies: List[int] = []
+        self.last_latencies_limit: int = client.last_latencies_limit
+        self.session_id: str = None
+        self.sequence_number: int = None
+        self.listeners: List[Callable] = client.listeners
+        self.waiting_for: List[Callable] = client.waiting_for
 
-        self.resuming = False
-        self.last_sequence_number = None
+        self.resuming: bool = False
+        self.last_sequence_number: int = None
 
         self.bot_user: User = None
 
-        self.guilds = []
-        self.unavailable_guilds = []
-        self.requested_guilds = []
-        self.users = []
-        self.request_members = []
+        self.guilds: List[Guild] = []
+        self.unavailable_guilds: List[dict] = []
+        self.requested_guilds: List[str] = []
+        self.users: List[User] = []
+        self.request_members: List[str] = []
 
-        self.messages_limit = client.messages_limit
-        self.messages = []
+        self.messages_limit: int = client.messages_limit
+        self.messages: List[Message] = []
 
-        self.dispatched_ready = False
-        self.presence = None
+        self.dispatched_ready: bool = False
+        self.presence: Presence = None
 
         await WebSocket(self, client)
 
-    async def dispatch(self, event, *args, **kwargs):
+    async def dispatch(self, event: str, *args, **kwargs):
         for listener in self.waiting_for:
             if listener[0] == event:
                 if listener[2](*args, **kwargs) is True:
@@ -122,8 +125,8 @@ class Gateway:
             "token": self.token,
             "properties": {
                 "$os": sys.platform,
-                "$browser": "cenzuralib",
-                "$device": "cenzuralib"
+                "$browser": "femcord",
+                "$device": "femcord"
             }
         }
 
@@ -145,7 +148,7 @@ class Gateway:
         self.resuming = False
         self.last_sequence_number = None
 
-    async def on_message(self, op, data, sequence_number, event_name):
+    async def on_message(self, op: Opcodes, data: dict, sequence_number: int, event_name: str):
         self.sequence_number = sequence_number
 
         if op is Opcodes.HELLO:
@@ -184,7 +187,7 @@ class Gateway:
                     await self.dispatch("ready")
 
         elif isinstance(event_name, str) and isinstance(data, dict):
-            copy_data = copy.deepcopy(data)
+            copy_data: dict = copy.deepcopy(data)
 
             if not self.dispatched_ready and event_name == "GUILD_CREATE":
                 await eventhandlers.guild_create(self, data)
@@ -215,27 +218,27 @@ class Gateway:
         self.presence = presence
         await self.ws.send(Opcodes.PRESENCE_UPDATE, self.presence.to_dict())
 
-    def get_guild(self, guild_id):
+    def get_guild(self, guild_id: str) -> Guild:
         for guild in self.guilds:
             if guild.id == guild_id:
                 return guild
 
-    def get_channel(self, channel_id):
+    def get_channel(self, channel_id: str) -> Channel:
         for guild in self.guilds:
             for channel in guild.channels:
                 if channel.id == channel_id:
                     return channel
 
-    def get_guild_by_channel_id(self, channel_id):
+    def get_guild_by_channel_id(self, channel_id: str) -> Guild:
         for guild in self.guilds:
             for channel in guild.channels:
                 if channel.id == channel_id:
                     return guild
 
-    async def fetch_user(self, user_id):
+    async def fetch_user(self, user_id: str) -> dict:
         return await self.http.request(Route("GET", "users", user_id))
 
-    async def get_user(self, user: Union[dict, str]):
+    async def get_user(self, user: Union[dict, str]) -> User:
         for cached_user in self.users:
             if isinstance(user, str):
                 if user.lower() in (cached_user.username.lower(), cached_user.id):

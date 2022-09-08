@@ -17,23 +17,26 @@ limitations under the License.
 from .enums import Permissions as PermissionsEnum
 from .errors import PermissionNotExist
 from functools import reduce
+from typing import TypeVar, Union
 
 __all__ = ("Permissions",)
 
+Permissions = TypeVar("Permissions")
+
 class Permissions:
-    def __init__(self, *permissions):
+    def __init__(self, *permissions: Union[PermissionsEnum, str]):
         self.permissions = []
 
         for permission in permissions:
             self.add(permission)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<Permissions permissions={!r} value={!r}>".format(self.permissions, self.get_int())
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<Permissions permissions={!r} value={!r}>".format(self.permissions, self.get_int())
 
-    def check(self, permission):
+    def check(self, permission: int) -> PermissionsEnum:
         if not isinstance(permission, PermissionsEnum) and permission.upper() in (i.name for i in PermissionsEnum):
             permission = PermissionsEnum[permission.upper()]
 
@@ -42,25 +45,25 @@ class Permissions:
 
         return permission
 
-    def add(self, permission):
+    def add(self, permission: int) -> Permissions:
         permission = self.check(permission)
         self.permissions.append(permission)
 
         return self
 
-    def remove(self, permission):
+    def remove(self, permission: int) -> Permissions:
         permission = self.check(permission)
         self.permissions.remove(permission)
 
         return self
 
-    def get_int(self):
+    def get_int(self) -> int:
         if not self.permissions:
             return 0
 
         return reduce(lambda a, b: a | b, [permission.value for permission in PermissionsEnum if permission in self.permissions])
 
-    def has(self, permission):
+    def has(self, permission: int) -> bool:
         permission = self.check(permission)
 
         if PermissionsEnum.ADMINISTRATOR in self.permissions:
@@ -73,5 +76,5 @@ class Permissions:
         return cls(*PermissionsEnum)
 
     @classmethod
-    def from_int(cls, permissions):
+    def from_int(cls, permissions: int):
         return cls(*(permission for permission in PermissionsEnum if permissions & permission.value == permission.value))

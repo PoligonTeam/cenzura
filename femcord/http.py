@@ -14,15 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import asyncio, aiohttp, json, logging
+import asyncio
+from aiohttp import ClientSession, FormData, ContentTypeError
 from .errors import *
 from .embed import Embed
 from .components import Components
 from .enums import *
-from typing import Sequence
+from typing import Optional, Sequence, Union
+import json, logging
 
 class Route:
-    def __init__(self, method, *endpoint):
+    def __init__(self, method: str, *endpoint: str):
         self.method = method
         self.endpoint = "/" + "/".join(endpoint)
 
@@ -43,12 +45,12 @@ class Http:
     async def __init__(self, client):
         client.http = self
         self.loop = asyncio.get_event_loop()
-        self.session = aiohttp.ClientSession(loop=self.loop)
-        self.token = client.token
-        self.bot = client.bot
+        self.session: ClientSession = ClientSession(loop=self.loop)
+        self.token: str = client.token
+        self.bot: bool = client.bot
 
-    async def request(self, route: Route, *, headers: dict = {}, data: dict = None, params: dict = None, files: list = None):
-        headers.update({"authorization": ("Bot " if self.bot is True else "") + self.token, "user-agent": "cenzuralib"})
+    async def request(self, route: Route, *, headers: Optional[dict] = {}, data: Optional[dict] = None, params: Optional[dict] = None, files: Optional[list] = None) -> Union[dict, str]:
+        headers.update({"authorization": ("Bot " if self.bot is True else "") + self.token, "user-agent": "femcord"})
 
         kwargs = dict(json=data)
 
@@ -56,7 +58,7 @@ class Http:
             kwargs["params"] = params
 
         if files is not None:
-            form = aiohttp.FormData()
+            form: FormData = FormData()
             form.add_field("payload_json", json.dumps(data))
 
             for index, file in enumerate(files):
@@ -69,7 +71,7 @@ class Http:
 
             try:
                 response_data = await response.json()
-            except aiohttp.ContentTypeError:
+            except ContentTypeError:
                 response_data = await response.text()
 
             if 300 > response.status >= 200:
@@ -87,12 +89,11 @@ class Http:
                 await asyncio.sleep(response_data["retry_after"])
                 return await self.request(route, headers=headers, data=data, params=params, files=files)
 
-    def start_typing(self, channel_id):
+    def start_typing(self, channel_id: str):
         return self.request(Route("POST", "channels", channel_id, "typing"))
 
-    def send_message(self, channel_id, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = [], mentions: list = [], other: dict = {}):
-        data = {"allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}
-        data.update(other)
+    def send_message(self, channel_id: str, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], other: Optional[dict] = {}):
+        data = {**other, "allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}
 
         if content is not None:
             data["content"] = str(content)
@@ -115,9 +116,8 @@ class Http:
 
         return self.request(Route("POST", "channels", channel_id, "messages"), data=data, files=files)
 
-    def edit_message(self, channel_id, message_id, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = [], mentions: list = [], other: dict = {}):
-        data = {"allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}
-        data.update(other)
+    def edit_message(self, channel_id: str, message_id: str, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], other: Optional[dict] = {}):
+        data = {**other, "allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}
 
         if content is not None:
             data["content"] = str(content)
@@ -140,12 +140,11 @@ class Http:
 
         return self.request(Route("PATCH", "channels", channel_id, "messages", message_id), data=data, files=files)
 
-    def delete_message(self, channel_id, message_id):
+    def delete_message(self, channel_id: str, message_id: str):
         return self.request(Route("DELETE", "channels", channel_id, "messages", message_id))
 
-    def interaction_callback(self, interaction_id, interaction_token, interaction_type: InteractionCallbackTypes, content = None, *, title: str = None, custom_id: str = None, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = [], mentions: list = [], other: dict = {}):
-        data = {"type": interaction_type.value, "data": {}}
-        data["data"].update(other)
+    def interaction_callback(self, interaction_id: str, interaction_token: str, interaction_type: InteractionCallbackTypes, content: Optional[str] = None, *, title: Optional[str] = None, custom_id: str = None, embed: Embed = None, embeds: Sequence[Embed] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], other: Optional[dict] = {}):
+        data = {"type": interaction_type.value, "data": {**other, "allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}}
 
         if content is not None:
             data["data"]["content"] = str(content)
@@ -174,7 +173,7 @@ class Http:
 
         return self.request(Route("POST", "interactions", interaction_id, interaction_token, "callback"), data=data, files=files)
 
-    def kick_member(self, guild_id, member_id, reason = None):
+    def kick_member(self, guild_id: str, member_id: str, reason: Optional[str] = None):
         headers = {}
 
         if reason is not None:
@@ -182,7 +181,7 @@ class Http:
 
         return self.request(Route("DELETE", "guilds", guild_id, "members", member_id), headers=headers)
 
-    def ban_member(self, guild_id, member_id, reason = None, delete_message_days = 0):
+    def ban_member(self, guild_id: str, member_id: str, reason: Optional[str] = None, delete_message_days: Optional[int] = 0):
         headers = {}
 
         if reason is not None:
@@ -190,7 +189,7 @@ class Http:
 
         return self.request(Route("PUT", "guilds", guild_id, "bans", member_id), headers=headers, data={"delete_message_days": delete_message_days})
 
-    def unban_member(self, guild_id, member_id, reason = None):
+    def unban_member(self, guild_id: str, member_id: str, reason: Optional[str] = None):
         headers = {}
 
         if reason is not None:
@@ -198,13 +197,13 @@ class Http:
 
         return self.request(Route("DELETE", "guilds", guild_id, "bans", member_id), headers=headers)
 
-    def add_role(self, guild_id, member_id, role_id):
+    def add_role(self, guild_id: str, member_id: str, role_id: str):
         return self.request(Route("PUT", "guilds", guild_id, "members", member_id, "roles", role_id))
 
-    def remove_role(self, guild_id, member_id, role_id):
+    def remove_role(self, guild_id: str, member_id: str, role_id: str):
         return self.request(Route("DELETE", "guilds", guild_id, "members", member_id, "roles", role_id))
 
-    def get_messages(self, channel_id, *, around = None, before = None, after = None, limit = None):
+    def get_messages(self, channel_id: str, *, around: Optional[str] = None, before: Optional[str] = None, after: Optional[str] = None, limit: Optional[str] = None):
         params = {}
 
         if around is not None:
@@ -218,8 +217,8 @@ class Http:
 
         return self.request(Route("GET", "channels", channel_id, "messages"), params=params)
 
-    def purge_channel(self, channel_id, messages):
+    def purge_channel(self, channel_id: str, messages: str):
         return self.request(Route("POST", "channels", channel_id, "messages", "bulk-delete"), data={"messages": messages})
 
-    def open_dm(self, user_id):
+    def open_dm(self, user_id: str):
         return self.request(Route("POST", "users", "@me", "channels"), data={"recipient_id": user_id})

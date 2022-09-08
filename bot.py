@@ -23,10 +23,11 @@ from utils import modules, builtins
 from types import CoroutineType
 from models import Guilds
 from datetime import datetime
+from typing import Callable, Union, Optional, List
 import asyncio, random, re, os, time, config, copy, logging
 
 class FakeCtx:
-    def __init__(self, guild, channel, member, su_role):
+    def __init__(self, guild: types.Guild, channel: types.Channel, member: types.Member, su_role: types.Role):
         self.guild = guild
         self.channel = channel
         self.member = copy.deepcopy(member)
@@ -42,7 +43,7 @@ class FakeCtx:
         pass
 
 class Schedule:
-    def __init__(self, task, interval, *, name = None, args = (), kwargs = {}, times = float("inf")):
+    def __init__(self, task: Callable, interval: int, *, name: Optional[str] = None, args: tuple = (), kwargs: dict = {}, times: int = float("inf")):
         self.task = task if isinstance(task, CoroutineType) else asyncio.coroutine(task)
         self.interval = interval
         self.timestamp = time.time() + interval
@@ -63,17 +64,18 @@ class Bot(commands.Bot):
         super().__init__(command_prefix=self.get_prefix, intents=femcord.Intents.all(), owners=config.OWNERS)
 
         self.start_time = start_time
-        self.presences = None
-        self.presence_update_interval = None
-        self.random_presence = False
-        self.presence_index = 0
-        self.presence_indexes = []
-        self.schedules = []
+
+        self.presences: List[types.Presence] = None
+        self.presence_update_interval: int = None
+        self.random_presence: bool = False
+        self.presence_index: int = 0
+        self.presence_indexes: List[int] = []
+        self.schedules: List[Schedule] = []
 
         self.embed_color = 0xb22487
         self.user_agent = "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.3) AppleWebkit/538.1 (KHTML, like Gecko) SamsungBrowser/1.0 TV Safari/538.1"
 
-        self.su_role = types.Role(
+        self.su_role: types.Role = types.Role(
             id = "su",
             name = "su",
             color = 0xffffff,
@@ -131,18 +133,18 @@ class Bot(commands.Bot):
         print("created scheduler")
 
     async def update_presences(self):
-        with open("presences.cscript", "r") as file:
+        with open("presence.fem", "r") as file:
             code = file.read()
 
             self.presences = []
 
-            def set_update_interval(interval):
+            def set_update_interval(interval: Union[str, int]):
                 self.presence_update_interval = interval
 
-            def set_random_presence(value):
+            def set_random_presence(value: bool):
                 self.random_presence = value
 
-            def add_presence(name, *, status_type = femcord.StatusTypes.ONLINE, activity_type = femcord.ActivityTypes.PLAYING):
+            def add_presence(name: str, *, status_type: femcord.StatusTypes = femcord.StatusTypes.ONLINE, activity_type: femcord.ActivityTypes = femcord.ActivityTypes.PLAYING):
                 self.presences.append(presence := femcord.Presence(status_type, activities=[femcord.Activity(name=name, type=activity_type)]))
                 return presence
 
@@ -189,7 +191,7 @@ class Bot(commands.Bot):
             if self.presence_index >= len(self.presences):
                 self.presence_index = 0
 
-    async def get_prefix(self, _, message):
+    async def get_prefix(self, _, message: femcord.types.Message) -> List[str]:
         prefixes = ["<@{}>", "<@!{}>", "<@{}> ", "<@!{}> "]
         prefixes = [prefix.format(self.gateway.bot_user.id) for prefix in prefixes]
 
@@ -212,7 +214,7 @@ class Bot(commands.Bot):
 
             await asyncio.sleep(1)
 
-    def get_schedules(self, name = None, *, check = None):
+    def get_schedules(self, name: Optional[str] = None, *, check: Optional[Callable] = None) -> List[Schedule]:
         schedules = []
 
         for schedule in self.schedules:
@@ -221,7 +223,7 @@ class Bot(commands.Bot):
 
         return schedules
 
-    def create_schedule(self, task, interval, *args, **kwargs):
+    def create_schedule(self, task: Callable, interval: Union[datetime, str], *args: tuple, **kwargs: dict) -> Schedule:
         if isinstance(interval, datetime):
             interval = (interval - datetime.now()).total_seconds()
             times = 1
@@ -233,7 +235,7 @@ class Bot(commands.Bot):
 
         return schedule
 
-    def cancel_schedule(self, schedule = None, *, name = None, check = None):
+    def cancel_schedule(self, schedule: Optional[Schedule] = None, *, name: Optional[str] = None, check: Optional[Callable] = None):
         if schedule is not None:
             return self.schedules.remove(schedule)
 
@@ -245,15 +247,15 @@ class Bot(commands.Bot):
     def clear_schedules(self):
         self.schedules.clear()
 
-    async def paginator(self, function, ctx, content: str = None, **kwargs):
-        pages = kwargs.pop("pages", None)
-        prefix = kwargs.pop("prefix", "")
-        suffix = kwargs.pop("suffix", "")
-        limit = kwargs.pop("limit", 2000)
-        timeout = kwargs.pop("timeout", 60)
-        page = kwargs.pop("page", 0)
-        replace = kwargs.pop("replace", True)
-        buttons = kwargs.pop("buttons", False)
+    async def paginator(self, function: Callable, ctx: femcord.commands.Context, content: Optional[str] = None, **kwargs: dict):
+        pages: list = kwargs.pop("pages", None)
+        prefix: str = kwargs.pop("prefix", "")
+        suffix: str = kwargs.pop("suffix", "")
+        limit: int = kwargs.pop("limit", 2000)
+        timeout: int = kwargs.pop("timeout", 60)
+        page: int = kwargs.pop("page", 0)
+        replace: bool = kwargs.pop("replace", True)
+        buttons: bool = kwargs.pop("buttons", False)
 
         if limit > 2000:
             limit = 2000
@@ -276,7 +278,7 @@ class Bot(commands.Bot):
         if page < 0:
             page = pages.index(pages[page])
 
-        def get_components(disabled: bool = False):
+        def get_components(disabled: Optional[bool] = False):
             return femcord.Components(
                 femcord.Row(
                     femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
@@ -291,7 +293,7 @@ class Bot(commands.Bot):
 
         canceled = False
 
-        async def change_page(interaction):
+        async def change_page(interaction: femcord.types.Interaction):
             nonlocal page, canceled
 
             if interaction.data.custom_id == "first":

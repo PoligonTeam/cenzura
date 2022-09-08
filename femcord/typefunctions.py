@@ -20,15 +20,17 @@ from .embed import Embed
 from .components import Components
 from .http import Route
 from .enums import *
-from typing import Union, Sequence, Callable
+from typing import TypeVar, Optional, Callable, Union, Sequence, List
 
-def set_functions(client):
+Client = TypeVar("Client")
+
+def set_functions(client: Client):
     @client.func_for(Guild)
-    async def fetch_member(self: Guild, member_id):
+    async def fetch_member(self: Guild, member_id: str) -> Member:
         return await client.http.request(Route("GET", "guilds", self.id, "members", member_id))
 
     @client.func_for(Guild)
-    async def get_member(self: Guild, member: Union[dict, str], user: Union[User, dict] = None):
+    async def get_member(self: Guild, member: Union[dict, str], user: Optional[Union[User, dict]] = None) -> Member:
         for cached_member in self.members:
             if isinstance(member, str):
                 if member.lower() in (cached_member.user.username.lower(), (cached_member.nick or "").lower(), cached_member.user.id):
@@ -60,7 +62,7 @@ def set_functions(client):
         return member
 
     @client.func_for(Channel)
-    async def fetch_message(self: Channel, message_id):
+    async def fetch_message(self: Channel, message_id: str) -> Message:
         return await client.http.request(Route("GET", "channels", self.id, "messages", message_id))
 
     @client.func_for(Channel)
@@ -68,19 +70,19 @@ def set_functions(client):
         return await client.http.start_typing(self.id)
 
     @client.func_for(Channel)
-    async def send(self: Channel, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = [], mentions: list = [], other: dict = {}):
+    async def send(self: Channel, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], other: Optional[dict] = {}) -> Message:
         resp = await client.http.send_message(self.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)
 
         if resp is not None:
             return await Message.from_raw(client.gateway, resp)
 
     @client.func_for(Message)
-    async def reply(self: Message, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = [], components: Components = None, files: list = None, mentions: list = [], other: dict = {}):
+    async def reply(self: Message, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = [], components: Optional[Components] = None, files: Optional[list] = None, mentions: Optional[list] = [], other: Optional[dict] = {}) -> Message:
         other["message_reference"] = {"guild_id": self.guild.id, "channel_id": self.channel.id, "message_id": self.id}
         return await self.channel.send(content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)
 
     @client.func_for(Message)
-    async def edit(self: Message, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = None, mentions: list = [], other: dict = {}):
+    async def edit(self: Message, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = None, mentions: Optional[list] = [], other: Optional[dict] = {}) -> Message:
         channel_id = self.channel
 
         if isinstance(self.channel, Channel):
@@ -96,11 +98,11 @@ def set_functions(client):
         return await client.http.delete_message(self.channel.id, self.id)
 
     @client.func_for(Interaction)
-    async def callback(self: Interaction, interaction_type: InteractionCallbackTypes, content = None, *, title: str = None, custom_id: str = None, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = None, mentions: list = [], other: dict = {}):
+    async def callback(self: Interaction, interaction_type: InteractionCallbackTypes, content: Optional[str] = None, *, title: Optional[str] = None, custom_id: Optional[str] = None, embed: Embed = None, embeds: Sequence[Embed] = None, components: Optional[Components] = None, files: Optional[list] = None, mentions: Optional[list] = [], other: Optional[dict] = {}):
         return await client.http.interaction_callback(self.id, self.token, interaction_type, content, title=title, custom_id=custom_id, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)
 
     @client.func_for(User)
-    async def send(self: User, content = None, *, embed: Embed = None, embeds: Sequence[Embed] = None, components: Components = None, files: list = [], mentions: list = [], other: dict = {}):
+    async def send(self: User, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], other: Optional[dict] = {}) -> Message:
         if self.dm is None:
             resp = await client.http.open_dm(self.id)
             self.dm = Channel.from_raw(resp)
@@ -111,11 +113,11 @@ def set_functions(client):
             return await Message.from_raw(client.gateway, resp)
 
     @client.func_for(Member)
-    async def kick(self: Member, reason = None):
+    async def kick(self: Member, reason: Optional[str] = None):
         return await client.http.kick_member(self.guild_id, self.user.id, reason=reason)
 
     @client.func_for(Member)
-    async def ban(self: Member, reason = None, delete_message_days = 0):
+    async def ban(self: Member, reason: Optional[str] = None, delete_message_days: Optional[int] = 0):
         return await client.http.ban_member(self.guild_id, self.user.id, reason=reason, delete_message_days=delete_message_days)
 
     @client.func_for(Member)
@@ -127,18 +129,18 @@ def set_functions(client):
         return await client.http.remove_role(self.guild_id, self.user.id, role.id)
 
     @client.func_for(Guild)
-    async def unban(self: Guild, member_id, reason = None):
+    async def unban(self: Guild, member_id: str, reason: Optional[str] = None):
         return await client.http.unban_member(self.id, member_id, reason=reason)
 
     @client.func_for(Channel)
-    async def get_messages(self: Channel, *, around: int = None, before: int = None, after: int = None, limit: int = None):
+    async def get_messages(self: Channel, *, around: Optional[int] = None, before: Optional[int] = None, after: Optional[int] = None, limit: Optional[int] = None) -> List[Message]:
         resp = await client.http.get_messages(self.id, around=around, before=before, after=after, limit=limit)
 
         if resp is not None:
             return [await Message.from_raw(client.gateway, message) for message in resp]
 
     @client.func_for(Channel)
-    async def purge(self: Channel, *, limit: int = None, messages: Sequence[Union[Message, str]] = [], key: Callable[[Message], bool] = None):
+    async def purge(self: Channel, *, limit: Optional[int] = None, messages: Optional[Sequence[Union[Message, str]]] = [], key: Optional[Callable[[Message], bool]] = None) -> List[dict]:
         if limit is not None:
             messages += [message for message in client.gateway.messages if message.channel.id == self.id][-limit:]
 

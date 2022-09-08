@@ -312,7 +312,7 @@ class Music(commands.Cog):
                         embed = femcord.Embed(title=f"Informacje o utworze", url=track["url"], color=self.bot.embed_color)
                         embed.add_field(name="Wykonawca", value=track["artist"]["name"], inline=True)
                         embed.add_field(name="Nazwa utworu", value=track["name"], inline=True)
-                        embed.add_field(name="\u200b", value="\u200b", inline=True)
+                        embed.add_blank_field()
                         embed.add_field(name="Gatunki", value="\n".join(["- " + genere["name"].title() for genere in track["toptags"]["tag"]]))
 
                         embed.set_thumbnail(url=track["album"]["image"][-1]["#text"])
@@ -401,7 +401,7 @@ class Music(commands.Cog):
 
                     result = await run(
                         lastfm.script,
-                        modules = await get_modules(ctx.guild),
+                        modules = await get_modules(self.bot, ctx.guild),
                         builtins = builtins,
                         variables = {
                             **convert(

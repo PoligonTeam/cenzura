@@ -17,9 +17,9 @@ limitations under the License.
 from enum import Enum
 
 class Enum(Enum):
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.name
 
 class Intents(Enum):

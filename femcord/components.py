@@ -16,70 +16,76 @@ limitations under the License.
 
 from .enums import ButtonStyles, TextInputStyles
 from .types import Emoji
+from typing import TypeVar, Union, Optional, List
+
+Row = TypeVar("Row")
+Button = TypeVar("Button")
+SelectMenu = TypeVar("SelectMenu")
+Option = TypeVar("Option")
 
 class Components:
-    def __init__(self, *rows):
+    def __init__(self, *rows: List[Row]):
         self.components = [row.__dict__ for row in rows]
 
-    def add_row(self, row):
+    def add_row(self, row: Row):
         self.components.append(row.__dict__)
 
 class Row:
-    def __init__(self, *items):
+    def __init__(self, *items: List[Union[Button, SelectMenu]]):
         self.type = 1
         self.components = [item.__dict__ for item in items]
 
-    def add_item(self, item):
+    def add_item(self, item: Union[Button, SelectMenu]):
         self.components.append(item.__dict__)
 
 class Button:
-    def __init__(self, label: str = None, *, custom_id: str = None, style: ButtonStyles, url: str = None, disabled: bool = False, emoji: Emoji = None):
-        self.type = 2
-        self.label = label
-        self.style = style.value
+    def __init__(self, label: Optional[str] = None, *, custom_id: Optional[str] = None, style: ButtonStyles, url: Optional[str] = None, disabled: Optional[bool] = False, emoji: Optional[Emoji] = None):
+        self.type: int = 2
+        self.label: str = label
+        self.style: int = style.value
         if custom_id:
-            self.custom_id = custom_id
+            self.custom_id: str = custom_id
         if url:
-            self.url = url
+            self.url: str = url
         if disabled:
-            self.disabled = disabled
+            self.disabled: bool = disabled
         if emoji:
-            self.emoji = {"id": emoji.id, "name": emoji.name}
+            self.emoji: dict = {"id": emoji.id, "name": emoji.name}
 
 class SelectMenu:
-    def __init__(self, *, custom_id: str, placeholder: str, min_values: int = 1, max_values: int = 1, disabled: bool = False, options):
-        self.type = 3
-        self.custom_id = custom_id
-        self.placeholder = placeholder
-        self.min_values = min_values
-        self.max_values = max_values
-        self.disabled = disabled
-        self.options = [option.__dict__ for option in options]
+    def __init__(self, *, custom_id: str, placeholder: str, min_values: Optional[int] = 1, max_values: Optional[int] = 1, disabled: Optional[bool] = False, options: List[Option]):
+        self.type: int = 3
+        self.custom_id: str = custom_id
+        self.placeholder: str = placeholder
+        self.min_values: int = min_values
+        self.max_values: int = max_values
+        self.disabled: bool = disabled
+        self.options: List[dict] = [option.__dict__ for option in options]
 
-    def add_option(self, option):
+    def add_option(self, option: Option):
         self.components.append(option.__dict__)
 
 class Option:
-    def __init__(self, label: str, value: str, *, description: str = None, emoji: Emoji = None, default: bool = False):
-        self.label = label
-        self.value = value
-        self.description = description
+    def __init__(self, label: str, value: str, *, description: Optional[str] = None, emoji: Optional[Emoji] = None, default: Optional[bool] = False):
+        self.label: str = label
+        self.value: str = value
+        self.description: str = description
         if emoji:
-            self.emoji = {"id": emoji.id, "name": emoji.name}
-        self.default = default
+            self.emoji: dict = {"id": emoji.id, "name": emoji.name}
+        self.default: bool = default
 
 class TextInput:
-    def __init__(self, label: str, *, custom_id: str, style: TextInputStyles, min_length: int = None, max_length = None, required: bool = True, value: str = None, placeholder: str = None):
-        self.type = 4
-        self.label = label
-        self.custom_id = custom_id
-        self.style = style.value
+    def __init__(self, label: str, *, custom_id: str, style: TextInputStyles, min_length: Optional[int] = None, max_length: Optional[int] = None, required: Optional[bool] = True, value: Optional[str] = None, placeholder: Optional[str] = None):
+        self.type: int = 4
+        self.label: str = label
+        self.custom_id: str = custom_id
+        self.style: int = style.value
         if min_length:
-            self.min_length = min_length
+            self.min_length: int = min_length
         if max_length:
-            self.max_length = max_length
-        self.required = required
+            self.max_length: int = max_length
+        self.required: bool = required
         if value:
-            self.value = value
+            self.value: str = value
         if placeholder:
-            self.placeholder = placeholder
+            self.placeholder: str = placeholder

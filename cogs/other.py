@@ -16,7 +16,7 @@ limitations under the License.
 
 import femcord
 from femcord import commands, types
-from femscript import Lexer, Parser, run
+from femscript import Lexer, Parser, run, Dict
 from utils import *
 from types import CoroutineType
 from models import Guilds
@@ -41,7 +41,7 @@ class Other(commands.Cog):
         result = await run(
             code,
             modules = {
-                **await get_modules(ctx.guild),
+                **await get_modules(self.bot, ctx.guild),
                 **(
                     {
                         "database": {}
@@ -50,14 +50,22 @@ class Other(commands.Cog):
                     {
 
                     }
-                )
-            },
-            builtins = {
-                **builtins,
+                ),
                 **(
                     {
-                        "send": ctx.send,
-                        "reply": ctx.reply
+                        "owneronly": {
+                            "builtins": {
+                                "call": lambda function, *args, **kwargs: function(*args, **kwargs),
+                                "py_builtins": Dict(**__builtins__),
+                                "send": ctx.send,
+                                "reply": ctx.reply
+                            },
+                            "variables": {
+                                "femcord": femcord,
+                                "_bot": self.bot,
+                                "ctx": ctx
+                            }
+                        }
                     }
                     if ctx.author.id in self.bot.owners else
                     {
@@ -65,11 +73,23 @@ class Other(commands.Cog):
                     }
                 )
             },
-            variables = convert(
-                guild = ctx.guild,
-                channel = ctx.channel,
-                author = ctx.author
-            )
+            builtins = builtins,
+            variables = {
+                **convert(
+                    guild = ctx.guild,
+                    channel = ctx.channel,
+                    author = ctx.author
+                ),
+                "bot": {
+                    "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ",
+                    "gateway": {
+                        "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ"
+                    },
+                    "http": {
+                        "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ"
+                    }
+                }
+            }
         )
 
         if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], femcord.Embed):
@@ -209,7 +229,7 @@ class Other(commands.Cog):
         parser = Parser(
             lexer,
             modules = {
-                **await get_modules(ctx.guild),
+                **await get_modules(self.bot, ctx.guild),
                 "requests": {
                     "builtins": {
                         "request": lambda *args, **kwargs: {"text": "", "json": {}},
@@ -320,7 +340,7 @@ class Other(commands.Cog):
 
                 result = await run(
                     code,
-                    modules = await get_modules(ctx.guild),
+                    modules = await get_modules(self.bot, ctx.guild),
                     builtins = {
                         **builtins,
                         "set_command_name": void,
@@ -370,7 +390,6 @@ class Other(commands.Cog):
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
 
         #DODAC ANOTACJE DO WSZYSTKIEGO
-        #UZYWAC ADD_BLANK_FIELD
         #NAPRAWIC RELOADOWANIE COGOW
         #PRZEPISAC UTILS.TABLE
         #LEPSZA WERYFIKACJA NA POLIGONIE

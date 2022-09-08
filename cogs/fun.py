@@ -505,7 +505,7 @@ class Fun(commands.Cog):
         embed.add_field(name="Poziom:", value=ctx.guild.premium_tier, inline=True)
         if ctx.guild.vanity_url is not None:
             embed.add_field(name="Własny url:", value="discord.gg/" + ctx.guild.vanity_url)
-        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_blank_field()
         embed.add_field(name="Ikona:", value=f"[link]({ctx.guild.icon_url})", inline=True)
         if ctx.guild.banner is not None:
             embed.add_field(name="Baner:", value=f"[link]({ctx.guild.banner_url})", inline=True)
@@ -640,10 +640,10 @@ class Fun(commands.Cog):
                     embed = femcord.Embed(title=f"Pogoda dla {city}", color=self.bot.embed_color)
                     embed.add_field(name="Temperatura:", value=f"{data['metric']['temp']}°C", inline=True)
                     embed.add_field(name="Indeks UV:", value=f"{data['uv']}", inline=True)
-                    embed.add_field(name="\u200b", value="\u200b", inline=True)
+                    embed.add_blank_field()
                     embed.add_field(name="Ciśnienie:", value=f"{data['metric']['pressure']} hPa", inline=True)
                     embed.add_field(name="Wilgotność:", value=f"{data['humidity']}%", inline=True)
-                    embed.add_field(name="\u200b", value="\u200b", inline=True)
+                    embed.add_blank_field()
                     embed.add_field(name="Kierunek wiatru:", value=f"{data['winddir']}°", inline=True)
                     embed.add_field(name="Prędkość wiatru:", value=f"{data['metric']['windSpeed']} km/h", inline=True)
 

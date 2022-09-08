@@ -149,6 +149,7 @@ async def request(method, url, *, headers = None, data = None, proxy = None):
             json = {}
 
         return {
+            "status": response.status_code,
             "text": response.text,
             "json": Dict(**json)
         }
@@ -188,7 +189,7 @@ builtins = {
     "table": table
 }
 
-async def get_modules(guild):
+async def get_modules(bot, guild):
     query = Guilds.filter(guild_id=guild.id)
     db_guild = await query.first()
 
@@ -202,6 +203,9 @@ async def get_modules(guild):
     async def delete(key):
         database.pop(key)
         await query.update(database=database)
+
+    def set_interval(name, interval):
+        pass
 
     return {
         **modules,
