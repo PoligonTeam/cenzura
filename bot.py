@@ -24,7 +24,7 @@ from types import CoroutineType
 from models import Guilds
 from datetime import datetime
 from typing import Callable, Union, Optional, List
-import asyncio, random, re, os, time, config, copy, logging
+import asyncio, random, re, os, time, config, copy, inspect, logging
 
 class FakeCtx:
     def __init__(self, guild: types.Guild, channel: types.Channel, member: types.Member, su_role: types.Role):
@@ -96,6 +96,7 @@ class Bot(commands.Bot):
                 print("loaded %s" % filename)
 
         self.event(self.on_ready)
+        self.event(self.on_message_update)
         self.loop.run_until_complete(self.async_init())
 
     async def on_ready(self):
@@ -105,7 +106,7 @@ class Bot(commands.Bot):
             db_guild = await Guilds.filter(guild_id=guild.id).first()
 
             if db_guild is None:
-                db_guild = await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[])
+                db_guild = await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[], database={}, permissions={}, schedules=[])
 
             if db_guild.custom_commands:
                 guild.owner = await guild.get_member(guild.owner)
@@ -119,6 +120,12 @@ class Bot(commands.Bot):
         await self.create_schedule(self.update_presences, "10m", name="update_presences")()
 
         print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - self.start_time:.2f}s)")
+
+    async def on_message_update(self, old_message: types.Message, message: types.Message):
+        if message.author.bot:
+            return
+
+        await self.process_commands(message)
 
     async def async_init(self):
         logging.getLogger("tortoise").setLevel(logging.WARNING)
@@ -145,7 +152,7 @@ class Bot(commands.Bot):
                 self.random_presence = value
 
             def add_presence(name: str, *, status_type: femcord.StatusTypes = femcord.StatusTypes.ONLINE, activity_type: femcord.ActivityTypes = femcord.ActivityTypes.PLAYING):
-                self.presences.append(presence := femcord.Presence(status_type, activities=[femcord.Activity(name=name, type=activity_type)]))
+                self.presences.append(presence := femcord.Presence(status_type, activities=[femcord.Activity(name, activity_type)]))
                 return presence
 
             await run(

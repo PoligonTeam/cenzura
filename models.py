@@ -29,7 +29,23 @@ class TextArray(Field):
 
     def to_python_value(self, value):
         if isinstance(value, str):
-            json.loads(value)
+            return json.loads(value)
+        return value
+
+class JSONArray(Field):
+    SQL_TYPE = "JSON[]"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def to_db_value(self, value, _):
+        if isinstance(value, dict):
+            return json.dumps(value)
+        return value
+
+    def to_python_value(self, value):
+        if isinstance(value, str):
+            return json.loads(value)
         return value
 
 class Guilds(Model):
@@ -43,6 +59,11 @@ class Guilds(Model):
     database = JSONField()
     permissions = JSONField()
     schedules = TextArray()
+
+class Users(Model):
+    id = IntField(pk=True)
+    user_id = TextField()
+    avatars = JSONArray()
 
 class LastFM(Model):
     id = IntField(pk=True)

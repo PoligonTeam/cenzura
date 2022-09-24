@@ -24,7 +24,11 @@ class Context:
         self.bot_user = self.bot.gateway.bot_user
 
         self.guild = message.guild
-        self.channel = message.channel
+        self.channel = message.channel or message.thread
+
+        if isinstance(self.channel, str):
+            self.channel = self.guild.get_channel(self.channel)
+
         self.message = message
 
         self.author = message.author

@@ -20,6 +20,7 @@ from femscript import run
 from utils import *
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
+from urllib.parse import quote_plus
 from models import LastFM
 from config import GENIUS, LAVALINK_IP, LAVALINK_PORT, LAVALINK_PASSWORD, LASTFM_API_KEY, LASTFM_API_SECRET, LASTFM_API_URL, MUSIXMATCH
 import hashlib, datetime, asyncio, lavalink, re, os, logging
@@ -219,8 +220,20 @@ class Music(commands.Cog):
         await ctx.reply(text or "nie ma nic")
 
     @commands.command(aliases=["np"])
-    async def nowplaying(self, ctx: commands.Context):
+    async def nowplaying(self, ctx: commands.Context, *, query: str = None):
         player = self.get_player(ctx.guild)
+
+        async def nowplaying_poligon():
+            async with ClientSession() as session:
+                async with session.get("https://radio.poligon.lgbt/api/live/nowplaying/station_1") as response:
+                    data = await response.json()
+                    now_playing = data["now_playing"]
+                    playing_next = data["playing_next"]
+
+                    return await ctx.reply(f"Gram teraz: `{now_playing['song']['text']}` {(now_playing['elapsed'] % 3600) // 60}:{now_playing['elapsed'] % 60:02d}/{(now_playing['duration'] % 3600) // 60}:{now_playing['duration'] % 60:02d}\nPotem będę grał: `{playing_next['song']['text']}`")
+
+        if query == r"%radio":
+            return await nowplaying_poligon()
 
         if not player:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
@@ -229,13 +242,8 @@ class Music(commands.Cog):
             return await ctx.reply("Nie gram żadnego utworu")
 
         if player.current.title == "radio poligon":
-            async with ClientSession() as session:
-                async with session.get("https://radio.poligon.lgbt/api/live/nowplaying/station_1") as response:
-                    data = await response.json()
-                    now_playing = data["now_playing"]
-                    playing_next = data["playing_next"]
+            return await nowplaying_poligon()
 
-                    return await ctx.reply(f"Gram teraz: `{now_playing['song']['text']}` {(now_playing['elapsed'] % 3600) // 60}:{now_playing['elapsed'] % 60:02d}/{(now_playing['duration'] % 3600) // 60}:{now_playing['duration'] % 60:02d}\nPotem będę grał: `{playing_next['song']['text']}`")
 
         position = int(player.position / 1000)
         duration = int(player.current.duration / 1000)
@@ -358,11 +366,11 @@ class Music(commands.Cog):
                         cs_data["nowplaying"] = True
 
                     async def append_track(index, track):
-                        async with session.get(LASTFM_API_URL + f"?method=track.getInfo&user={lastfm.username}&artist={track['artist']['name']}&track={track['name']}&api_key={LASTFM_API_KEY}&format=json") as response:
+                        async with session.get(LASTFM_API_URL + f"?method=track.getInfo&user={lastfm.username}&artist={quote_plus(track['artist']['name'])}&track={quote_plus(track['name'])}&api_key={LASTFM_API_KEY}&format=json") as response:
                             data = await response.json()
                             track_info = data["track"]
 
-                        async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&user={lastfm.username}&artist={track['artist']['name']}&api_key={LASTFM_API_KEY}&format=json") as response:
+                        async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&user={lastfm.username}&artist={quote_plus(track['artist']['name'])}&api_key={LASTFM_API_KEY}&format=json") as response:
                             data = await response.json()
                             artist_info = data["artist"]
 
@@ -444,16 +452,21 @@ class Music(commands.Cog):
         await self.fmscript(ctx, script=self.templates[template])
 
     @commands.command(description="Użytkownicy którzy znają artyste", aliases=["wk"])
-    async def whoknows(self, ctx: commands.Context):
+    async def whoknows(self, ctx: commands.Context, *, user: types.User = None):
+        user = user or ctx.author
+
         lastfm_users = await LastFM.all()
 
-        if not ctx.author.id in [lastfm_user.user_id for lastfm_user in lastfm_users]:
-            return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+        if not user.id in [lastfm_user.user_id for lastfm_user in lastfm_users]:
+            if ctx.author is user:
+                return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+
+            return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
 
         lastfm_users = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id in [member.user.id for member in ctx.guild.members]]
         lastfm_scrobbles = []
 
-        lastfm_user = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == ctx.author.id][0]
+        lastfm_user = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == user.id][0]
 
         async with femcord.Typing(ctx.message):
             async with ClientSession() as session:
@@ -522,14 +535,6 @@ class Music(commands.Cog):
                         name = track["title"] + " " + track["artist"]
 
                 if name is None:
-                    activities = ctx.member.presence.activities
-                    index = femcord.utils.get_index(activities, "Spotify", key=lambda activity: activity.name)
-
-                    if index is not None:
-                        activity = activities[index]
-                        name = activity.details + " " + activity.state
-
-                if name is None:
                     lastfm = await LastFM.filter(user_id=ctx.author.id).first()
 
                     if lastfm is None:
@@ -544,6 +549,14 @@ class Music(commands.Cog):
 
                         if len(tracks) == 2:
                             name = tracks[0]["name"] + " " + tracks[0]["artist"]["#text"]
+
+                if name is None:
+                    activities = ctx.member.presence.activities
+                    index = femcord.utils.get_index(activities, "Spotify", key=lambda activity: activity.name)
+
+                    if index is not None:
+                        activity = activities[index]
+                        name = activity.details + " " + activity.state
 
                 if name is None:
                     return await ctx.reply("Nie podałeś nazwy")

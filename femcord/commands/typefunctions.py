@@ -18,19 +18,41 @@ limitations under the License.
 import re
 from ..types import *
 
+pattern = re.compile(r"\d{16,19}")
+
 def set_functions(bot):
     @bot.func_for(User)
     def from_arg(ctx, argument):
-        return bot.gateway.get_user(user_id.group() if (user_id := re.search("\d+", argument)) is not None else argument)
+        result = pattern.search(argument)
+
+        if result is not None:
+            argument = result.group()
+
+        return bot.gateway.get_user(argument)
 
     @bot.func_for(Member)
     def from_arg(ctx, argument):
-        return ctx.guild.get_member(member_id.group() if (member_id := re.search("\d+", argument)) is not None else argument)
+        result = pattern.search(argument)
+
+        if result is not None:
+            argument = result.group()
+
+        return ctx.guild.get_member(argument)
 
     @bot.func_for(Channel)
     def from_arg(ctx, argument):
-        return ctx.guild.get_channel(channel_id.group() if (channel_id := re.search("\d+", argument)) is not None else argument)
+        result = pattern.search(argument)
+
+        if result is not None:
+            argument = result.group()
+
+        return ctx.guild.get_channel(argument)
 
     @bot.func_for(Role)
     def from_arg(ctx, argument):
-        return ctx.guild.get_role(role_id.group() if (role_id := re.search("\d+", argument)) is not None else argument)
+        result = pattern.search(argument)
+
+        if result is not None:
+            argument = result.group()
+
+        return ctx.guild.get_role(argument)

@@ -166,7 +166,7 @@ async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_
     if embed:
         data["embeds"] = [embed.__dict__]
 
-    await request("POST", femcord.http.URL + "/webhooks/" + webhook_id + "/" + webhook_token, data=data)
+    await request("POST", femcord.http.Http.URL + "/webhooks/" + webhook_id + "/" + webhook_token, data=data)
 
 def void(*args, **kwargs):
     return False
@@ -203,9 +203,6 @@ async def get_modules(bot, guild):
     async def delete(key):
         database.pop(key)
         await query.update(database=database)
-
-    def set_interval(name, interval):
-        pass
 
     return {
         **modules,

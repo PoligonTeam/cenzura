@@ -134,7 +134,7 @@ class Guild:
         if not channel_id_or_name:
             return
 
-        for channel in self.channels:
+        for channel in self.channels + self.threads:
             if channel.name.lower() == channel_id_or_name.lower() or channel.id == channel_id_or_name:
                 return channel
 

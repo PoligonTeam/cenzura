@@ -24,8 +24,8 @@ class EnumMeta(EnumMeta):
         return item in [v.value for v in cls.__members__.values()]
 
 class Tokens(Enum, metaclass=EnumMeta):
-    LEFT_CURLY_BACKET = "{"
-    RIGHT_CURLY_BACKET = "}"
+    LEFT_CURLY_BRACKET = "{"
+    RIGHT_CURLY_BRACKET = "}"
     LEFT_BRACKET = "("
     RIGHT_BRACKET = ")"
     COMMA = ","
@@ -40,7 +40,7 @@ class Tokens(Enum, metaclass=EnumMeta):
     EQUALS = "=="
     NOTEQUALS = "!="
     GREATER = ">"
-    LOWER = "<"
+    LESS = "<"
     COMMENT = "#"
     NEWLINE = "\n"
 

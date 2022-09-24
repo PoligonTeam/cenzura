@@ -63,7 +63,19 @@ class Tools(commands.Cog):
 
             async with async_playwright() as p:
                 browser = await p.firefox.launch()
-                page = await browser.new_page()
+                context = await browser.new_context(
+                    storage_state={
+                        "cookies": [
+                            {
+                                "name": "CONSENT",
+                                "value": "YES+0",
+                                "domain": ".google.com",
+                                "path": "/"
+                            }
+                        ]
+                    }
+                )
+                page = await context.new_page()
 
                 try:
                     await page.goto(url)

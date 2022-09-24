@@ -29,6 +29,13 @@ class CustomCommands(commands.Cog):
     def __init__(self):
         self.prefixes = []
 
+    def append_prefix(self, prefix):
+        self.prefixes.append(prefix)
+
+        if "" in self.prefixes:
+            self.prefixes.remove("")
+            self.prefixes.append("")
+
 class Other(commands.Cog):
     name = "Inne"
 
@@ -146,7 +153,7 @@ class Other(commands.Cog):
             command_name = name
 
             if prefix is not None and not prefix in self.custom_commands_cog.prefixes:
-                self.custom_commands_cog.prefixes.append(prefix)
+                self.custom_commands_cog.append_prefix(prefix)
 
             if not re.findall(r"# (DATE|GUILD|CHANNEL|AUTHOR): \d+", code) == ["DATE", "GUILD", "CHANNEL", "AUTHOR"]:
                 code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
@@ -288,7 +295,7 @@ class Other(commands.Cog):
 
         if command_object:
             if command_prefix is not None and not command_prefix in self.custom_commands_cog.prefixes:
-                self.custom_commands_cog.prefixes.append(command_object.other["prefix"])
+                self.custom_commands_cog.append_prefix(command_object.other["prefix"])
 
             custom_commands.remove(command_object.other["code"])
             self.bot.remove_command(command_object)
@@ -388,21 +395,6 @@ class Other(commands.Cog):
 
         if command_usage is not None:
             command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
-
-        #DODAC ANOTACJE DO WSZYSTKIEGO
-        #NAPRAWIC RELOADOWANIE COGOW
-        #PRZEPISAC UTILS.TABLE
-        #LEPSZA WERYFIKACJA NA POLIGONIE
-        #STICKERY DO SEND
-        #AUTOPATCH DO DISCORD VOICE
-        #CUSTOMOWE PERMISJE
-        #DODAC LOOPY DO FEMSCRIPT
-        #OGRANICZYC RPS DO 16
-        #LIMIT DO INTOW W CS
-        #NAPRAWIC LIB.EVENTHANDLERS W NIEKTORYCH MIEJSCACH
-        #HTTP PROXY
-        #NAPRAWIC RETURNY W IFACH
-        #HANDLOWANIE PRAWIE WSZYSTKICH ERROROW W PARSER.PY
 
         self.custom_commands_cog.commands.append(command)
         self.bot.commands.append(command)

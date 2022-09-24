@@ -166,7 +166,7 @@ class Parser:
             Tokens.EQUALS: "__eq__",
             Tokens.NOTEQUALS: "__ne__",
             Tokens.GREATER: "__gt__",
-            Tokens.LOWER: "__lt__"
+            Tokens.LESS: "__lt__"
         }
 
         types = {
@@ -214,7 +214,7 @@ class Parser:
                 elif current_token in comparison_operators:
                     self.set(Token(Types.BOOL, "true" if getattr(self.convert(self.position - 1), comparison_operators[current_token])(self.convert(self.position + 1)) is True else "false"))
                     continue
-                elif current_token is Tokens.LEFT_CURLY_BACKET:
+                elif current_token is Tokens.LEFT_CURLY_BRACKET:
                     if self.tokens[self.position - 1].type is Types.VAR:
                         self.tokens[self.position - 1] = Token(Types.BOOL, ["false", "true"][bool(self.variables[self.tokens[self.position - 1].value])])
 
@@ -223,7 +223,7 @@ class Parser:
                         while True:
                             if self.position >= len(self.tokens):
                                 break
-                            if self.tokens[self.position] is Tokens.RIGHT_CURLY_BACKET:
+                            if self.tokens[self.position] is Tokens.RIGHT_CURLY_BRACKET:
                                 self.position += 1
                                 break
                             self.position += 1

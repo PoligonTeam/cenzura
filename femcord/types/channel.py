@@ -56,14 +56,15 @@ class ThreadMetadata:
 
 @modified_dataclass
 class ThreadMember:
-    id: str
-    user_id: str
-    join_timestamp: datetime
-    flags: int
+    id: str = None
+    user_id: str = None
+    join_timestamp: datetime = None
+    flags: int = None
 
     @classmethod
     def from_raw(cls, member):
-        member["datetime"] = parse_time(member["datetime"])
+        if "datetime" in member:
+            member["datetime"] = parse_time(member["datetime"])
 
         return cls(**member)
 

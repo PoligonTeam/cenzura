@@ -17,6 +17,7 @@ limitations under the License.
 from .types import *
 from .enums import *
 from .utils import *
+from copy import deepcopy
 
 CDN_URL = "https://cdn.discordapp.com"
 
@@ -244,7 +245,9 @@ async def guild_member_update(gateway, member):
     guild = gateway.get_guild(member["guild_id"])
 
     if guild is None:
-        return member,
+        return None, None, member
+
+    old_member = deepcopy(await guild.get_member(member["user"]["id"]))
 
     del member["guild_id"]
 
@@ -266,7 +269,7 @@ async def guild_member_update(gateway, member):
     else:
         guild.members[member_index] = member
 
-    return guild, member
+    return guild, old_member, member
 
 async def guild_role_create(gateway, role):
     guild = gateway.get_guild(role["guild_id"])
@@ -314,7 +317,7 @@ async def message_update(gateway, message):
     if index is None: return
 
     old_message = gateway.messages[index]
-    new_message = Message(**old_message.__dict__)
+    new_message = deepcopy(old_message)
 
     if "content" in message:
         new_message.content = message["content"]

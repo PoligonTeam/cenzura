@@ -17,7 +17,7 @@ limitations under the License.
 import femcord
 from femcord import commands, types
 from typing import Union
-import ast, inspect, copy
+import ast, inspect, copy, models
 
 class Dev(commands.Cog):
     hidden = True
@@ -57,6 +57,7 @@ class Dev(commands.Cog):
 
         result = await self._eval(code, {
             "femcord": femcord,
+            "models": models,
             "ctx": ctx,
             "bot": self.bot,
             "src": inspect.getsource

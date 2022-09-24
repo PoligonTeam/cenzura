@@ -1,3 +1,17 @@
+// Copyright 2022 PoligonTeam
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #define MAXLINES 50
 #define MAXLEN 255
 
@@ -78,6 +92,14 @@ void update() {
 
     padding = 0;
 
+    for (int index = 0; index < todo_length; index++) {
+        if (index == selected_todo)
+            attron(COLOR_PAIR(1));
+
+        mvprintw(index, 1, "%d. %s", index + 1, todo[index]);
+        attroff(COLOR_PAIR(1));
+    }
+
     for (int index = 0; index < sizeof(options) / 8; index++) {
         if (index == selected_option)
             attron(COLOR_PAIR(1));
@@ -86,14 +108,6 @@ void update() {
         attroff(COLOR_PAIR(1));
 
         padding += strlen(options[index]);
-    }
-
-    for (int index = 0; index < todo_length; index++) {
-        if (index == selected_todo)
-            attron(COLOR_PAIR(1));
-
-        mvprintw(index, 1, "%d. %s", index + 1, todo[index]);
-        attroff(COLOR_PAIR(1));
     }
 
     refresh();
@@ -154,7 +168,14 @@ int main(int argc, char *argv[]) {
             case 10:
                 switch (selected_option) {
                     case 0:
-                        selected_todo = todo_length++;
+                        todo_length++;
+
+                        for (int index = todo_length - 1; index > 0; index--)
+                            strcpy(todo[index], todo[index - 1]);
+
+                        strcpy(todo[0], "");
+
+                        selected_todo = 0;
 
                         update();
                         editTodo();
@@ -163,7 +184,7 @@ int main(int argc, char *argv[]) {
 
                     case 1:
                         for (int index = selected_todo; index < todo_length - 1; index++)
-                            todo[index] = todo[index + 1];
+                            strcpy(todo[index], todo[index + 1]);
 
                         todo = realloc(todo, --todo_length * sizeof(char *));
                         selected_todo = 0;

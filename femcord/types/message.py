@@ -46,8 +46,8 @@ class Attachment:
 
 @modified_dataclass
 class MessageReference:
-    message_id: str
-    channel_id: str
+    message_id: str = None
+    channel_id: str = None
     guild_id: str = None
     fail_if_not_exists: bool = None
 

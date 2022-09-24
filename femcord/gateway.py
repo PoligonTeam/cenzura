@@ -225,7 +225,7 @@ class Gateway:
 
     def get_channel(self, channel_id: str) -> Channel:
         for guild in self.guilds:
-            for channel in guild.channels:
+            for channel in guild.channels + guild.threads:
                 if channel.id == channel_id:
                     return channel
 

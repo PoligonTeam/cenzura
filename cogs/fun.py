@@ -486,7 +486,12 @@ class Fun(commands.Cog):
         if user.bot is True:
             embed.add_field(name="Zaproszenie:", value=f"[link](https://discord.com/oauth2/authorize?client_id={user.id}&scope=bot)")
 
-        await ctx.reply(types.m @ user, embed=embed)
+        args = []
+
+        if member is not None:
+            args.append(types.m @ user)
+
+        await ctx.reply(*args, embed=embed)
 
     @commands.command(description="Pokazuje informacje o serwerze", aliases=["si"])
     async def serverinfo(self, ctx: commands.Context):
