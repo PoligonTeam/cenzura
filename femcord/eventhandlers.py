@@ -314,7 +314,7 @@ async def message_create(gateway, message):
 
 async def message_update(gateway, message):
     index = get_index(gateway.messages, message["id"], key=lambda m: m.id)
-    if index is None: return
+    if index is None: return None, None
 
     old_message = gateway.messages[index]
     new_message = deepcopy(old_message)

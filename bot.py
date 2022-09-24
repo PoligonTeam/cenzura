@@ -122,7 +122,7 @@ class Bot(commands.Bot):
         print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - self.start_time:.2f}s)")
 
     async def on_message_update(self, old_message: types.Message, message: types.Message):
-        if message.author.bot:
+        if not old_message or not message or message.author.bot:
             return
 
         await self.process_commands(message)
