@@ -22,6 +22,7 @@ from tortoise import Tortoise
 from utils import modules, builtins
 from types import CoroutineType
 from models import Guilds
+from poligonlgbt import Poligon
 from datetime import datetime
 from typing import Callable, Union, Optional, List
 import asyncio, random, re, os, time, config, copy, inspect, logging
@@ -70,6 +71,7 @@ class Bot(commands.Bot):
         self.random_presence: bool = False
         self.presence_index: int = 0
         self.presence_indexes: List[int] = []
+        self.poligon: Poligon = None
         self.schedules: List[Schedule] = []
 
         self.embed_color = 0xb22487
@@ -134,6 +136,10 @@ class Bot(commands.Bot):
         await Tortoise.generate_schemas()
 
         print("connected to database")
+
+        self.poligon = await Poligon(config.POLIGON_LGBT_API_KEY, config.POLIGON_LGBT_UPLOAD_KEY)
+
+        print("created poligon.lgbt client")
 
         self.loop.create_task(self.scheduler())
 

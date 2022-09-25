@@ -115,7 +115,7 @@ class Tools(commands.Cog):
             async with async_playwright() as p:
                 browser = await p.firefox.launch()
                 context = await browser.new_context(
-                    record_video_dir="videos/",
+                    record_video_dir="/tmp/",
                     record_video_size={"width": 1920, "height": 1080},
                     viewport={"width": 1920, "height": 1080}
                 )

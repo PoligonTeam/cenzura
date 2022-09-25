@@ -21,7 +21,6 @@ from femscript import run
 from aiohttp import ClientSession, FormData
 from utils import *
 from models import Guilds, Users
-from config import POLIGON_LGBT
 import time
 
 class Events(commands.Cog):
