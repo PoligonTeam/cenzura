@@ -1,3 +1,17 @@
+// Copyright 2022 PoligonTeam
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +43,7 @@ enum TokenType {
     ELSE,
     AND,
     OR,
-    FN,
+    FUNC,
     IMPORT,
     RETURN,
 
@@ -72,7 +86,7 @@ Token *makeTokens(char *code) {
 
     char currentChar;
 
-    while (position < (int)strlen(code)) {
+    while (position < (int) strlen(code)) {
         currentChar = code[position];
 
         if (currentChar == '{') {
@@ -210,8 +224,8 @@ Token *makeTokens(char *code) {
             } else if (strcmp(word, "or") == 0) {
                 tokens[tokensCount].type = OR;
                 tokens[tokensCount].value = word;
-            } else if (strcmp(word, "fn") == 0) {
-                tokens[tokensCount].type = FN;
+            } else if (strcmp(word, "func") == 0) {
+                tokens[tokensCount].type = FUNC;
                 tokens[tokensCount].value = word;
             } else {
                 tokens[tokensCount].type = VAR;
@@ -835,7 +849,7 @@ Token parseTokens(Token *tokens, int length, Variable *variables, int variablesL
 
             index = 0;
             continue;
-        } else if (currentToken->type == FN) {
+        } else if (currentToken->type == FUNC) {
             // TODO: zrobic seks
         } else if (currentToken->type == IMPORT) {
             return (Token) { ERROR, "import is not implemented yet" };

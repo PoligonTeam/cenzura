@@ -1,33 +1,19 @@
-username = user.username
+import lastfm
 
-lastfm_username = lastfm_user.username
 scrobbles = lastfm_user.scrobbles
 
-current_track = tracks.0
+track = tracks.0
+track_title = track.title
+track_url = track.url
+track_scrobbles = track.scrobbles
 
-current_title = current_track.title
-current_track_url = current_track.url
-current_artist = current_track.artist
-current_artist_name = current_artist.name
-current_album = current_track.album
+artist = track.artist
+track_artist = artist.name
+artist_url = artist.url
+artist_stats = artist.stats
+artist_scrobbles = artist_stats.userplaycount
 
-embed_color = hex("b22487")
-author_name = "Ostatnie utwory dla " + username + ":"
-author_url = "https://www.last.fm/user/" + lastfm_username
-current_description = "[" + current_title + "](" + current_track_url + ")
-Przez **" + current_artist_name + "** | _" + current_album + "_"
-footer_text = lastfm_username + " posiada łącznie " + scrobbles + " scrobbli"
-
-embed = Embed(description: current_description, color: embed_color)
-
-nowplaying == false {
-    footer_text = footer_text + " | Ostatni scrobble"
-    embed_timestamp = current_track.timestamp
-    embed = Embed(description: current_description, color: embed_color, timestamp: embed_timestamp)
-}
-
-Embed.set_author(embed, name: author_name, url: author_url, icon_url: user.avatar_url)
-Embed.set_thumbnail(embed, url: current_track.image)
-Embed.set_footer(embed, text: footer_text)
-
-return embed
+text = " [" + track_title + "](" + track_url + ") " + track_scrobbles + "x
+by " + "[" + track_artist + "]" + "(" + artist_url + ")" + " " + artist_scrobbles + "x (" + scrobbles + "♪)"
+_color = hex("2f3136")
+return Embed(description: text, color: _color)

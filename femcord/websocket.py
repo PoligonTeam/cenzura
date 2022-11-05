@@ -31,7 +31,7 @@ class WebSocket:
         self.gateway = gateway
         self.client = client
 
-        self.ws = await self.session.ws_connect(self.URL)
+        self.ws = await self.session.ws_connect(WebSocket.URL)
         self.gateway.ws = self
         self.client.gateway = self.gateway
 

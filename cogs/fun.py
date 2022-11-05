@@ -19,14 +19,12 @@ from femcord import commands, types, InvalidArgument, HTTPException
 from femcord.http import Route
 from femcord.utils import get_index
 from aiohttp import ClientSession
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, ResultSet
 from datetime import datetime
-from dateutil import parser
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from pyfiglet import Figlet
 from typing import Union
 from utils import *
-from config import WEATHER_API_KEY
 import io, random, urllib.parse, json, re
 
 class Fun(commands.Cog):
@@ -53,14 +51,6 @@ class Fun(commands.Cog):
         self.interactions = []
         self.results = {}
         self.urls = {}
-
-    @commands.Listener
-    async def on_ready(self):
-        async with ClientSession() as session:
-            async with session.get("https://data.iana.org/rdap/dns.json") as response:
-                data = await response.json()
-
-                self.rdap_services = data["services"]
 
     @commands.command(description="arwatar", usage="[użytkownik]")
     async def avatar(self, ctx: commands.Context, user: types.User = None):
@@ -158,7 +148,10 @@ class Fun(commands.Cog):
     async def howgay(self, ctx: commands.Context, user: types.User = None):
         user = user or ctx.author
 
-        await ctx.reply(f"{user.username} jest gejem w {get_int(user)}%")
+        y = get_int(user)
+        x = get_int(user, self.bot.gateway.bot_user)
+
+        await ctx.reply("https://charts.idrlabs.com/graphic/sexual-orientation?p=%d,%d&l=PL" % (y, x))
 
     @commands.command(description="Achievement Get!", usage="(tekst)")
     async def achievement(self, ctx: commands.Context, *, text: replace_chars):
@@ -509,7 +502,7 @@ class Fun(commands.Cog):
         embed.add_field(name="Ulepszenia:", value=ctx.guild.premium_subscription_count, inline=True)
         embed.add_field(name="Poziom:", value=ctx.guild.premium_tier, inline=True)
         if ctx.guild.vanity_url is not None:
-            embed.add_field(name="Własny url:", value="discord.gg/" + ctx.guild.vanity_url)
+            embed.add_field(name="Własne zaproszenie:", value="discord.gg/" + ctx.guild.vanity_url)
         embed.add_blank_field()
         embed.add_field(name="Ikona:", value=f"[link]({ctx.guild.icon_url})", inline=True)
         if ctx.guild.banner is not None:
@@ -584,112 +577,85 @@ class Fun(commands.Cog):
 
         await ctx.reply(embed=embed)
 
-    @commands.command(description="Słownik", usage="(język) (słowo)", aliases=["definition", "word", "dict", "def"], other={"embed": femcord.Embed(description="\nJęzyki: `pl`, `en`, `es`, `urban`")})
+    async def fetch(self, word, url, tag, attributes, expression):
+        response = await self.bot.http.session.get(url, headers={"user-agent": self.bot.user_agent})
+
+        soup = BeautifulSoup(await response.content.read(), "lxml")
+        text = soup.find_all(tag, attributes)
+
+        if not text:
+            return "Nie znaleziono takiego słowa"
+
+        text = text[0].get_text()
+
+        return f"**{word}**\n{re.findall(expression, text)[-1]}\n*z <{url.replace(' ', '%20')}>*"
+
+    @commands.group(description="Słownik", aliases=["definition", "word", "dict", "def"])
+    async def dictionary(self, ctx: commands.Context):
+        pass
+
+    @dictionary.command(usage="(słowo)", aliases=["pl"])
+    async def polish(self, ctx: commands.Context, *, word):
+        await ctx.reply(await self.fetch(word, "https://sjp.pwn.pl/szukaj/" + word + ".html", "div", {"class": "znacz"}, r"[\w,. ]+"))
+
+    @dictionary.command(usage="(słowo)", aliases=["en"])
+    async def english(self, ctx: commands.Context, *, word):
+        await ctx.reply(await self.fetch(word, "https://dictionary.cambridge.org/pl/dictionary/english/" + word, "div", {"class": "def"}, r"[\w,. ]+"))
+
+    @dictionary.command(usage="(słowo)", aliases=["es"])
+    async def spanish(self, ctx: commands.Context, *, word):
+        await ctx.reply(await self.fetch(word, "https://dictionary.cambridge.org/pl/dictionary/spanish-english/" + word, "div", {"class": "def"}, r"[\w,. ]+"))
+
+    @dictionary.command(usage="(słowo)")
     @commands.is_nsfw
-    async def dictionary(self, ctx: commands.Context, language: lambda arg: arg if arg in "pl" + "en" + "es" + "urban" else None, *, word):
-        async def fetch(url, tag, attributes, expression):
-            response = await self.bot.http.session.get(url, headers={"user-agent": self.bot.user_agent})
+    async def urban(self, ctx: commands.Context, *, word):
+        await ctx.reply(await self.fetch(word, "https://www.urbandictionary.com/define.php?term=" + word, "div", {"class": "meaning"}, r".+"))
 
-            soup = BeautifulSoup(await response.content.read(), "lxml")
-            text = soup.find_all(tag, attributes)
-
-            if not text:
-                return "Nie znaleziono takiego słowa"
-
-            text = text[0].get_text()
-
-            return f"**{word}**\n{re.findall(expression, text)[-1]}\n*z <{url.replace(' ', '%20')}>*"
-
-        match language:
-            case "en":
-                definition = await fetch("https://dictionary.cambridge.org/pl/dictionary/english/" + word, "div", {"class": "def"}, r"[\w,. ]+")
-
-            case "pl":
-                definition = await fetch("https://sjp.pwn.pl/szukaj/" + word + ".html", "div", {"class": "znacz"}, r"[\w,. ]+")
-
-            case "es":
-                definition = await fetch("https://dictionary.cambridge.org/pl/dictionary/spanish-english/" + word, "div", {"class": "def"}, r"[\w,. ]+")
-
-            case "urban":
-                definition = await fetch("https://www.urbandictionary.com/define.php?term=" + word, "div", {"class": "meaning"}, r".+")
-
-        await ctx.reply(definition)
-
-    @commands.command(description="pogoda", aliases=["pogoda", "pogoda.onet.pl", "wp.pl"])
-    async def weather(self, ctx: commands.Context, *, city):
+    @commands.command(description="Informacje o memie z KnowYourMeme", usage="(nazwa)", aliases=["kym", "meme"])
+    @commands.is_nsfw
+    async def knowyourmeme(self, ctx: commands.Context, *, name):
         async with ClientSession() as session:
-            json = [
-                {
-                    "name": "getSunV3LocationSearchUrlConfig",
-                    "params": {
-                        "query": city,
-                        "language": "en-US",
-                        "locationType": "locale"
-                    }
-                }
-            ]
-
-            async with session.post("https://weather.com/api/v1/p/redux-dal", json=json) as response:
+            async with session.get(f"http://rkgk.api.searchify.com/v1/indexes/kym_production/instantlinks?query={name}&field=name&fetch=name%2Curl&function=10&len=1") as response:
                 data = await response.json()
-                data = data["dal"]["getSunV3LocationSearchUrlConfig"]["language:en-US;locationType:locale;query:" + city]
 
-                if not data["status"] == 200:
-                    return await ctx.reply("Nie znaleziono takiego miasta")
+                if not data["results"]:
+                    return await ctx.reply("Nie znaleziono takiego mema")
 
-                station = data["data"]["location"]["pwsId"][0]
+                async with session.get("https://knowyourmeme.com" + data["results"][0]["url"]) as response:
+                    content = await response.content.read()
 
-                async with session.get(f"https://api.weather.com/v2/pws/observations/current?apiKey={WEATHER_API_KEY}&units=m&stationId={station}&numericPrecision=decimal&format=json") as response:
-                    data = await response.json()
-                    data = data["observations"][0]
+                    soup = BeautifulSoup(content, "lxml")
+                    text: ResultSet = soup.find_all("section", {"class": "bodycopy"})[0]
+                    about = text.find("h2", {"id": "about"}).find_next("p").get_text()
 
-                    embed = femcord.Embed(title=f"Pogoda dla {city}", color=self.bot.embed_color)
-                    embed.add_field(name="Temperatura:", value=f"{data['metric']['temp']}°C", inline=True)
-                    embed.add_field(name="Indeks UV:", value=f"{data['uv']}", inline=True)
-                    embed.add_blank_field()
-                    embed.add_field(name="Ciśnienie:", value=f"{data['metric']['pressure']} hPa", inline=True)
-                    embed.add_field(name="Wilgotność:", value=f"{data['humidity']}%", inline=True)
-                    embed.add_blank_field()
-                    embed.add_field(name="Kierunek wiatru:", value=f"{data['winddir']}°", inline=True)
-                    embed.add_field(name="Prędkość wiatru:", value=f"{data['metric']['windSpeed']} km/h", inline=True)
+                    await ctx.reply(f"**Informacje o {urllib.parse.unquote(data['results'][0]['name'])}**\n\n{about}\n\n*z <https://knowyourmeme.com{data['results'][0]['url']}>*")
 
-                    await ctx.reply(embed=embed)
-
-    @commands.command(description="wyszukuje informacje o domenie", usage="(domena)", aliases=["domain", "domena", "domaininfo", "domenainfo"])
-    async def whois(self, ctx: commands.Context, domain):
-        tld = domain.split(".")[-1]
-
-        rdap_service = None
-
-        for service in self.rdap_services:
-            if tld in service[0]:
-                rdap_service = service[1][0]
-                break
-
-        assert rdap_service is not None, "Nie znaleziono takiej domeny"
-
+    @commands.command(description="Informacje o użytkowniku GitHub", usage="(nazwa użytkownika)", aliases=["gh"])
+    async def github(self, ctx: commands.Context, *, name):
         async with ClientSession() as session:
-            async with session.get(rdap_service + "domain/" + domain) as response:
-                assert response.status == 200, "Nie znaleziono takiej domeny"
+            async with session.get(f"https://api.github.com/users/{name}") as response:
+                if not response.status == 200:
+                    return await ctx.reply("Nie znaleziono takiego użytkownika")
 
                 data = await response.json()
 
-                nameservers = data["nameservers"]
-                events = data["events"]
-                entities = data["entities"]
-                registrant = entities[0].get("remarks")
-                registrar = entities[-1]["vcardArray"][1][1][3]
-
-                events = sorted(parser.isoparse(event["eventDate"]) for event in events)
-
-                embed = femcord.Embed(title=f"Informacje o domenie {domain}:", color=self.bot.embed_color)
-                embed.add_field(name="Rejestrator:", value=registrar, inline=False)
-                if registrant is not None:
-                    embed.add_field(name="Abonent:", value=registrant[0]["title"], inline=False)
-                embed.add_field(name="Utworzona:", value=femcord.types.t @ events[0], inline=True)
-                embed.add_field(name="Ostatnia modyfikacja:", value=femcord.types.t @ events[1], inline=True)
-                embed.add_field(name="Koniec okresu rozliczeniowego:", value=femcord.types.t @ events[2], inline=True)
-
-                embed.add_field(name="Serwery DNS:", value=", ".join(nameserver["ldhName"] for nameserver in nameservers), inline=False)
+                embed = femcord.Embed(title=f"Informacje o {data['login']}:", color=self.bot.embed_color)
+                embed.add_field(name="ID:", value=data["id"], inline=True)
+                embed.add_field(name="Nazwa:", value=data["name"], inline=True)
+                embed.add_blank_field()
+                if data["avatar_url"]:
+                    embed.set_thumbnail(url=data["avatar_url"])
+                embed.add_field(name="Liczba obserwujących:", value=data["followers"], inline=True)
+                embed.add_field(name="Liczba obserwowanych:", value=data["following"], inline=True)
+                embed.add_blank_field()
+                embed.add_field(name="Liczba publicznych repozytoriów:", value=data["public_repos"], inline=True)
+                embed.add_field(name="Liczba publicznych gistów:", value=data["public_gists"], inline=True)
+                embed.add_blank_field()
+                embed.add_field(name="Utworzył konto:", value=femcord.types.t @ datetime.strptime(data["created_at"], "%Y-%m-%dT%H:%M:%SZ"), inline=True)
+                embed.add_field(name="Ostatnia aktualizacja:", value=femcord.types.t @ datetime.strptime(data["updated_at"], "%Y-%m-%dT%H:%M:%SZ"), inline=True)
+                embed.add_blank_field()
+                if data["bio"]:
+                    embed.add_field(name="Bio:", value=data["bio"])
 
                 await ctx.reply(embed=embed)
 
@@ -745,12 +711,12 @@ class Fun(commands.Cog):
             else:
                 members.remove(selected_member)
                 await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=get_components())
-                await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id, timeout=60 * 5)
+                await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60 * 5, on_timeout=on_timeout)
 
         async def on_timeout():
-            await message.edit("Nie udało się nikomu zgadnąć", embeds=[])
+            await message.edit("Nie udało się nikomu zgadnąć", embeds=[], components=[])
 
-        await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id, timeout=60 * 5, on_timeout=on_timeout)
+        await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60 * 5, on_timeout=on_timeout)
 
 def setup(bot):
     bot.load_cog(Fun(bot))

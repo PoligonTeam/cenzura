@@ -1,0 +1,38 @@
+import lastfm
+
+username = user.username
+
+lastfm_username = lastfm_user.username
+scrobbles = lastfm_user.scrobbles
+
+current_track = tracks.0
+
+current_title = current_track.title
+current_track_url = current_track.url
+current_track_images = current_track.image
+current_track_large_image = current_track_images.3
+current_artist = current_track.artist
+current_artist_name = current_artist.name
+current_album = current_track.album
+current_album_name = current_album.name
+
+embed_color = hex("b22487")
+author_name = "Ostatnie utwory dla " + username + ":"
+author_url = "https://www.last.fm/user/" + lastfm_username
+current_description = "[" + current_title + "](" + current_track_url + ")
+Przez **" + current_artist_name + "** | _" + current_album_name + "_"
+footer_text = lastfm_username + " posiada łącznie " + scrobbles + " scrobbli"
+
+embed = Embed(description: current_description, color: embed_color)
+
+nowplaying == false {
+    footer_text = footer_text + " | Ostatni scrobble"
+    embed_date = current_track.date
+    embed = Embed(description: current_description, color: embed_color, timestamp: embed_date.uts)
+}
+
+Embed.set_author(embed, name: author_name, url: author_url, icon_url: user.avatar_url)
+Embed.set_thumbnail(embed, url: current_track_large_image.url)
+Embed.set_footer(embed, text: footer_text)
+
+return embed

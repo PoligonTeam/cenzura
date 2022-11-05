@@ -16,8 +16,9 @@ limitations under the License.
 
 import femcord
 from femcord import commands
-import psutil
+from femcord.http import Route
 from datetime import datetime
+import psutil, time
 
 class About(commands.Cog):
     name = "O bocie"
@@ -26,18 +27,24 @@ class About(commands.Cog):
         self.bot: commands.Bot = bot
         self.process = psutil.Process()
 
-    def get_ping_text(self):
+    async def get_ping_text(self):
         text = f"Obecny ping: `{self.bot.gateway.latency}ms`"
 
         if self.bot.gateway.last_latencies:
             text += f"\nPoprzednie: {', '.join('`' + str(ping) + 'ms`' for ping in self.bot.gateway.last_latencies[-5:])}"
             text += f"\nŚrednia: `{(sum(self.bot.gateway.last_latencies) + self.bot.gateway.latency) // (len(self.bot.gateway.last_latencies) + 1)}ms`"
 
+        before = time.perf_counter()
+        await self.bot.http.request(Route("GET", "users", "@me"))
+        after = time.perf_counter()
+
+        text += f"\nPing REST: `{round((after - before) * 1000)}ms`"
+
         return text
 
     @commands.command(description="pong")
     async def ping(self, ctx: commands.Context):
-        await ctx.reply(self.get_ping_text())
+        await ctx.reply(await self.get_ping_text())
 
     @commands.command(description="Statystyki bota", aliases=["stats", "botinfo"])
     async def botstats(self, ctx: commands.Context):
@@ -49,7 +56,7 @@ class About(commands.Cog):
                       f"Komendy: `{len(self.bot.commands)}`\n\n" \
                       f"RAM: `{self.process.memory_full_info().rss / 1000 / 1000:.1f} MB ({(memory.total - memory.available) / 1000 / 1000 / 1000:.1f} GB / {memory.total / 1000 / 1000 / 1000:.1f} GB)`\n" \
                       f"Procesor: `{psutil.cpu_percent()}%`\n\n" + \
-                      self.get_ping_text() + "\n\n" \
+                      await self.get_ping_text() + "\n\n" \
                       f"Czas online: `{diff.days} dni, {(diff.days * 24 + diff.seconds) // 3600} godzin, {(diff.seconds % 3600) // 60} minut, {diff.seconds % 60} sekund`\n\n"
 
         await ctx.reply(embed=femcord.Embed(title="Statystyki bota:", description=description, color=self.bot.embed_color))

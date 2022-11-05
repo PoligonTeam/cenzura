@@ -17,9 +17,9 @@ limitations under the License.
 import aiohttp, asyncio, json, random
 from .types import Player, Bug
 
-URL = "wss://ws.korrumzthegame.wtf"
-
 class Client:
+    URL = "wss://ws.korrumzthegame.wtf"
+
     def __init__(self, username, x: int, y: int, pull_requests: int, image_number: int):
         self.loop = asyncio.get_event_loop()
         self.session = aiohttp.ClientSession()
@@ -79,7 +79,7 @@ class Client:
         })
 
     async def run(self):
-        self.ws = await self.session.ws_connect(URL)
+        self.ws = await self.session.ws_connect(Client.URL)
 
         await self.identify()
 
@@ -129,3 +129,7 @@ class Client:
 
                     case "player disconnected":
                         self.players.remove(player)
+
+    async def close(self):
+        await self.ws.close()
+        await self.session.close()

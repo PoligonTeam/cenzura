@@ -20,7 +20,7 @@ from .errors import *
 from .embed import Embed
 from .components import Components
 from .enums import *
-from typing import Optional, Sequence, Union
+from typing import Optional, List, Sequence, Union
 import json, logging
 
 class Route:
@@ -34,7 +34,7 @@ class Route:
     def __ne__(self, route):
         return self.method != route.method and self.endpoint != route.endpoint
 
-class Http:
+class HTTP:
     URL = "https://discord.com/api/v10"
 
     async def __new__(cls, *args):
@@ -66,7 +66,7 @@ class Http:
 
             kwargs = dict(data=form)
 
-        async with self.session.request(route.method, self.URL + route.endpoint, headers=headers, **kwargs) as response:
+        async with self.session.request(route.method, HTTP.URL + route.endpoint, headers=headers, **kwargs) as response:
             logging.debug(f"{route.method} {route.endpoint}, data: {data}, params: {params}, files: {[file[0] for file in files] if files is not None else None}; status: {response.status}, text: {await response.text()}")
 
             try:
@@ -92,7 +92,7 @@ class Http:
     def start_typing(self, channel_id: str):
         return self.request(Route("POST", "channels", channel_id, "typing"))
 
-    def send_message(self, channel_id: str, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], other: Optional[dict] = {}):
+    def send_message(self, channel_id: str, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], stickers: Optional[list] = None, other: Optional[dict] = {}):
         data = {**other, "allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}
 
         if content is not None:
@@ -113,10 +113,13 @@ class Http:
 
         if components is not None:
             data["components"] = getattr(components, "components", components)
+
+        if stickers is not None:
+            data["sticker_ids"] = [sticker.id for sticker in stickers]
 
         return self.request(Route("POST", "channels", channel_id, "messages"), data=data, files=files)
 
-    def edit_message(self, channel_id: str, message_id: str, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], other: Optional[dict] = {}):
+    def edit_message(self, channel_id: str, message_id: str, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], stickers: Optional[list] = None, other: Optional[dict] = {}):
         data = {**other, "allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}
 
         if content is not None:
@@ -137,13 +140,16 @@ class Http:
 
         if components is not None:
             data["components"] = getattr(components, "components", components)
+
+        if stickers is not None:
+            data["sticker_ids"] = [sticker.id for sticker in stickers]
 
         return self.request(Route("PATCH", "channels", channel_id, "messages", message_id), data=data, files=files)
 
     def delete_message(self, channel_id: str, message_id: str):
         return self.request(Route("DELETE", "channels", channel_id, "messages", message_id))
 
-    def interaction_callback(self, interaction_id: str, interaction_token: str, interaction_type: InteractionCallbackTypes, content: Optional[str] = None, *, title: Optional[str] = None, custom_id: str = None, embed: Embed = None, embeds: Sequence[Embed] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], other: Optional[dict] = {}):
+    def interaction_callback(self, interaction_id: str, interaction_token: str, interaction_type: InteractionCallbackTypes, content: Optional[str] = None, *, title: Optional[str] = None, custom_id: str = None, embed: Embed = None, embeds: Sequence[Embed] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], stickers: Optional[list] = None, other: Optional[dict] = {}):
         data = {"type": interaction_type.value, "data": {**other, "allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}}
 
         if content is not None:
@@ -171,6 +177,9 @@ class Http:
         if components is not None:
             data["data"]["components"] = getattr(components, "components", components)
 
+        if stickers is not None:
+            data["sticker_ids"] = [sticker.id for sticker in stickers]
+
         return self.request(Route("POST", "interactions", interaction_id, interaction_token, "callback"), data=data, files=files)
 
     def kick_member(self, guild_id: str, member_id: str, reason: Optional[str] = None):
@@ -181,13 +190,13 @@ class Http:
 
         return self.request(Route("DELETE", "guilds", guild_id, "members", member_id), headers=headers)
 
-    def ban_member(self, guild_id: str, member_id: str, reason: Optional[str] = None, delete_message_days: Optional[int] = 0):
+    def ban_member(self, guild_id: str, member_id: str, reason: Optional[str] = None, delete_message_seconds: Optional[int] = 0):
         headers = {}
 
         if reason is not None:
             headers["X-Audit-Log-Reason"] = reason
 
-        return self.request(Route("PUT", "guilds", guild_id, "bans", member_id), headers=headers, data={"delete_message_days": delete_message_days})
+        return self.request(Route("PUT", "guilds", guild_id, "bans", member_id), headers=headers, data={"delete_message_seconds": delete_message_seconds})
 
     def unban_member(self, guild_id: str, member_id: str, reason: Optional[str] = None):
         headers = {}

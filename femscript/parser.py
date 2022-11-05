@@ -91,13 +91,13 @@ class Parser:
                     "random_choice": lambda *args: random.choice(args[0] if len(args) == 1 else args)
                 }
             },
-            "regex": {
-                "builtins": {
-                    "match": lambda pattern, string: not not re.match(pattern, string),
-                    "find": lambda pattern, string, index = 0: (re.findall(pattern, string) or [False])[index],
-                    "find_all": lambda pattern, string, join_string = "": join_string.join(re.findall(pattern, string)) or False
-                }
-            },
+            # "regex": {
+            #     "builtins": {
+            #         "match": lambda pattern, string: not not re.match(pattern, string),
+            #         "find": lambda pattern, string, index = 0: (re.findall(pattern, string) or [False])[index],
+            #         "find_all": lambda pattern, string, join_string = "": join_string.join(re.findall(pattern, string)) or False
+            #     }
+            # },
             "date": {
                 "builtins": {
                     "now": lambda format = r"%Y-%m-%d %H:%M:%S": datetime.datetime.now().strftime(format),

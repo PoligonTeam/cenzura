@@ -16,7 +16,7 @@ limitations under the License.
 
 import asyncio
 from .websocket import WebSocket
-from .http import Route, Http
+from .http import Route, HTTP
 from .intents import Intents
 from .enums import Opcodes
 from .types import Guild, Channel, User, Message, Presence
@@ -61,7 +61,7 @@ class Gateway:
     async def __init__(self, client):
         client.gateway = self
         self.loop = asyncio.get_event_loop()
-        self.http: Http = client.http
+        self.http: HTTP = client.http
         self.intents: Intents = client.intents
         self.token: str = client.token
         self.bot: bool = client.bot

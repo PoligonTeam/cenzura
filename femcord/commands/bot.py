@@ -29,9 +29,10 @@ from typing import Callable, Union, Iterable
 import importlib.util, inspect, traceback, sys
 
 class Bot(Client):
-    def __init__(self, *, command_prefix, intents: Intents = Intents.all(), messages_limit: int = 1000, owners: Iterable = []):
+    def __init__(self, *, name: str = None, command_prefix, intents: Intents = Intents.all(), messages_limit: int = 1000, owners: Iterable = []):
         super().__init__(intents = intents, messages_limit = messages_limit)
 
+        self.name = name
         self.original_prefix = self.command_prefix = command_prefix
         self.owners = list(owners)
 
@@ -56,6 +57,12 @@ class Bot(Client):
                 return
 
             await self.process_commands(message)
+
+    def __str__(self):
+        return self.name or self.gateway.bot_user.username
+
+    def __repr__(self):
+        return f"<Bot name={str(self)!r}>"
 
     def before_call(self, func):
         self.before_call_functions.append(func)

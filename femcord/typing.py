@@ -1,7 +1,8 @@
 import asyncio
+from .types import Message
 
 class Typing:
-    def __init__(self, message):
+    def __init__(self, message: Message):
         self.loop = asyncio.get_event_loop()
         self.message = message
 

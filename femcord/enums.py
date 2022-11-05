@@ -110,6 +110,14 @@ class PublicFlags(Enum):
     VERIFIED_BOT_DEVELOPER = 1 << 17
     CERTIFIED_MODERATOR = 1 << 18
 
+class ChannelFlags(Enum):
+    PINNED = 1 << 1
+    REQUIRE_TAG = 1 << 4
+
+class SortOrderTypes(Enum):
+    LATEST_ACTIVITY = 0
+    CREATION_DATE = 1
+
 class ChannelTypes(Enum):
     NONE = None
     GUILD_TEXT = 0

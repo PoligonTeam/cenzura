@@ -71,3 +71,16 @@ class LastFM(Model):
     username = TextField()
     token = TextField()
     script = TextField()
+    avatar = TextField()
+
+class Artists(Model):
+    id = IntField(pk=True)
+    artist = TextField()
+    image = TextField()
+
+class Lyrics(Model):
+    id = IntField(pk=True)
+    artist = TextField()
+    title = TextField()
+    source = TextField()
+    lyrics = TextField()

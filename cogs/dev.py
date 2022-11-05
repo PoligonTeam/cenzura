@@ -17,7 +17,7 @@ limitations under the License.
 import femcord
 from femcord import commands, types
 from typing import Union
-import ast, inspect, copy, models
+import asyncio, time, ast, inspect, copy, models
 
 class Dev(commands.Cog):
     hidden = True
@@ -164,6 +164,34 @@ class Dev(commands.Cog):
             self.bot.owners.remove(ctx.author.id)
 
         await self.bot.process_commands(fake_message, before_call_functions=before_call, after_call_functions=after_call)
+
+    @commands.command(description="cenzura to bot, bot to cenzura", usage="(komenda) [argumenty]")
+    @commands.is_owner
+    async def perf(self, ctx: commands.Context, command, *, args = None):
+        fake_message = copy.deepcopy(ctx.message)
+
+        fake_message.content = (await self.bot.get_prefix(self.bot, ctx.message))[-1] + command
+
+        if args is not None:
+            fake_message.content += " " + args
+
+        before = None
+        after = None
+
+        async def before_call(ctx):
+            nonlocal before
+            before = time.perf_counter()
+
+        async def after_call(ctx):
+            nonlocal after
+            after = time.perf_counter()
+
+        await self.bot.process_commands(fake_message, before_call_functions=before_call, after_call_functions=after_call)
+
+        while after is None:
+            await asyncio.sleep(0.01)
+
+        await ctx.reply(f"Wykonano w `{after - before:.2f}s`")
 
 def setup(bot):
     bot.load_cog(Dev(bot))

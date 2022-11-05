@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import dataclasses
+import dataclasses, datetime
 
 def modified_dataclass(cls, **kwargs):
     if hasattr(cls, "from_raw") is True:
@@ -102,7 +102,7 @@ class T:
 
         return self
 
-    def __matmul__(self, item):
+    def __matmul__(self, item: datetime.datetime):
         text = f"<t:{int(item.timestamp())}:{self.style}>"
         self.style = "f"
 

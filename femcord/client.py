@@ -16,7 +16,7 @@ limitations under the License.
 
 import asyncio
 from .gateway import Gateway
-from .http import Http
+from .http import HTTP
 from .intents import Intents
 from .types import *
 from .typefunctions import set_functions
@@ -28,7 +28,7 @@ class Client:
         self.loop = asyncio.get_event_loop()
         self.token: str = None
         self.intents: Intents = intents
-        self.http: Http = None
+        self.http: HTTP = None
         self.gateway: Gateway = None
         self.listeners: List[Callable] = []
         self.waiting_for: List[Callable] = []
@@ -55,7 +55,7 @@ class Client:
         self.token: str = token
         self.bot: bool = bot
 
-        self.loop.create_task(Http(self))
+        self.loop.create_task(HTTP(self))
         self.loop.create_task(Gateway(self))
 
         set_functions(self)
@@ -65,6 +65,11 @@ class Client:
         except KeyboardInterrupt:
             pass
         finally:
+            on_closes = [listener() for listener in self.listeners if listener.__name__ == "on_close"]
+
+            for on_close in on_closes:
+                self.loop.run_until_complete(on_close)
+
             self.gateway.heartbeat.stop()
 
     @classmethod

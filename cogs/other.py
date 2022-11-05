@@ -48,7 +48,7 @@ class Other(commands.Cog):
         result = await run(
             code,
             modules = {
-                **await get_modules(self.bot, ctx.guild),
+                **await get_modules(self.bot, ctx.guild, ctx=ctx),
                 **(
                     {
                         "database": {}
@@ -209,7 +209,7 @@ class Other(commands.Cog):
             command = self.bot.get_command(name, guild_id=ctx.guild.id)
 
             if not command or not "code" in command.other or not command.guild_id == ctx.guild.id:
-                raise femcord.CommandNotFound()
+                raise commands.CommandNotFound()
 
             await self.bot.paginator(ctx.reply, ctx, command.other["code"], prefix="```py\n", suffix="```")
 

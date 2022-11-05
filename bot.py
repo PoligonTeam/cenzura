@@ -18,14 +18,16 @@ import femcord
 from femcord import commands, types
 from femcord.permissions import Permissions
 from femscript import run
-from tortoise import Tortoise
+from tortoise import Tortoise, run_async
 from utils import modules, builtins
 from types import CoroutineType
 from models import Guilds
 from poligonlgbt import Poligon
 from datetime import datetime
 from typing import Callable, Union, Optional, List
-import asyncio, random, re, os, time, config, copy, inspect, logging
+import asyncio, uvloop, random, re, os, time, config, copy, logging
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 class FakeCtx:
     def __init__(self, guild: types.Guild, channel: types.Channel, member: types.Member, su_role: types.Role):
@@ -61,8 +63,8 @@ class Schedule:
         return self.task(*self.args, **self.kwargs)
 
 class Bot(commands.Bot):
-    def __init__(self, *, start_time: float):
-        super().__init__(command_prefix=self.get_prefix, intents=femcord.Intents.all(), owners=config.OWNERS)
+    def __init__(self, *, start_time: float = time.time()):
+        super().__init__(name="benzura", command_prefix=self.get_prefix, intents=femcord.Intents.all(), owners=config.OWNERS)
 
         self.start_time = start_time
 
@@ -98,7 +100,7 @@ class Bot(commands.Bot):
                 print("loaded %s" % filename)
 
         self.event(self.on_ready)
-        self.event(self.on_message_update)
+        self.event(self.on_close)
         self.loop.run_until_complete(self.async_init())
 
     async def on_ready(self):
@@ -123,11 +125,10 @@ class Bot(commands.Bot):
 
         print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - self.start_time:.2f}s)")
 
-    async def on_message_update(self, old_message: types.Message, message: types.Message):
-        if not old_message or not message or message.author.bot:
-            return
+    async def on_close(self):
+        await Tortoise.close_connections()
 
-        await self.process_commands(message)
+        print("closed db connection")
 
     async def async_init(self):
         logging.getLogger("tortoise").setLevel(logging.WARNING)

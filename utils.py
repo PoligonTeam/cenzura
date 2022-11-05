@@ -16,11 +16,17 @@ limitations under the License.
 
 import femcord
 from femcord import types
-from femscript import Dict
+from femscript import Dict, List
+from aiohttp import ClientSession
 from httpx import AsyncClient, Timeout
+from bs4 import BeautifulSoup
+from urllib.parse import quote_plus
 from json.decoder import JSONDecodeError
-from models import Guilds
-import random, config
+from models import Artists, Guilds, LastFM, Lyrics
+from tortoise.queryset import QuerySet
+from config import LASTFM_API_URL, LASTFM_API_KEY
+from lastfm import Track
+import asyncio, random, re, config
 
 CHARS = (("\u200b", ("0", "1", "2", "3")), ("\u200c", ("4", "5", "6", "7")), ("\u200d", ("8", "9", "A", "B")), ("\u200e", ("C", "D", "E", "F")))
 SEPARATOR = "\u200f"
@@ -38,6 +44,103 @@ def replace_chars(text):
         text = text.replace(x, y)
 
     return text
+
+async def update_lastfm_avatars():
+    async def get_lastfm_avatar(lastfm_user: LastFM):
+        async with ClientSession() as session:
+            async with session.get(LASTFM_API_URL + f"?method=user.getinfo&user={user.username}&api_key={LASTFM_API_KEY}&format=json") as response:
+                data = await response.json()
+
+                if not "image" in data:
+                    return
+
+                elif data["image"][-1] == lastfm_user.avatar:
+                    return
+
+                await LastFM.filter(id=lastfm_user.id).update(avatar=data["image"][-1])
+
+    users = LastFM.all()
+    for user in await users:
+        asyncio.create_task(get_lastfm_avatar(user))
+
+async def get_artist_image(artist: str):
+    artist_db = await Artists.filter(artist=artist).first()
+
+    if artist_db:
+        return artist_db.image
+
+    async with ClientSession() as session:
+        async with session.get("https://www.last.fm/music/" + artist) as response:
+            if not response.status == 200:
+                return "https://www.last.fm/static/images/marvin.05ccf89325af.png"
+
+            await Artists.create(artist=artist, image=re.search(r"<meta property=\"og:image\"[ ]+content=\"([\w/:.]+)\" data-replaceable-head-tag>", await response.text()).group(1))
+
+    return await get_artist_image(artist)
+
+async def get_track_lyrics(artist, title: str, user_agent: str):
+    lyrics_db = await Lyrics.filter(title__istartswith=title).first()
+
+    if lyrics_db:
+        return lyrics_db
+
+    name = artist + " " + title
+
+    lyrics = None
+
+    async with ClientSession() as session:
+        async with session.get(f"https://api.musixmatch.com/ws/1.1/track.search?q_track_artist={name}&page_size=1&page=1&s_track_rating=desc&s_artist_rating=desc&country=us&apikey={config.MUSIXMATCH}") as response:
+            data = await response.json(content_type=None)
+
+            track_list = data["message"]["body"]["track_list"]
+
+            if track_list:
+                track = track_list[0]["track"]
+
+                artist_name = track["artist_name"]
+                track_name = track["track_name"]
+                track_share_url = track["track_share_url"]
+
+                async with session.get(track_share_url, headers={"user-agent": user_agent}) as response:
+                    content = await response.content.read()
+                    soup = BeautifulSoup(content, features="lxml")
+
+                    elements = soup.find_all("p", {"class": "mxm-lyrics__content"})
+
+                    if elements:
+                        source = "Musixmatch"
+                        lyrics = "\n".join([element.get_text() for element in elements])
+
+            if lyrics is None:
+                async with session.get(f"https://api.genius.com/search?q={name}&access_token={config.GENIUS}") as response:
+                    data = await response.json()
+
+                    hits = data["response"]["hits"]
+
+                    if hits:
+                        track = hits[0]["result"]
+
+                        artist_name = track["artist_names"]
+                        track_name = track["title"]
+                        track_share_url = track["url"]
+
+                        async with session.get(track_share_url, headers={"user-agent": user_agent}) as response:
+                            content = await response.content.read()
+                            soup = BeautifulSoup(content, features="lxml")
+
+                            element = soup.find("div", {"data-lyrics-container": True})
+
+                            if element:
+                                source = "Genius"
+                                lyrics = element.get_text("\n")
+
+            lyrics_db = await Lyrics.filter(title__icontains=track_name).first()
+
+            if not lyrics_db:
+                lyrics_db = Lyrics(artist=artist_name, title=track_name, source=source, lyrics=lyrics)
+                await lyrics_db.save()
+
+            return lyrics_db
 
 def convert(**items):
     objects = {
@@ -81,14 +184,104 @@ def convert(**items):
             discriminator = user.discriminator,
             avatar_url = user.avatar_url,
             bot = user.bot or False
+        ),
+        Track: lambda track: Dict(
+            artist = Dict(
+                name = track.artist.name,
+                url = track.artist.url,
+                image = List(
+                    *(
+                        Dict(
+                            url = image.url,
+                            size = image.size
+                        ) for image in track.artist.image
+                    )
+                ),
+                streamable = track.artist.streamable,
+                ontour = track.artist.ontour,
+                stats = Dict(
+                    listeners = track.artist.stats.listeners,
+                    playcount = track.artist.stats.playcount,
+                    userplaycount = track.artist.stats.userplaycount
+                ),
+                similar = List(
+                    *(
+                        Dict(
+                            name = similar.name,
+                            url = similar.url,
+                            image = List(
+                                *(
+                                    Dict(
+                                        url = image.url,
+                                        size = image.size
+                                    ) for image in similar.image
+                                )
+                            )
+                        ) for similar in track.artist.similar
+                    )
+                ),
+                tags = List(
+                    *(
+                        Dict(
+                            name = tag.name,
+                            url = tag.url
+                        )
+                        for tag in track.artist.tags
+                    )
+                ),
+                bio = Dict(
+                    links = Dict(
+                        name = track.artist.bio.links.name,
+                        rel = track.artist.bio.links.rel,
+                        url = track.artist.bio.links.url
+                    ),
+                    published = track.artist.bio.published,
+                    summary = track.artist.bio.summary,
+                    content = track.artist.bio.content
+                )
+            ),
+            image = List(
+                *(
+                    Dict(
+                        url = image.url,
+                        size = image.size
+                    ) for image in track.image
+                )
+            ),
+            album = Dict(
+                name = track.album.name,
+                mbid = track.album.mbid
+            ),
+            title = track.title,
+            url = track.url,
+            date = Dict(
+                uts = track.date.uts,
+                text = track.date.text,
+                date = track.date.date
+
+            ) if track.date else False,
+            listeners = track.listeners,
+            playcount = track.playcount,
+            scrobbles = track.scrobbles,
+            tags = List(
+                *(
+                    Dict(
+                        name = tag.name,
+                        url = tag.url
+                    )
+                    for tag in track.tags
+                )
+            )
         )
     }
 
     converted = {}
 
     for key, value in items.items():
-        if type(value) in objects:
+        if (_type := type(value)) in objects:
             converted[key] = objects[type(value)](value)
+        elif _type is list:
+            converted[key] = [objects[type(item)](item) for item in value]
 
     return converted
 
@@ -99,9 +292,9 @@ def get_int(user, user2 = None):
     user2_avatar = user2.avatar
 
     if user_avatar is None:
-        user_avatar = "".join(chr(int(a)) for a in str(int(user.created_at.timestamp())))
+        user_avatar = "".join(chr(int(char)) for char in str(int(user.created_at.timestamp())))
     if user2_avatar is None:
-        user2_avatar = "".join(chr(int(a)) for a in str(int(user2.created_at.timestamp())))
+        user2_avatar = "".join(chr(int(char)) for char in str(int(user2.created_at.timestamp())))
 
     return (int(user.id) + int(user2.id)) * sum(ord(a) + ord(b) for a, b in list(zip(user_avatar, user2_avatar))) % 10000 // 100
 
@@ -148,10 +341,15 @@ async def request(method, url, *, headers = None, data = None, proxy = None):
         except JSONDecodeError:
             json = {}
 
+        if isinstance(json, dict):
+            json = Dict(**json)
+        elif isinstance(json, list):
+            json = List(*json)
+
         return {
             "status": response.status_code,
             "text": response.text,
-            "json": Dict(**json)
+            "json": json
         }
 
 async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_url = None, content = None, embed: femcord.Embed = None):
@@ -189,20 +387,104 @@ builtins = {
     "table": table
 }
 
-async def get_modules(bot, guild):
+async def get_modules(bot, guild, *, ctx = None, user = None, message_errors = False):
     query = Guilds.filter(guild_id=guild.id)
     db_guild = await query.first()
 
     database = db_guild.database
 
-    async def update(key, value):
+    async def db_update(key, value):
         database[key] = value
         await query.update(database=database)
         return value
 
-    async def delete(key):
+    async def db_delete(key):
         database.pop(key)
         await query.update(database=database)
+
+    async def lastfm():
+        nonlocal user
+
+        user = user or ctx.author
+        lastfm = await LastFM.filter(user_id=user.id).first()
+
+        if lastfm is None:
+            if message_errors is True:
+                if ctx.author is user:
+                    await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+
+                await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
+
+            return {}
+
+        async with ClientSession() as session:
+            async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&user={lastfm.username}&limit=2&extended=1&api_key={LASTFM_API_KEY}&format=json") as response:
+                if not response.status == 200:
+                    return await ctx.reply("Takie konto LastFM nie istnieje")
+
+                data = await response.json()
+                data = data["recenttracks"]
+                tracks = data["track"]
+                lastfm_user = data["@attr"]
+
+                fs_data = {
+                    "tracks": [],
+                    "lastfm_user": {
+                        "username": lastfm_user["user"],
+                        "scrobbles": lastfm_user["total"],
+                    },
+                    "nowplaying": False
+                }
+
+                if not tracks:
+                    return await ctx.reply("Nie ma żadnych utworów")
+
+                if len(tracks) == 3:
+                    fs_data["nowplaying"] = True
+
+                async def append_track(index, track):
+                    async with session.get(LASTFM_API_URL + f"?method=track.getInfo&user={lastfm.username}&artist={quote_plus(track['artist']['name'])}&track={quote_plus(track['name'])}&api_key={LASTFM_API_KEY}&format=json") as response:
+                        data = await response.json()
+                        track_info = data["track"]
+                        del track_info["artist"]
+
+                    async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&user={lastfm.username}&artist={quote_plus(track['artist']['name'])}&api_key={LASTFM_API_KEY}&format=json") as response:
+                        data = await response.json()
+                        artist_info = data["artist"]
+
+                    cs_track = Track.from_raw({
+                        "artist": artist_info,
+                        "image": track["image"],
+                        "album": track["album"],
+                        "title": track["name"],
+                        "url": track["url"],
+                        "listeners": track_info["listeners"],
+                        "playcount": track_info["playcount"],
+                        "scrobbles": track_info["userplaycount"],
+                        "tags": track_info["toptags"]["tag"],
+                        **(
+                            {
+                                "date": track["date"]
+                            }
+                            if "date" in track else
+                            {
+
+                            }
+                        )
+                    })
+
+                    fs_data["tracks"].append((index, cs_track))
+
+                for index, track in enumerate(tracks):
+                    bot.loop.create_task(append_track(index, track))
+
+                while len(fs_data["tracks"]) < 2:
+                    await asyncio.sleep(0.1)
+
+                fs_data["tracks"].sort(key=lambda track: track[0])
+                fs_data["tracks"] = [track[1] for track in fs_data["tracks"]]
+
+                return fs_data
 
     return {
         **modules,
@@ -210,9 +492,19 @@ async def get_modules(bot, guild):
             "builtins": {
                 "get_all": lambda: Dict(**database),
                 "get": lambda key: database.get(key, False),
-                "update": update,
-                "delete": delete
+                "update": db_update,
+                "delete": db_delete
             },
             "variables": database
+        },
+        "lastfm": {
+            "variables": {
+                **convert(tracks=(lfm := await lastfm()).get("tracks", [])),
+                "lastfm_user": lfm.get("lastfm_user"),
+                "nowplaying": lfm.get("nowplaying")
+            }
+        }
+        if ctx is not None else {
+            "variables": {}
         }
     }

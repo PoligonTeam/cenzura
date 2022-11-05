@@ -1,3 +1,19 @@
+"""
+Copyright 2022 PoligonTeam
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
+
 from ctypes import *
 from ctypes.util import find_library
 
@@ -18,4 +34,12 @@ def get_extension(content: bytes) -> str:
     lib.magic_load(magic, None)
     extension = lib.magic_buffer(magic, content, len(content))
     lib.magic_close(magic)
-    return extension.decode("utf-8").split("/")[0]
+
+    extension = extension.decode("utf-8").split("/")[0]
+
+    extensions = {
+        "jpeg": "jpg",
+        "???": "txt"
+    }
+
+    return extensions.get(extension, extension)

@@ -17,6 +17,8 @@ limitations under the License.
 import femcord
 from femcord import commands
 from femcord.permissions import Permissions
+from typing import Union
+import inspect
 
 permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles")
 
@@ -186,5 +188,74 @@ class Help(commands.Cog):
         message = await ctx.reply(embed=embed, components=components)
         self.interactions.append(("help", ctx.author.id, ctx.channel.id, message.id))
 
+class HelpRewrite(commands.Cog):
+    hidden = True
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    def get_cog_help(self, cog: commands.Cog) -> femcord.Embed:
+        embed = femcord.Embed()
+
+        if cog.hidden is True:
+            return embed
+
+        text = "> "
+        cog_commands = []
+
+        for command in cog.commands:
+            if True in [command.hidden, not command.enabled, command.type == commands.CommandTypes.SUBCOMMAND, command.guild_id is not None]:
+                continue
+
+            cog_commands.append(command.other.get("display_name", False) or command.name)
+
+        if cog_commands:
+            embed.add_field(name=cog.name + ":", value="> " + ", ".join("`" + command + "`" for command in cog_commands))
+
+        return embed
+
+    def get_command_help(self, command: commands.Command) -> femcord.Embed:
+        embed = femcord.Embed()
+        embed.set_footer(text="() - obowiązkowe, [] - opcjonalne")
+
+        if True in [command.hidden, not command.enabled, command.guild_id is not None]:
+            return embed
+
+        embed.add_field(name="Nazwa:", value=command.other.get("display_name", False) or command.name)
+
+        if command.description is not None:
+            embed.add_field(name="Opis:", value=command.description)
+        if command.usage is not None:
+            embed.add_field(name="Użycie:", value=command.usage)
+        if command.aliases != []:
+            embed.add_field(name="Aliasy:", value=", ".join(command.aliases))
+
+        if "embed" in command.other:
+            embed += command.other["embed"]
+
+        return embed
+
+    @commands.command()
+    async def h(self, ctx: commands.Context, *, argument = None):
+        base_embed = femcord.Embed(title="Pomoc:", color=self.bot.embed_color)
+
+        cog, command = None, None
+
+        if argument is not None:
+            cog = self.bot.get_cog(argument)
+            command = self.bot.get_command(argument)
+
+            if " " in argument:
+                arguments = argument.split(" ")
+                command = self.bot.get_command(arguments[0])
+
+                if command is not None:
+                    for subcommand in arguments[1:]:
+                        command = command.get_subcommand(subcommand)
+
+                        if command is None:
+                            break
+
 def setup(bot):
     bot.load_cog(Help(bot))
+    bot.load_cog(HelpRewrite(bot))

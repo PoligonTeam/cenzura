@@ -49,7 +49,7 @@ void deinit() {
     endwin();
 }
 
-void loadTodo() {
+void load_todo() {
     FILE *file = fopen(filename, "r");
 
     if (file == NULL)
@@ -65,7 +65,7 @@ void loadTodo() {
     fclose(file);
 }
 
-void saveTodo() {
+void save_todo() {
     FILE *file = fopen(filename, "w");
 
     if (file == NULL)
@@ -77,14 +77,14 @@ void saveTodo() {
     fclose(file);
 }
 
-void editTodo() {
+void edit_todo() {
     echo();
     curs_set(1);
     mvgetnstr(selected_todo, width / 2, todo[selected_todo], MAXLEN);
     noecho();
     curs_set(0);
 
-    saveTodo();
+    save_todo();
 }
 
 void update() {
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
     for (int index = 0; index < MAXLINES; index++)
         todo[index] = malloc(MAXLEN * sizeof(char));
 
-    loadTodo();
+    load_todo();
 
     init();
 
@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
                         selected_todo = 0;
 
                         update();
-                        editTodo();
+                        edit_todo();
 
                         break;
 
@@ -189,12 +189,12 @@ int main(int argc, char *argv[]) {
                         todo = realloc(todo, --todo_length * sizeof(char *));
                         selected_todo = 0;
 
-                        saveTodo();
+                        save_todo();
 
                         break;
 
                     case 2:
-                        editTodo();
+                        edit_todo();
                         break;
 
                     case 3:
