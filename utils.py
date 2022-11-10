@@ -437,7 +437,8 @@ async def get_modules(bot, guild, *, ctx = None, user = None, message_errors = F
                 }
 
                 if not tracks:
-                    return await ctx.reply("Nie ma żadnych utworów")
+                    await ctx.reply("Nie ma żadnych utworów")
+                    return {}
 
                 if len(tracks) == 3:
                     fs_data["nowplaying"] = True
@@ -460,7 +461,7 @@ async def get_modules(bot, guild, *, ctx = None, user = None, message_errors = F
                         "url": track["url"],
                         "listeners": track_info["listeners"],
                         "playcount": track_info["playcount"],
-                        "scrobbles": track_info["userplaycount"],
+                        "scrobbles": track_info.get("userplaycount", "0"),
                         "tags": track_info["toptags"]["tag"],
                         **(
                             {

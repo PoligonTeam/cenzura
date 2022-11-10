@@ -109,6 +109,8 @@ class PublicFlags(Enum):
     BUG_HUNTER_LEVEL_2 = 1 << 14
     VERIFIED_BOT_DEVELOPER = 1 << 17
     CERTIFIED_MODERATOR = 1 << 18
+    BOT_HTTP_INTERACTIONS = 1 << 19
+    ACTIVE_DEVELOPER = 1 << 22
 
 class ChannelFlags(Enum):
     PINNED = 1 << 1

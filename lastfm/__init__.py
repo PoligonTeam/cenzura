@@ -47,7 +47,7 @@ class TrackImage:
 class TrackArtistStats:
     listeners: str
     playcount: str
-    userplaycount: str
+    userplaycount: str = None
 
     @classmethod
     def from_raw(cls, data):
@@ -237,9 +237,9 @@ class PartialTrack:
     listeners: str
     playcount: str
     artist: PartialTrackArtist
-    userplaycount: str
     userloved: str
     tags: List[TrackTag]
+    userplaycount: str = None
     wiki: PartialTrackWiki = None
 
     __CHANGE_KEYS__ = (
