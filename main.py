@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import logging, socket, threading, re, sys, io, time, config
+import logging, socket, threading, re, sys, io, time, config, argparse
 from datetime import datetime
 from bot import Bot
 
@@ -73,11 +73,11 @@ class StreamHandler(io.StringIO):
 
         if self.path:
             self.file = open(self.path + "/%s.log" % self.date.strftime("%Y-%m-%d"), "a")
-            self.file.write("\n\n\n\n\nTIMEZONE: %s; DATE: %s; TIMESTAMP: %d; BLACKLIST: %s; COMMAND LINE: \"<python> %s\"\n\n\n\n\n\n" % (str(time.tzname), self.date.strftime("%Y-%m-%d %H:%M:%S"), self.date.timestamp(), str(self.blacklist), self.command_line))
+            self.file.write("\n\n\n\n\nTIMEZONE: %s; DATE: %s; TIMESTAMP: %d; BLACKLIST: %s; COMMAND LINE: \"<python> %s\"\n\n\n\n\n\n" % (str(time.tzname), self.date.strftime("%Y-%m-%d %H:%M:%S"), self.date.timestamp(), str([expression.pattern for expression in self.blacklist]), self.command_line))
 
     def write(self, content):
         for pattern in self.blacklist:
-            if re.match(pattern, content):
+            if pattern.match(content):
                 return
 
         if not self.date.date() == datetime.now().date():
@@ -92,8 +92,19 @@ class StreamHandler(io.StringIO):
             threading.Thread(target=self.tcp_server.send, args=(content,), daemon=True).start()
 
 def main():
+    parser = argparse.ArgumentParser(description="cenzura to bot, bot to cenzura")
+    parser.add_argument("--logging", "-l", help="enable logging")
+    parser.add_argument("--logterminal", "-lt", help="prints logs to specified terminal")
+    parser.add_argument("--path", "-p", help="saves logs to specified path")
+    parser.add_argument("--blacklist", "-bl", nargs="*", action="append", help="for example \"^[\\d\\s:,-]+\\[DEBUG:.+\\].(sent.)?op:.(HEARTBEAT|PRESENCE_UPDATE).+$" or "^.+event.name:.PRESENCE_UPDATE$\"")
+    parser.add_argument("--serverport", "-sp", type=int, help="tcp server port")
+    parser.add_argument("--clients", "-c", type=int, help="maximum number of clients")
+    parser.add_argument("--token", "-t", help="bot token")
+    parser.add_argument("--bot", "-b", help="true if token is a bot token", choices=("true", "false"))
+
+    args = parser.parse_args()
+
     stream = sys.stdout
-    flags = re.findall(r" -+[\w]+ ?\S*", " ".join(sys.argv))
 
     logging_enabled = False
     path = None
@@ -105,39 +116,30 @@ def main():
     token = None
     bot = True
 
-    for flag in flags:
-        flag = flag.split()
+    if args.logging:
+        logging_enabled = True
 
-        if flag[0] in ["-h", "--help"]:
-            print(""""cenzura to bot, bot to cenzura"
+    if args.logterminal:
+        logging_enabled = True
+        stream = open("/dev/pts/" + args.logterminal, "w")
 
-    -h  or --help                shows help
-    -l  or --logging             enable logging
-    -lt or --logterminal         prints logs to a specified terminal
-    -p  or --path                saves logs to a specified path
-    -bl or --blacklist           for example "^[\\d\\s:,-]+\\[DEBUG:.+\\].(sent.)?op:.(HEARTBEAT|PRESENCE_UPDATE).+$" or "^.+event.name:.PRESENCE_UPDATE$"
-    -sp or --serverport          tcp server port
-    -c  or --clients             maximum number of clients
-    -t  or --token               bot token
-    -b  or --bot <true/false>    true if token is a bot token""")
-            exit(0)
-        elif flag[0] in ["-l", "--logging"]:
-            logging_enabled = True
-        elif flag[0] in ["-lt", "--logterminal"]:
-            logging_enabled = True
-            stream = open("/dev/pts/" + flag[1], "w")
-        elif flag[0] in ["-p", "--path"]:
-            path = flag[1]
-        elif flag[0] in ["-bl", "--blacklist"]:
-            blacklist.append(flag[1])
-        elif flag[0] in ["-sp", "--serverport"]:
-            server_port = int(flag[1])
-        elif flag[0] in ["-c", "--clients"]:
-            max_clients = int(flag[1])
-        elif flag[0] in ["-t", "--token"]:
-            token = flag[1]
-        elif flag[0] in ["-b", "--bot"]:
-            bot = flag[1] == "true"
+    if args.path:
+        path = args.path
+
+    if args.blacklist:
+        blacklist = [re.compile(blacklisted[0]) for blacklisted in args.blacklist]
+
+    if args.serverport:
+        server_port = args.serverport
+
+    if args.clients:
+        max_clients = args.clients
+
+    if args.token:
+        token = args.token
+
+    if args.bot:
+        bot = args.bot == "true"
 
     if logging_enabled is True:
         tcp_server = None

@@ -91,6 +91,8 @@ class Gateway:
         self.dispatched_ready: bool = False
         self.presence: Presence = None
 
+        self.copied_objects: list = []
+
         await WebSocket(self, client)
 
     async def dispatch(self, event: str, *args, **kwargs):
@@ -156,13 +158,24 @@ class Gateway:
             self.heartbeat.start()
 
             if self.resuming is True:
+                while (index := len(self.copied_objects)) > 0:
+                    del self.copied_objects[index - 1]
+                    index -= 1
+
+                await self.dispatch("reconnect")
                 return await self.resume()
 
             await self.identify()
 
         elif op is Opcodes.INVALID_SESSION:
+            while (index := len(self.copied_objects)) > 0:
+                del self.copied_objects[index - 1]
+                index -= 1
+
             await asyncio.sleep(5)
             await self.identify()
+            await asyncio.sleep(1)
+            await self.dispatch("reconnect")
 
         elif op is Opcodes.HEARTBEAT_ACK:
             if len(self.last_latencies) > self.last_latencies_limit:
@@ -187,7 +200,9 @@ class Gateway:
                     await self.dispatch("ready")
 
         elif isinstance(event_name, str) and isinstance(data, dict):
-            copy_data: dict = copy.deepcopy(data)
+            if self.dispatched_ready:
+                await self.dispatch("raw_" + event_name.lower(), copied_data := copy.copy(data))
+                del copied_data
 
             if not self.dispatched_ready and event_name == "GUILD_CREATE":
                 await eventhandlers.guild_create(self, data)
@@ -211,7 +226,6 @@ class Gateway:
                 parsed_data = ()
 
             if self.dispatched_ready:
-                await self.dispatch("raw_" + event_name.lower(), copy_data)
                 await self.dispatch(event_name.lower(), *parsed_data)
 
     async def set_presence(self, presence: Presence):
@@ -254,3 +268,13 @@ class Gateway:
         self.users.append(user)
 
         return user
+
+    def copy(self, _object, deep: bool = False):
+        if deep is True:
+            copied_object = copy.deepcopy(_object)
+        elif deep is False:
+            copied_object = copy.copy(_object)
+
+        self.copied_objects.append(copied_object)
+
+        return copied_object

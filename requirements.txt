@@ -2,8 +2,6 @@ uvloop
 aiohttp
 asyncpg
 beautifulsoup4
-httpx[socks]
-lavalink
 lxml
 Pillow
 playwright
@@ -11,3 +9,4 @@ psutil
 pyfiglet
 tortoise-orm
 yt-dlp
+ujson

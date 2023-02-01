@@ -17,11 +17,10 @@ limitations under the License.
 import femcord
 from femcord import commands
 from femcord.types import Guild, Member, User, Message
+from femcord.http import Route
 from femscript import run
-from aiohttp import ClientSession, FormData
 from utils import *
-from models import Guilds, Users
-import time
+from models import Guilds
 
 class Events(commands.Cog):
     def __init__(self, bot):
@@ -40,6 +39,9 @@ class Events(commands.Cog):
 
     @commands.Listener
     async def on_guild_member_add(self, guild: Guild, member: Member):
+        if guild.id == "704439884340920441":
+            await self.bot.http.request(Route("PATCH", "guilds", guild.id, "members", member.user.id), data={"nick": get_random_username()})
+
         if not hasattr(guild, "welcome_message"):
             db_guild = await Guilds.filter(guild_id=guild.id).first()
 
@@ -115,54 +117,8 @@ class Events(commands.Cog):
             else:
                 await channel.send(result)
 
-    # @commands.Listener
-    # async def on_user_update(self, old_user: User, user: User):
-    #     if old_user.avatar == user.avatar:
-    #         return
-
-    #     print(1)
-
-    #     query = Users.filter(user_id=user.id)
-    #     user_db = await query.first()
-
-    #     if not user_db:
-    #         await Users.create(user_id=user.id, avatars=[])
-    #         user_db = await query.first()
-
-    #     async with ClientSession() as session:
-    #         async with session.get(user.avatar_url + "?size=2048") as response:
-    #             if not response.status == 200:
-    #                 return
-
-    #             data = await response.content.read()
-
-    #             headers = {
-    #                 "authorization": POLIGON_LGBT
-    #             }
-
-    #             form = FormData()
-    #             form.add_field("file", data, filename="avatar.png")
-
-    #             async with session.post("https://poligon.lgbt/api/upload", headers=headers, data=form) as response:
-    #                 if not response.status == 201:
-    #                     return
-
-    #                 data = await response.json()
-
-    #                 avatars = user_db.avatars
-    #                 avatars.append({
-    #                     "name": data["name"],
-    #                     "time": time.time()
-    #                 })
-    #                 print(avatars)
-
-    #                 await query.update(avatars=avatars)
-
     @commands.Listener
     async def on_message_create(self, message: Message):
-        if message.author.id == "1010932694693199972":
-            return await (await self.bot.gateway.get_user("740349770165518347")).send(message.content)
-
         if message.author.bot:
             return
 

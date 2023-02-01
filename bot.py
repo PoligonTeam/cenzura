@@ -18,22 +18,21 @@ import femcord
 from femcord import commands, types
 from femcord.permissions import Permissions
 from femscript import run
-from tortoise import Tortoise, run_async
+from tortoise import Tortoise
 from utils import modules, builtins
-from types import CoroutineType
 from models import Guilds
 from poligonlgbt import Poligon
 from datetime import datetime
 from typing import Callable, Union, Optional, List
-import asyncio, uvloop, random, re, os, time, config, copy, logging
+import asyncio, uvloop, random, re, os, time, config, logging
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 class FakeCtx:
-    def __init__(self, guild: types.Guild, channel: types.Channel, member: types.Member, su_role: types.Role):
+    def __init__(self, copy_function: Callable, guild: types.Guild, channel: types.Channel, member: types.Member, su_role: types.Role):
         self.guild = guild
         self.channel = channel
-        self.member = copy.deepcopy(member)
+        self.member = copy_function(member, deep=True)
         self.author = self.member.user
 
         self.member.roles.append(su_role)
@@ -47,7 +46,7 @@ class FakeCtx:
 
 class Schedule:
     def __init__(self, task: Callable, interval: int, *, name: Optional[str] = None, args: tuple = (), kwargs: dict = {}, times: int = float("inf")):
-        self.task = task if isinstance(task, CoroutineType) else asyncio.coroutine(task)
+        self.task = task
         self.interval = interval
         self.timestamp = time.time() + interval
         self.name = name
@@ -101,6 +100,7 @@ class Bot(commands.Bot):
 
         self.event(self.on_ready)
         self.event(self.on_close)
+
         self.loop.run_until_complete(self.async_init())
 
     async def on_ready(self):
@@ -117,7 +117,7 @@ class Bot(commands.Bot):
 
             for custom_command in db_guild.custom_commands:
                 channel_id, author_id = re.findall(r"# \w+: (\d+)", custom_command)[2:4]
-                fake_ctx = FakeCtx(guild, guild.get_channel(channel_id), await guild.get_member(author_id), self.su_role)
+                fake_ctx = FakeCtx(self.gateway.copy, guild, guild.get_channel(channel_id), await guild.get_member(author_id), self.su_role)
 
                 await customcommand_command(fake_ctx, code=custom_command)
 
@@ -240,7 +240,7 @@ class Bot(commands.Bot):
     def create_schedule(self, task: Callable, interval: Union[datetime, str], *args: tuple, **kwargs: dict) -> Schedule:
         if isinstance(interval, datetime):
             interval = (interval - datetime.now()).total_seconds()
-            times = 1
+            kwargs["times"] = 1
         elif isinstance(interval, str):
             interval = sum(int(unit[:-1]) * {"s": 1, "m": 60, "h": 3600, "d": 86400}[unit[-1]] for unit in re.findall(r"\d+[smhd]", interval))
 

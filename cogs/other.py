@@ -20,7 +20,7 @@ from femscript import Lexer, Parser, run, Dict
 from utils import *
 from types import CoroutineType
 from models import Guilds
-import re, datetime, copy
+import re, datetime
 
 class CustomCommands(commands.Cog):
     name = "Komendy serwerowe"
@@ -95,7 +95,9 @@ class Other(commands.Cog):
                     "http": {
                         "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ"
                     }
-                }
+                },
+                "sex": 69,
+                "dupa": True
             }
         )
 
@@ -127,7 +129,7 @@ class Other(commands.Cog):
                 if not command or ("prefix" in command.other and not command.other["prefix"] == prefix):
                     return
 
-                fake_message = copy.deepcopy(message)
+                fake_message = self.bot.gateway.copy(message)
                 fake_message.content = (await self.bot.get_prefix(self.bot, message))[-1] + message.content[len(prefix):]
 
                 return await self.bot.process_commands(fake_message)

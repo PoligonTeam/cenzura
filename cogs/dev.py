@@ -17,7 +17,7 @@ limitations under the License.
 import femcord
 from femcord import commands, types
 from typing import Union
-import asyncio, time, ast, inspect, copy, models
+import asyncio, time, ast, inspect, models
 
 class Dev(commands.Cog):
     hidden = True
@@ -143,8 +143,8 @@ class Dev(commands.Cog):
             command = member
             member = ctx.member
 
-        fake_member = copy.deepcopy(member)
-        fake_message = copy.deepcopy(ctx.message)
+        fake_member = self.bot.gateway.copy(member)
+        fake_message = self.bot.gateway.copy(ctx.message)
 
         fake_member.roles.append(self.bot.su_role)
         fake_member.hoisted_role = self.bot.su_role
@@ -168,7 +168,7 @@ class Dev(commands.Cog):
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(komenda) [argumenty]")
     @commands.is_owner
     async def perf(self, ctx: commands.Context, command, *, args = None):
-        fake_message = copy.deepcopy(ctx.message)
+        fake_message = self.bot.gateway.copy(ctx.message)
 
         fake_message.content = (await self.bot.get_prefix(self.bot, ctx.message))[-1] + command
 

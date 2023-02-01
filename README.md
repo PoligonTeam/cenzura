@@ -19,7 +19,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  
+
   <a href="https://github.com/PoligonTeam/cenzura">
     <img src="https://cdn.poligon.lgbt/XwrHwBjmXw.png">
   </a>
@@ -84,7 +84,6 @@ cenzurabot is a multifunctional discord bot that is very cool
 * [Aiohttp](https://aiohttp.org/)
 * [Asyncpg](https://github.com/MagicStack/asyncpg)
 * [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/)
-* [Httpx](https://www.python-httpx.org/)
 * [Lavalink](https://github.com/freyacodes/Lavalink)
 * [Lavalink.py](https://github.com/Devoxin/Lavalink.py)
 * [Pillow](https://python-pillow.org/)

@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <python3.10/Python.h>
+#include <python3.11/Python.h>
 
 enum TokenType {
     UNKNOWN,
@@ -850,7 +850,7 @@ Token parseTokens(Token *tokens, int length, Variable *variables, int variablesL
             index = 0;
             continue;
         } else if (currentToken->type == FUNC) {
-            // TODO: zrobic seks
+
         } else if (currentToken->type == IMPORT) {
             return (Token) { ERROR, "import is not implemented yet" };
         } else if (currentToken->type == RETURN) {

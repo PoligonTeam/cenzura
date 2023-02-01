@@ -719,5 +719,9 @@ class Fun(commands.Cog):
 
         await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60 * 5, on_timeout=on_timeout)
 
+    @commands.command(description="losowy nick")
+    async def nick(self, ctx):
+        await ctx.reply(get_random_username())
+
 def setup(bot):
     bot.load_cog(Fun(bot))

@@ -13,3 +13,33 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+
+class InvalidApiKey(Exception):
+    pass
+
+class BadGateway(Exception):
+    pass
+
+class NotFound(Exception):
+    pass
+
+class InvalidSignature(Exception):
+    pass
+
+class UnauthorizedToken(Exception):
+    pass
+
+class InvalidToken(Exception):
+    pass
+
+class ExpiredToken(Exception):
+    pass
+
+class TemporaryError(Exception):
+    pass
+
+class SuspendedApiKey(Exception):
+    pass
+
+class RateLimitExceeded(Exception):
+    pass

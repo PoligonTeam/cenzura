@@ -25,7 +25,6 @@ from .emoji import Emoji
 from .member import Member
 from .role import Role
 from .embed import Embed
-from .sticker import Sticker
 from .interaction import Interaction
 from datetime import datetime
 

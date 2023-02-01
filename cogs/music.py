@@ -19,22 +19,20 @@ from femcord import commands, types, HTTPException
 from femscript import run
 from utils import *
 from aiohttp import ClientSession
-from urllib.parse import quote_plus
 from models import LastFM
 from config import *
-from lastfm import PartialTrack, TrackArtist
 from typing import Union
-import hashlib, datetime, asyncio, lavalink, re, os, logging
+from lastfm import exceptions
+import hashlib, datetime, asyncio, femlink, re, os
 
-soundcloud_pattern = re.compile(
-    r"(https?:\/\/)?(www.)?(m\.)?soundcloud\.com/.+/.+"
-)
+soundcloud_pattern = re.compile(r"(https?:\/\/)?(www.)?(m\.)?soundcloud\.com/.+/.+")
 
 class Music(commands.Cog):
     name = "Muzyka"
 
     def __init__(self, bot):
         self.bot = bot
+        self.client: femlink.Client = None
         self.templates = {}
         self.milestones = [50, 100, 250, 420, 500, 1000, 1337, 2500, 5000, 10000, 25000, 50000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 450000, 500000, 600000, 700000, 800000, 900000, 1000000, 2000000, 3000000, 4000000, 5000000]
 
@@ -44,21 +42,26 @@ class Music(commands.Cog):
 
     async def on_load(self):
         if self.bot.gateway is not None:
-            self.client: lavalink.Client = lavalink.Client(int(self.bot.gateway.bot_user.id))
-
-            for node in LAVALINK_NODES:
-                self.client.add_node(*node)
+            self.client = await femlink.Client(self.bot.gateway.bot_user.id, "127.0.0.1", 6968, "Dupa123@")
 
             await asyncio.sleep(1)
-
             await self.connect("704439884340920441", "853657308152070144", mute=True, deaf=True)
 
-            player = self.client.player_manager.create(guild_id=704439884340920441)
-            result = await player.node.get_tracks("https://radio.poligon.lgbt/listen/station_1/radio.mp3")
-            track = lavalink.models.AudioTrack(result["tracks"][0], "921822086102679572")
-            player.add(requester="921822086102679572", track=track)
-            await player.play()
+            player: femlink.Player = self.client.get_player("704439884340920441")
+
+            while player is None:
+                player = self.client.get_player("704439884340920441")
+                await asyncio.sleep(0.5)
+
+            tracks = await self.client.get_tracks("https://radio.poligon.lgbt/listen/station_1/radio.mp3")
+
+            await player.play(tracks[0])
+
             print("joined poligon and started playing radio")
+
+            self.lastfm_users = {
+                user.user_id: user for user in (await LastFM.all())
+            }
 
     def connect(self, guild, channel = None, *, mute = False, deaf = False):
         return self.bot.gateway.ws.send(femcord.enums.Opcodes.VOICE_STATE_UPDATE, {
@@ -68,34 +71,23 @@ class Music(commands.Cog):
             "self_deaf": deaf
         })
 
-    def get_player(self, guild) -> lavalink.DefaultPlayer:
-        return self.client.player_manager.get(int(guild.id))
-
     def sign(self, method, token):
         string = "api_key" + LASTFM_API_KEY + "method" + method + "token" + token + LASTFM_API_SECRET
         return hashlib.md5(string.encode("utf-8")).hexdigest()
 
     @commands.Listener
     async def on_ready(self):
-        logging.getLogger("lavalink").setLevel(logging.CRITICAL)
-
         await self.on_load()
 
     @commands.Listener
     async def on_voice_server_update(self, data):
-        await self.client.voice_update_handler({
-            "t": "VOICE_SERVER_UPDATE",
-            "d": data
-        })
+        await self.client.voice_server_update(data)
 
     @commands.Listener
     async def on_raw_voice_state_update(self, data):
-        await self.client.voice_update_handler({
-            "t": "VOICE_STATE_UPDATE",
-            "d": data
-        })
+        await self.client.voice_state_update(data)
 
-    @commands.command()
+    @commands.command(description="Łączy z kanałem głosowym", usage="join [wyciszony_mikrofon] [wyciszone_słuchawki]")
     async def join(self, ctx: commands.Context, mute: int = 0, deaf: int = 0):
         channel = ctx.member.voice_state.channel
 
@@ -104,34 +96,17 @@ class Music(commands.Cog):
 
         await self.connect(ctx.guild, channel, mute=bool(mute), deaf=bool(deaf))
 
-        self.client.player_manager.create(guild_id=int(ctx.guild.id))
-
         await ctx.reply("Dołączyłem na kanał głosowy")
 
-    @commands.command()
+    @commands.command(description="Rozłącza z kanału głosowego")
     async def leave(self, ctx: commands.Context):
         await self.connect(ctx.guild, None)
 
         await ctx.reply("Wyszedłem z kanału głosowego")
 
-    @commands.command()
-    async def bassboost(self, ctx: commands.Context):
-        player = self.get_player(ctx.guild)
-
-        if player is None:
-            if ctx.member.voice_state.channel is None:
-                return await ctx.reply("Nie jesteś na żadnym kanale głosowym")
-
-        if any(player.equalizer) is True:
-            await player.reset_equalizer()
-            return await ctx.reply("Wyłączyłem bassboost")
-
-        await player.set_gains((0, 0.15), (1, 0.20))
-        await ctx.reply("Włączyłem bassboost")
-
-    @commands.command()
+    @commands.command(description="Odtwarza muzykę", usage="play [tytuł]")
     async def play(self, ctx: commands.Context, *, query):
-        player: lavalink.DefaultPlayer = self.get_player(ctx.guild)
+        player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None:
             if ctx.member.voice_state.channel is None:
@@ -139,8 +114,8 @@ class Music(commands.Cog):
 
             await self.join(ctx)
 
-            for _ in range(6):
-                player: lavalink.DefaultPlayer = self.get_player(ctx.guild)
+            for _ in range(5):
+                player = self.client.get_player(ctx.guild.id)
                 await asyncio.sleep(0.5)
 
         if query == r"%radio":
@@ -149,63 +124,63 @@ class Music(commands.Cog):
         elif not soundcloud_pattern.match(query):
             query = "scsearch:" + query
 
-        result = await player.node.get_tracks(query)
+        tracks = await self.client.get_tracks(query)
 
-        if not result or not result["tracks"]:
+        if not tracks:
             return await ctx.reply("Nie znaleziono żadnych utworów")
 
-        track = lavalink.models.AudioTrack(result["tracks"][0], ctx.author.id)
-        player.add(requester=ctx.author.id, track=track)
+        track: femlink.Track = tracks[0]
 
-        if not player.is_playing:
-            await ctx.reply("Zaczynam grać `" + track.title + " - " + track.author + "`")
-            return await player.play()
+        if player.track is None:
+            await player.play(track)
+            return await ctx.reply("Zaczynam grać `" + track.info.title + " - " + track.info.artist + "`")
 
-        await ctx.reply("Dodano do kolejki `" + track.title + " - " + track.author + "`")
+        player.add(track)
+        await ctx.reply("Dodano do kolejki `" + track.info.title + " - " + track.info.artist + "`")
 
-    @commands.command()
-    async def resume(self, ctx: commands.Context):
-        player = self.get_player(ctx.guild)
+    @commands.command(description="Pomija utwór")
+    async def skip(self, ctx):
+        player: femlink.Player = self.client.get_player(ctx.guild.id)
 
-        if player is None or player.is_playing is False:
+        if player is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
 
-        if player.paused is False:
-            return await ctx.reply("Muzyka nie jest zatrzymana")
+        await player.skip()
+        await ctx.reply("Pominięto utwór")
 
-        await player.set_pause(False)
-        await ctx.reply("Wznowiłem muzykę")
+    @commands.command(description="Zatrzymuje odtwarzanie")
+    async def stop(self, ctx):
+        player: femlink.Player = self.client.get_player(ctx.guild.id)
 
-    @commands.command()
-    async def pause(self, ctx: commands.Context):
-        player = self.get_player(ctx.guild)
-
-        if player is None or player.is_playing is False:
+        if player is None or player.track is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
 
-        if player.paused is True:
-            return await ctx.reply("Muzyka jest już zatrzymana")
+        await player.stop()
+        await ctx.reply("Zatrzymałem odtwarzanie")
 
-        await player.set_pause(True)
-        await ctx.reply("Wstrzymałem muzykę")
+    @commands.command(description="Pauzuje odtwarzanie")
+    async def pause(self, ctx):
+        player: femlink.Player = self.client.get_player(ctx.guild.id)
 
-    @commands.command()
-    async def skip(self, ctx: commands.Context):
-        player = self.get_player(ctx.guild)
-
-        if not player:
-            if ctx.member.voice_state.channel is None:
-                return await ctx.reply("Nie jesteś na żadnym kanale głosowym")
-
+        if player is None or player.track is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
 
-        if player.is_playing:
-            await player.skip()
-            await ctx.reply("Pominięto utwór")
+        await player.pause()
+        await ctx.reply("Pauzuje odtwarzanie")
 
-    @commands.command()
-    async def volume(self, ctx: commands.Context, volume: float):
-        player = self.get_player(ctx.guild)
+    @commands.command(description="Wznawia odtwarzanie")
+    async def resume(self, ctx):
+        player: femlink.Player = self.client.get_player(ctx.guild.id)
+
+        if player is None or player.track is None:
+            return await ctx.reply("Nie gram na żadnym kanale głosowym")
+
+        await player.resume()
+        await ctx.reply("Wznawiam odtwarzanie")
+
+    @commands.command(description="Zmienia głośność", usage="volume [głośność]")
+    async def volume(self, ctx, volume: float):
+        player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
@@ -215,124 +190,158 @@ class Music(commands.Cog):
 
         await player.set_volume(volume)
 
-        await ctx.reply(f"Zmieniono głośność na {volume:.1f}%")
+        await ctx.reply(f"Ustawiono głośność na {volume:.1f}%")
 
     @commands.command()
-    async def queue(self, ctx: commands.Context):
-        player = self.get_player(ctx.guild)
+    async def bassboost(self, ctx: commands.Context):
+        player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
 
-        text = ""
+        if player.filters.get("equalizer"):
+            await player.set_filters(equalizer=None)
+            return await ctx.reply("Wyłączyłem bassboost")
 
-        for track in player.queue:
-            text += track.title + "\n"
+        await player.set_filters(equalizer=[{"band": 0, "gain": 0.15}, {"band": 1, "gain": 0.2}, {"band": 2, "gain": 0.0}, {"band": 3, "gain": 0.0}, {"band": 4, "gain": 0.0}, {"band": 5, "gain": 0.0}, {"band": 6, "gain": 0.0}, {"band": 7, "gain": 0.0}, {"band": 8, "gain": 0.0}, {"band": 9, "gain": 0.0}, {"band": 10, "gain": 0.0}, {"band": 11, "gain": 0.0}, {"band": 12, "gain": 0.0}, {"band": 13, "gain": 0.0}, {"band": 14, "gain": 0.0}])
+        await ctx.reply("Włączyłem bassboost")
 
-        await ctx.reply(text or "nie ma nic")
+    @commands.command(description="Włącza/wyłącza pętlę utworu")
+    async def loop(self, ctx):
+        player: femlink.Player = self.client.get_player(ctx.guild.id)
 
-    @commands.command(aliases=["np"])
-    async def nowplaying(self, ctx: commands.Context, *, query: str = None):
-        player = self.get_player(ctx.guild)
-
-        async def nowplaying_poligon():
-            async with ClientSession() as session:
-                async with session.get("https://radio.poligon.lgbt/api/live/nowplaying/station_1") as response:
-                    data = await response.json()
-                    now_playing = data["now_playing"]
-                    playing_next = data["playing_next"]
-
-                    return await ctx.reply(f"Gram teraz: `{now_playing['song']['text']}` {(now_playing['elapsed'] % 3600) // 60}:{now_playing['elapsed'] % 60:02d}/{(now_playing['duration'] % 3600) // 60}:{now_playing['duration'] % 60:02d}\nPotem będę grał: `{playing_next['song']['text']}`")
-
-        if query == r"%radio":
-            return await nowplaying_poligon()
-
-        if not player:
+        if player is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
 
-        if not player.current:
+        player.set_loop(not player.loop)
+        await ctx.reply("Włączono pętlę" if player.loop is True else "Wyłączono pętlę")
+
+    @commands.command(description="Pokazuje kolejkę utworów")
+    async def queue(self, ctx: commands.Context):
+        player: femlink.Player = self.client.get_player(ctx.guild.id)
+
+        if player is None:
+            return await ctx.reply("Nie gram na żadnym kanale głosowym")
+
+        if not player.queue:
+            return await ctx.reply("Kolejka jest pusta")
+
+        await ctx.reply("\n".join([f"`{track.info.title} - {track.info.artist}`" for track in player.queue]))
+
+    @commands.command(description="Pokazuje informacje o odtwarzanym utworze", aliases=["np"])
+    async def nowplaying(self, ctx):
+        player: femlink.Player = self.client.get_player(ctx.guild.id)
+
+        if player is None:
+            return await ctx.reply("Nie gram na żadnym kanale głosowym")
+
+        if player.track is None:
             return await ctx.reply("Nie gram żadnego utworu")
 
-        if player.current.title == "radio poligon":
-            return await nowplaying_poligon()
-
-
         position = int(player.position / 1000)
-        duration = int(player.current.duration / 1000)
+        duration = int(player.track.info.length / 1000)
 
-        await ctx.reply(f"Gram teraz: `{player.current.title}` {(position % 3600) // 60}:{position % 60:02d}/{(duration % 3600) // 60}:{duration % 60:02d}")
+        await ctx.reply(f"Gram teraz `{player.track.info.title}` {(position % 3600) // 60}:{position % 60:02d}/{(duration % 3600) // 60}:{duration % 60:02d}")
 
     @commands.command(description="Łączenie konta LastFM do bota")
     async def login(self, ctx: commands.Context):
-        async with ClientSession() as session:
-            async with session.get(LASTFM_API_URL + f"?method=auth.getToken&api_key={LASTFM_API_KEY}&format=json") as response:
-                data = await response.json()
-                token = data["token"]
+        async with Client(LASTFM_API_KEY, LASTFM_API_SECRET) as client:
+            token = await client.get_token()
+
+            try:
+                message = await ctx.author.send(f"Aby połączyć konto LastFM z botem musisz wejść w poniższy link\n<https://www.last.fm/api/auth?api_key={LASTFM_API_KEY}&token={token}>")
+            except HTTPException:
+                return await ctx.reply("Bot nie może wysłać ci wiadomości prywatnej")
+
+            await ctx.reply("Wiadomość z linkiem została wysłana w wiadomości prywatnej")
+
+            for attempt in range(3):
+                await asyncio.sleep(20)
 
                 try:
-                    message = await ctx.author.send(f"Aby połączyć konto LastFM z botem musisz wejść w poniższy link\n<https://www.last.fm/api/auth?api_key={LASTFM_API_KEY}&token={token}>")
-                except HTTPException:
-                    return await ctx.reply("Bot nie może wysłać ci wiadomości prywatnej")
+                    session = await client.get_session(token)
+                except (exceptions.UnauthorizedToken, exceptions.InvalidApiKey):
+                    if attempt == 8:
+                        return await message.edit("Logowanie się nie powiodło... link się przedawnił lub coś poszło nie tak")
 
-                await ctx.reply("Wiadomość z linkiem została wysłana w wiadomości prywatnej")
+                    continue
 
-                signature = self.sign("auth.getSession", token)
+                user: LastFM = self.lastfm_users.get(ctx.author.id)
 
-                for attempt in range(3):
-                    await asyncio.sleep(20)
+                if user is None:
+                    user = LastFM(user_id=ctx.author.id, username=session["name"], token=session["key"], script=self.templates["embedmini"])
+                else:
+                    user.username = session["name"]
+                    user.token = session["key"]
 
-                    async with session.get(LASTFM_API_URL + f"?method=auth.getSession&token={token}&api_key={LASTFM_API_KEY}&api_sig={signature}&format=json") as response:
-                        if not response.status == 200:
-                            if attempt == 8:
-                                return await message.edit("Logowanie się nie powiodło... link się przedawnił lub coś poszło nie tak")
+                await user.save()
 
-                            continue
+                self.lastfm_users[ctx.author.id] = user
 
-                        data = await response.json()
-                        data = data["session"]
-
-                        query = LastFM.filter(user_id=ctx.author.id)
-
-                        if await query.first() is None:
-                            query = LastFM.create
-                        else:
-                            query = query.update
-
-                        await query(user_id=ctx.author.id, username=data["name"], token=data["key"], script=self.templates["embedmini"])
-
-                        return await message.edit("Pomyślnie połączono konto `" + data["name"] + "`")
+                return await message.edit("Pomyślnie połączono konto `" + session["name"] + "`")
 
     @commands.command(description="Informacje o artyście", aliases=["ai", "artist"])
     async def artistinfo(self, ctx: commands.Context, *, artist_name: str):
-        lastfm = await LastFM.filter(user_id=ctx.author.id).first()
+        lastfm = self.lastfm_users.get(ctx.author.id)
 
         if lastfm is None:
             return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
 
-        async with ClientSession() as session:
-            async with session.get(LASTFM_API_URL + f"?method=artist.getinfo&user={lastfm.username}&artist={quote_plus(artist_name)}&api_key={LASTFM_API_KEY}&format=json") as response:
-                if not response.status == 200:
-                    return await ctx.reply("Nie znaleziono artysty")
+        async with Client(LASTFM_API_KEY) as client:
+            try:
+                artist = await client.artist_info(artist_name, lastfm.username)
+            except exceptions.NotFound:
+                return await ctx.reply("Nie znaleziono takiego artysty")
 
-                data = await response.json()
-                artist = TrackArtist.from_raw(data["artist"])
+            embed = femcord.Embed(title="Informacje o " + artist.name, url=artist.url, description=artist.bio.summary, color=self.bot.embed_color, timestamp=datetime.datetime.now())
+            embed.add_field(name="Liczba słuchaczy", value=artist.stats.listeners, inline=True)
+            embed.add_field(name="Liczba odtworzeń", value=artist.stats.playcount, inline=True)
+            embed.add_field(name="Liczba twoich odtworzeń", value=artist.stats.userplaycount, inline=True)
+            embed.add_field(name="Gatunki", value="\n".join(["- " + genere.name.title() for genere in artist.tags]), inline=False)
 
-                embed = femcord.Embed(title="Informacje o " + artist.name, url=artist.url, description=artist.bio.summary, color=self.bot.embed_color, timestamp=datetime.datetime.now())
-                embed.add_field(name="Liczba słuchaczy", value=artist.stats.listeners, inline=True)
-                embed.add_field(name="Liczba odtworzeń", value=artist.stats.playcount, inline=True)
-                embed.add_field(name="Liczba twoich odtworzeń", value=artist.stats.userplaycount, inline=True)
-                embed.add_field(name="Gatunki", value="\n".join(["- " + genere.name.title() for genere in artist.tags]), inline=False)
+            embed.set_thumbnail(url=artist.image[-1].url)
+            embed.set_footer(text="hejka tu lenka", icon_url=ctx.author.avatar_url)
 
-                embed.set_thumbnail(url=artist.image[-1].url)
-                embed.set_footer(text="hejka tu lenka", icon_url=ctx.author.avatar_url)
-
-                await ctx.reply(embed=embed)
+            await ctx.reply(embed=embed)
 
     @commands.command(description="Informacje o obecnie grającej piosence", usage="[użytkownik]", aliases=["ti", "track", "trackstats"])
     async def trackinfo(self, ctx: commands.Context, *, user: types.User = None):
         user = user or ctx.author
 
-        lastfm = await LastFM.filter(user_id=user.id).first()
+        lastfm = self.lastfm_users.get(user.id)
+
+        if lastfm is None:
+            if ctx.author is user:
+                return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+
+            return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
+
+        async with Client(LASTFM_API_KEY) as client:
+            try:
+                recent_tracks = await client.recent_tracks(lastfm.username, limit=1)
+            except exceptions.NotFound:
+                return await ctx.reply("Nie znaleziono takiego użytkownika")
+
+            track = recent_tracks.tracks[0]
+
+            track_info = await client.track_info(track.artist.name, track.title, lastfm.username)
+            track_info.image = track.image
+
+            embed = femcord.Embed(title=f"Informacje o utworze", url=track_info.url, color=self.bot.embed_color)
+            embed.add_field(name="Wykonawca", value=track_info.artist.name, inline=True)
+            embed.add_field(name="Nazwa utworu", value=track_info.title, inline=True)
+            embed.add_blank_field()
+            embed.add_field(name="Gatunki", value="\n".join(["- " + genere.name.title() for genere in track_info.tags]))
+
+            embed.set_thumbnail(url=track_info.image[-1].url)
+
+            await ctx.reply(embed=embed)
+
+    @commands.command(description="Informacje o użytkowniku LastFM", usage="[użytkownik]", aliases=["fui"])
+    async def fmuserinfo(self, ctx: commands.Context, *, user: types.User = None):
+        user = user or ctx.author
+
+        lastfm = self.lastfm_users.get(user.id)
 
         if lastfm is None:
             if ctx.author is user:
@@ -341,64 +350,23 @@ class Music(commands.Cog):
             return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
 
         async with femcord.Typing(ctx.message):
-            async with ClientSession() as session:
-                async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&user={lastfm.username}&limit=2&api_key={LASTFM_API_KEY}&format=json") as response:
-                    if not response.status == 200:
-                        return await ctx.reply("Takie konto LastFM nie istnieje")
+            result = await run(
+                lastfm.uiscript,
+                modules = await get_modules(self.bot, ctx.guild, ctx=ctx, user=user),
+                builtins = builtins,
+                variables = convert(user=user)
+            )
 
-                    data = await response.json()
-                    data = data["recenttracks"]["track"][0]
-                    track_name = data["name"]
-                    track_image = data["image"]
-                    artist_name = data["artist"]["#text"]
+            if isinstance(result, femcord.Embed):
+                return await ctx.reply(embed=result)
 
-                    async with session.get(LASTFM_API_URL + f"?method=track.getInfo&username={lastfm.username}&artist={quote_plus(artist_name)}&track={quote_plus(track_name)}&api_key={LASTFM_API_KEY}&format=json") as response:
-                        data = await response.json()
-                        track = PartialTrack.from_raw({
-                            "images": track_image,
-                            **data["track"]
-                        })
-
-                        embed = femcord.Embed(title=f"Informacje o utworze", url=track.url, color=self.bot.embed_color)
-                        embed.add_field(name="Wykonawca", value=track.artist.name, inline=True)
-                        embed.add_field(name="Nazwa utworu", value=track.title, inline=True)
-                        embed.add_blank_field()
-                        embed.add_field(name="Gatunki", value="\n".join(["- " + genere.name.title() for genere in track.tags]))
-
-                        embed.set_thumbnail(url=track.images[-1].url)
-
-                        await ctx.reply(embed=embed)
-
-    # @commands.command(description="Informacje o użytkowniku LastFM", usage="[użytkownik]", aliases=["fui"])
-    # async def fmuserinfo(self, ctx: commands.Context, *, user: types.User = None):
-    #     user = user or ctx.author
-
-    #     lastfm = await LastFM.filter(user_id=user.id).first()
-
-    #     if lastfm is None:
-    #         if ctx.author is user:
-    #             return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
-
-    #         return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
-
-    #     async with femcord.Typing(ctx.message):
-    #         result = await run(
-    #             lastfm.uiscript,
-    #             modules = await get_modules(self.bot, ctx.guild, ctx=ctx, user=user),
-    #             builtins = builtins,
-    #             variables = convert(user=user)
-    #         )
-
-    #         if isinstance(result, femcord.Embed):
-    #             return await ctx.reply(embed=result)
-
-    #         await ctx.reply(result)
+            await ctx.reply(result)
 
     @commands.command(description="Statystyki konta LastFM", usage="[użytkownik]", aliases=["fmstats", "fm"])
     async def lastfm(self, ctx: commands.Context, *, user: types.User = None):
         user = user or ctx.author
 
-        lastfm = await LastFM.filter(user_id=user.id).first()
+        lastfm = self.lastfm_users.get(user.id)
 
         if lastfm is None:
             if ctx.author is user:
@@ -426,8 +394,7 @@ class Music(commands.Cog):
 
     @commands.command(description="Ustawianie skryptu dla komendy lastfm", usage="(skrypt)", aliases=["fms", "fmset"])
     async def fmscript(self, ctx: commands.Context, *, script):
-        query = LastFM.filter(user_id=ctx.author.id)
-        lastfm_user = await query.first()
+        lastfm_user = self.lastfm_users.get(ctx.author.id)
 
         if lastfm_user is None:
             return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
@@ -442,7 +409,9 @@ class Music(commands.Cog):
                  "import lastfm\n\n" \
                + script
 
-        await query.update(script=script)
+        lastfm_user.script = script
+
+        await lastfm_user.save()
         await ctx.reply("Skrypt został ustawiony")
 
     @commands.command(description="Wybieranie szablonu dla komendy lastfm", usage="(szablon)", aliases=["fmmode"], other={"embed": femcord.Embed(description="\nSzablony: `embedfull`, `embedsmall`, `embedmini`, `textfull`, `textmini`")})
@@ -456,7 +425,7 @@ class Music(commands.Cog):
     async def pace(self, ctx: commands.Context, *, user: types.User = None):
         user = user or ctx.author
 
-        lastfm = await LastFM.filter(user_id=user.id).first()
+        lastfm = self.lastfm_users.get(user.id)
 
         if lastfm is None:
             if ctx.author is user:
@@ -491,12 +460,15 @@ class Music(commands.Cog):
                     await ctx.reply(f"{types.t['D'] @ pace} ({scrobbles_per_day:.2f} scrobbli dziennie | {scrobbles} w {account_age.days} dni)")
 
     @commands.command(description="Użytkownicy którzy znają artyste", aliases=["wk"])
-    async def whoknows(self, ctx: commands.Context, *, user: types.User = None):
-        user = user or ctx.author
+    async def whoknows(self, ctx: commands.Context, *, user_or_track: Union[types.User, str] = None):
+        lastfm_users = self.lastfm_users.values()
 
-        lastfm_users = await LastFM.all()
+        user = ctx.author
 
-        if not user.id in [lastfm_user.user_id for lastfm_user in lastfm_users]:
+        if isinstance(user_or_track, types.User):
+            user = user_or_track
+
+        if not user.id in self.lastfm_users.keys():
             if ctx.author is user:
                 return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
 
@@ -507,36 +479,39 @@ class Music(commands.Cog):
         lastfm_scrobbles = []
 
         async with femcord.Typing(ctx.message):
-            async with ClientSession() as session:
-                async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&username={lastfm_user.username}&limit=1&extended=1&api_key={LASTFM_API_KEY}&format=json") as response:
-                    data = await response.json()
+            async with Client(LASTFM_API_KEY) as client:
+                if isinstance(user_or_track, str):
+                    try:
+                        artist = await client.artist_info(user_or_track, lastfm_user.username)
+                    except exceptions.NotFound:
+                        return await ctx.reply("Nie znaleziono artysty")
+                else:
+                    tracks = await client.recent_tracks(lastfm_user.username)
+                    artist = tracks.tracks[0].artist
 
-                    artist = data["recenttracks"]["track"][0]["artist"]
-                    artist_name = artist["name"]
-                    artist_url = artist["url"]
+                artist_name = artist.name
+                artist_url = artist.url
 
-                    artist_thumbnail = await get_artist_image(artist_name)
+                artist_thumbnail = await get_artist_image(artist_name)
 
-                    async def get_scrobbles(lastfm_user):
-                        nonlocal lastfm_scrobbles, artist_url
+                async def get_scrobbles(lastfm_user):
+                    nonlocal lastfm_scrobbles, artist_url
+                    artist_info = await client.artist_info(artist_name, lastfm_user.username)
 
-                        async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&artist={artist_name}&username={lastfm_user.username}&api_key={LASTFM_API_KEY}&format=json") as response:
-                            data = await response.json()
+                    userplaycount = "0"
 
-                            userplaycount = "0"
+                    if artist_info.stats.userplaycount is not None:
+                        userplaycount = artist_info.stats.userplaycount
 
-                            if "userplaycount" in data["artist"]["stats"]:
-                                userplaycount = data["artist"]["stats"]["userplaycount"]
+                    lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, userplaycount))
 
-                            lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, userplaycount))
+                for lastfm_user in lastfm_users:
+                    self.bot.loop.create_task(get_scrobbles(lastfm_user))
 
-                    for lastfm_user in lastfm_users:
-                        self.bot.loop.create_task(get_scrobbles(lastfm_user))
+                while len(lastfm_scrobbles) < len(lastfm_users):
+                    await asyncio.sleep(0.1)
 
-                    while len(lastfm_scrobbles) < len(lastfm_users):
-                        await asyncio.sleep(0.1)
-
-                    lastfm_scrobbles.sort(key=lambda scrobbles: int(scrobbles[2]), reverse=True)
+                lastfm_scrobbles.sort(key=lambda scrobbles: int(scrobbles[2]), reverse=True)
 
             description = ""
 
@@ -553,16 +528,16 @@ class Music(commands.Cog):
                 else:
                     index = f"{index}."
 
-                description += f"{index} [{member.user.username}](https://www.last.fm/user/{lastfm_user.username}) - **{scrobbles}** odtworzeń\n"
+                description += f"{index} [{member.user.username}](https://www.last.fm/user/{lastfm_user.username}/library/{artist_url[20:]}) - **{scrobbles}** odtworzeń\n"
 
-            embed = femcord.Embed(title="Użytkownicy którzy znają " + artist_name + ":", url=artist_url, description=description, color=self.bot.embed_color, timestamp=datetime.datetime.now())
+            embed = femcord.Embed(title="Użytkownicy którzy znają " + artist_name + ":", url=artist_url, description=description or f"Nikt nie zna **{artist_name}**", color=self.bot.embed_color, timestamp=datetime.datetime.now())
             embed.set_thumbnail(url=artist_thumbnail)
 
             await ctx.reply(embed=embed)
 
     @commands.command(description="Użytkownicy którzy znają utwór", usage="[nazwa]", aliases=["wt", "wkt", "whoknowst"])
     async def whoknowstrack(self, ctx: commands.Context, *, user_or_track: Union[types.User, str] = None):
-        lastfm_users = await LastFM.all()
+        lastfm_users = self.lastfm_users.values()
 
         user = ctx.author
 
@@ -580,42 +555,34 @@ class Music(commands.Cog):
         lastfm_scrobbles = []
 
         async with femcord.Typing(ctx.message):
-            async with ClientSession() as session:
-                if isinstance(user_or_track, types.User) or user_or_track is None:
-                    async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&username={lastfm_user.username}&limit=1&extended=1&api_key={LASTFM_API_KEY}&format=json") as response:
-                        data = await response.json()
+            async with Client(LASTFM_API_KEY) as client:
+                if isinstance(user_or_track, str):
+                    try:
+                        tracks = await client.track_search(user_or_track)
+                    except exceptions.NotFound:
+                        return await ctx.reply("Nie znaleziono utworu")
 
-                        track = data["recenttracks"]["track"][0]
-                        track_name = track["name"]
+                else:
+                    recent_tracks = await client.recent_tracks(lastfm_user.username)
+                    tracks = recent_tracks.tracks
 
-                        artist_name = track["artist"]["name"]
-                elif isinstance(user_or_track, str):
-                    async with session.get(LASTFM_API_URL + f"?method=track.search&track={user_or_track}&api_key={LASTFM_API_KEY}&format=json") as response:
-                        data = await response.json()
+                artist_name = tracks[0].artist.name
+                track_name = tracks[0].title
+                track_url = tracks[0].url
 
-                        if not len(data["results"]["trackmatches"]["track"]):
-                            return await ctx.reply("Nie znaleziono utworu")
-
-                        track = data["results"]["trackmatches"]["track"][0]
-                        track_name = track["name"]
-
-                        artist_name = track["artist"]
-
-                track_url = f"https://last.fm/music/{quote_plus(artist_name)}/_/{quote_plus(track_name)}"
                 artist_thumbnail = await get_artist_image(artist_name)
 
                 async def get_scrobbles(lastfm_user: LastFM):
                     nonlocal lastfm_scrobbles, artist_name, track_name
 
-                    async with session.get(LASTFM_API_URL + f"?method=track.getInfo&track={quote_plus(track_name)}&artist={quote_plus(artist_name)}&autocorrect=1&username={lastfm_user.username}&api_key={LASTFM_API_KEY}&format=json") as response:
-                        data = await response.json()
+                    track = await client.track_info(artist_name, track_name, lastfm_user.username)
 
-                        userplaycount = "0"
+                    userplaycount = "0"
 
-                        if "track" in data and "userplaycount" in data["track"]:
-                            userplaycount = data["track"]["userplaycount"]
+                    if track.scrobbles is not None:
+                        userplaycount = track.scrobbles
 
-                        lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, userplaycount))
+                    lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, userplaycount))
 
                 for lastfm_user in lastfm_users:
                     self.bot.loop.create_task(get_scrobbles(lastfm_user))
@@ -640,9 +607,9 @@ class Music(commands.Cog):
             else:
                 index = f"{index}."
 
-            description += f"{index} [{member.user.username}](https://www.last.fm/user/{lastfm_user.username}) - **{scrobbles}** odtworzeń\n"
+            description += f"{index} [{member.user.username}](https://www.last.fm/user/{lastfm_user.username}/library/{track_url[20:]}) - **{scrobbles}** odtworzeń\n"
 
-        embed = femcord.Embed(title="Użytkownicy którzy znają " + track_name + " przez " + artist_name + ":", url=track_url, description=description, color=self.bot.embed_color, timestamp=datetime.datetime.now())
+        embed = femcord.Embed(title="Użytkownicy którzy znają " + track_name + " przez " + artist_name + ":", url=track_url, description=description or f"Nikt nie zna {track_name} przez **{artist_name}**", color=self.bot.embed_color, timestamp=datetime.datetime.now())
         embed.set_thumbnail(url=artist_thumbnail)
 
         await ctx.reply(embed=embed)
@@ -662,26 +629,25 @@ class Music(commands.Cog):
                         artist = track["artist"]
 
                 if name is None:
-                    lastfm = await LastFM.filter(user_id=ctx.author.id).first()
+                    lastfm = self.lastfm_users.get(ctx.author.id)
 
                     if lastfm is None:
                         return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
 
-                    async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&username={lastfm.username}&limit=1&api_key={LASTFM_API_KEY}&format=json") as response:
-                        data = await response.json()
-                        tracks = data["recenttracks"]["track"]
+                    async with Client(LASTFM_API_KEY, session=session) as client:
+                        recent_tracks = await client.recent_tracks(lastfm.username, limit=1)
 
-                        if not tracks:
+                        if not recent_tracks.tracks:
                             return await ctx.reply("Nie ma żadnych utworów")
 
-                        if len(tracks) == 2:
-                            name = tracks[0]["name"]
-                            artist = tracks[0]["artist"]["#text"]
+                        if len(recent_tracks.tracks) == 2:
+                            name = recent_tracks.tracks[0].title
+                            artist = recent_tracks.tracks[0].artist.name
 
                 if name is None:
                     return await ctx.reply("Nie podałeś nazwy")
 
-                lyrics: Lyrics = await get_track_lyrics(artist, name, self.bot.user_agent)
+                lyrics: Lyrics = await get_track_lyrics(artist, name, session)
 
                 if lyrics is None:
                     return await ctx.reply("Nie ma tekstu dla tej piosenki")

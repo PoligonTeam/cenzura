@@ -15,8 +15,11 @@ limitations under the License.
 """
 
 from dataclasses import modified_dataclass
+from typing import TypeVar
 from .channel import Channel
 from datetime import datetime
+
+Guild = TypeVar("Guild")
 
 @modified_dataclass
 class VoiceState:
@@ -27,7 +30,7 @@ class VoiceState:
     self_mute: bool
     self_video: bool
     suppress: bool
-    guild = None
+    guild: Guild = None
     channel: Channel = None
     self_stream: bool = None
     request_timestamp: datetime = None

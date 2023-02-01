@@ -17,12 +17,13 @@ limitations under the License.
 from .types import *
 from .enums import *
 from .utils import *
-from copy import deepcopy
 
 CDN_URL = "https://cdn.discordapp.com"
 
 async def channel_create(gateway, channel):
-    if not "guild_id" in channel: return
+    if "guild_id" not in channel:
+        return
+
     guild = gateway.get_guild(channel["guild_id"])
     channel = Channel.from_raw(channel)
 
@@ -31,19 +32,23 @@ async def channel_create(gateway, channel):
     return channel,
 
 async def channel_update(gateway, channel):
-    if not "guild_id" in channel: return
+    if "guild_id" not in channel:
+        return
+
     guild = gateway.get_guild(channel["guild_id"])
     channel = Channel.from_raw(channel)
 
     index = get_index(guild.channels, channel.id, key=lambda c: c.id)
 
-    old_channel = guild.channels[index]
+    old_channel = gateway.copy(guild.channels[index])
     guild.channels[index] = channel
 
     return old_channel, channel
 
 async def channel_delete(gateway, channel):
-    if not "guild_id" in channel: return
+    if "guild_id" not in channel:
+        return
+
     guild = gateway.get_guild(channel["guild_id"])
 
     index = get_index(guild.channels, channel["id"], key=lambda c: c.id)
@@ -67,7 +72,7 @@ async def thread_update(gateway, thread):
 
     index = get_index(guild.threads, thread.id, key=lambda t: t.id)
 
-    old_thread = guild.threads[index]
+    old_thread = gateway.copy(guild.threads[index])
     guild.threads[index] = thread
 
     return old_thread, thread
@@ -134,12 +139,12 @@ async def presence_update(gateway, presence):
 
     return member,
 
-#TUTAJ NAPRAWIC
-async def _guild_update(gateway, guild):
+async def guild_update(gateway, guild):
     index = get_index(gateway.guilds, guild["id"], key=lambda g: g.id)
-    guild_object = gateway.guilds[index]
 
-    #tutaj
+    old_guild = gateway.copy(gateway.guilds[index])
+
+    guild_object = gateway.guilds[index]
 
     guild_object.premium_tier = guild["premium_tier"]
     guild_object.discovery_splash = guild["discovery_splash"]
@@ -181,11 +186,13 @@ async def _guild_update(gateway, guild):
 
     guild_object.icon_url = icon_url
 
-    return guild_object, guild_object
+    return old_guild, guild_object
 
 async def guild_delete(gateway, guild):
     guild = gateway.get_guild(guild["id"])
-    if guild is None: return
+
+    if guild is None:
+        return
 
     index = get_index(gateway.guilds, guild.id, key=lambda g: g.id)
     del gateway.guilds[index]
@@ -207,7 +214,7 @@ async def guild_ban_remove(gateway, ban):
 async def guild_emojis_update(gateway, emojis):
     guild = gateway.get_guild(emojis["guild_id"])
 
-    old_emojis = guild.emojis
+    old_emojis = gateway.copy(guild.emojis)
     guild.emojis = [Emoji.from_raw(emoji) for emoji in emojis["emojis"]]
 
     return old_emojis, guild.emojis
@@ -215,7 +222,7 @@ async def guild_emojis_update(gateway, emojis):
 async def guild_stickers_update(gateway, stickers):
     guild = gateway.get_guild(stickers["guild_id"])
 
-    old_stickers = guild.stickers
+    old_stickers = gateway.copy(guild.stickers)
     guild.stickers = [Sticker.from_raw(sticker) for sticker in stickers["stickers"]]
 
     return old_stickers, guild.stickers
@@ -228,17 +235,6 @@ async def guild_member_add(gateway, member):
 
     return guild, member
 
-async def guild_member_remove(gateway, user):
-    guild = gateway.get_guild(user["guild_id"])
-
-    user = await gateway.get_user(user["user"])
-
-    index = get_index(guild.members, user.id, key=lambda m: m.user.id)
-    if index is not None:
-        del guild.members[index]
-
-    return guild, user
-
 async def guild_member_update(gateway, member):
     if not gateway.guilds: return
 
@@ -247,7 +243,7 @@ async def guild_member_update(gateway, member):
     if guild is None:
         return None, None, member
 
-    old_member = deepcopy(await guild.get_member(member["user"]["id"]))
+    old_member = gateway.copy(await guild.get_member(member["user"]["id"]))
 
     del member["guild_id"]
 
@@ -271,6 +267,18 @@ async def guild_member_update(gateway, member):
 
     return guild, old_member, member
 
+async def guild_member_remove(gateway, user):
+    guild = gateway.get_guild(user["guild_id"])
+
+    user = await gateway.get_user(user["user"])
+
+    index = get_index(guild.members, user.id, key=lambda m: m.user.id)
+
+    if index is not None:
+        del guild.members[index]
+
+    return guild, user
+
 async def guild_role_create(gateway, role):
     guild = gateway.get_guild(role["guild_id"])
 
@@ -281,13 +289,14 @@ async def guild_role_create(gateway, role):
 
 async def guild_role_update(gateway, role):
     guild = gateway.get_guild(role["guild_id"])
-
     role = Role.from_raw(role["role"])
 
     index = get_index(guild.roles, role.id, key=lambda r: r.id)
+
+    old_role = gateway.copy(guild.roles[index])
     guild.roles[index] = role
 
-    return guild, role
+    return guild, old_role, role
 
 async def guild_role_delete(gateway, role):
     guild = gateway.get_guild(role["guild_id"])
@@ -314,10 +323,12 @@ async def message_create(gateway, message):
 
 async def message_update(gateway, message):
     index = get_index(gateway.messages, message["id"], key=lambda m: m.id)
-    if index is None: return None, None
+
+    if index is None:
+        return None, None
 
     old_message = gateway.messages[index]
-    new_message = deepcopy(old_message)
+    new_message = gateway.copy(old_message)
 
     if "content" in message:
         new_message.content = message["content"]
@@ -362,7 +373,10 @@ async def message_reaction_add(gateway, reaction):
     guild = gateway.get_guild(reaction["guild_id"])
     channel = guild.get_channel(reaction["channel_id"])
     user = await gateway.get_user(reaction["user_id"])
-    if user is None: return
+
+    if user is None:
+        return
+
     emoji = Emoji.from_raw(reaction["emoji"])
 
     index = get_index(gateway.messages, reaction["message_id"], key=lambda m: m.id)
@@ -383,7 +397,10 @@ async def message_reaction_remove(gateway, reaction):
     guild = gateway.get_guild(reaction["guild_id"])
     channel = guild.get_channel(reaction["channel_id"])
     user = await gateway.get_user(reaction["user_id"])
-    if user is None: return
+
+    if user is None:
+        return
+
     emoji = Emoji.from_raw(reaction["emoji"])
 
     index = get_index(gateway.messages, reaction["message_id"], key=lambda m: m.id)
@@ -441,9 +458,11 @@ async def voice_state_update(gateway, voice_state):
 
     member = await guild.get_member(voice_state["user_id"])
 
+    old_voice_state = gateway.copy(member.voice_state)
+
     _voice_state = VoiceState.from_raw(gateway, voice_state)
     _voice_state.guild = guild
     _voice_state.channel = channel
     member.voice_state = _voice_state
 
-    return guild, channel, member
+    return member, old_voice_state, _voice_state

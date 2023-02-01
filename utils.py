@@ -17,16 +17,12 @@ limitations under the License.
 import femcord
 from femcord import types
 from femscript import Dict, List
-from aiohttp import ClientSession
-from httpx import AsyncClient, Timeout
-from bs4 import BeautifulSoup
-from urllib.parse import quote_plus
-from json.decoder import JSONDecodeError
+from aiohttp import ClientSession, ClientTimeout
 from models import Artists, Guilds, LastFM, Lyrics
-from tortoise.queryset import QuerySet
 from config import LASTFM_API_URL, LASTFM_API_KEY
-from lastfm import Track
-import asyncio, random, re, config
+from lastfm import Client, Track, exceptions
+from lyrics import GeniusClient, MusixmatchClient, TrackNotFound, LyricsNotFound, Lyrics as LyricsTrack
+import asyncio, config, random, ujson
 
 CHARS = (("\u200b", ("0", "1", "2", "3")), ("\u200c", ("4", "5", "6", "7")), ("\u200d", ("8", "9", "A", "B")), ("\u200e", ("C", "D", "E", "F")))
 SEPARATOR = "\u200f"
@@ -44,6 +40,17 @@ def replace_chars(text):
         text = text.replace(x, y)
 
     return text
+
+def get_random_username():
+    gender = random.randint(0, 1)
+
+    with open("NIGGER/words%d.txt" % gender, "r") as f:
+        word = random.choice(f.read().splitlines())
+
+    with open("NIGGER/names%d.txt" % gender, "r") as f:
+        name = random.choice(f.read().splitlines()).replace(" ", "_").lower()
+
+    return f"{word}_{name}{random.randint(1, 100)}"
 
 async def update_lastfm_avatars():
     async def get_lastfm_avatar(lastfm_user: LastFM):
@@ -69,78 +76,45 @@ async def get_artist_image(artist: str):
     if artist_db:
         return artist_db.image
 
-    async with ClientSession() as session:
-        async with session.get("https://www.last.fm/music/" + artist) as response:
-            if not response.status == 200:
-                return "https://www.last.fm/static/images/marvin.05ccf89325af.png"
+    async with Client() as client:
+        try:
+            image = await client.artist_image(artist)
+        except exceptions.NotFound:
+            return "https://www.last.fm/static/images/marvin.05ccf89325af.png"
 
-            await Artists.create(artist=artist, image=re.search(r"<meta property=\"og:image\"[ ]+content=\"([\w/:.]+)\" data-replaceable-head-tag>", await response.text()).group(1))
+        await Artists.create(artist=artist, image=image)
 
     return await get_artist_image(artist)
 
-async def get_track_lyrics(artist, title: str, user_agent: str):
-    lyrics_db = await Lyrics.filter(title__istartswith=title).first()
+async def get_track_lyrics(artist: str, title: str, session: ClientSession):
+    lyrics_db = await Lyrics.get_or_none(title__icontains=title)
 
-    if lyrics_db:
-        return lyrics_db
+    if lyrics_db is None:
+        name = artist + " " + title
+        track = LyricsTrack(artist, title)
 
-    name = artist + " " + title
+        async with MusixmatchClient(config.MUSIXMATCH, session) as musixmatch:
+            try:
+                track = await musixmatch.get_lyrics(name)
+                source = "Musixmatch"
+            except (TrackNotFound, LyricsNotFound):
+                pass
 
-    lyrics = None
+            if track.lyrics is None:
+                async with GeniusClient(config.GENIUS, session) as genius:
+                    try:
+                        track = await genius.get_lyrics(name)
+                        source = "Genius"
+                    except (TrackNotFound, LyricsNotFound):
+                        return None
 
-    async with ClientSession() as session:
-        async with session.get(f"https://api.musixmatch.com/ws/1.1/track.search?q_track_artist={name}&page_size=1&page=1&s_track_rating=desc&s_artist_rating=desc&country=us&apikey={config.MUSIXMATCH}") as response:
-            data = await response.json(content_type=None)
+            lyrics_db = await Lyrics.get_or_none(title__icontains=track.title)
 
-            track_list = data["message"]["body"]["track_list"]
-
-            if track_list:
-                track = track_list[0]["track"]
-
-                artist_name = track["artist_name"]
-                track_name = track["track_name"]
-                track_share_url = track["track_share_url"]
-
-                async with session.get(track_share_url, headers={"user-agent": user_agent}) as response:
-                    content = await response.content.read()
-                    soup = BeautifulSoup(content, features="lxml")
-
-                    elements = soup.find_all("p", {"class": "mxm-lyrics__content"})
-
-                    if elements:
-                        source = "Musixmatch"
-                        lyrics = "\n".join([element.get_text() for element in elements])
-
-            if lyrics is None:
-                async with session.get(f"https://api.genius.com/search?q={name}&access_token={config.GENIUS}") as response:
-                    data = await response.json()
-
-                    hits = data["response"]["hits"]
-
-                    if hits:
-                        track = hits[0]["result"]
-
-                        artist_name = track["artist_names"]
-                        track_name = track["title"]
-                        track_share_url = track["url"]
-
-                        async with session.get(track_share_url, headers={"user-agent": user_agent}) as response:
-                            content = await response.content.read()
-                            soup = BeautifulSoup(content, features="lxml")
-
-                            element = soup.find("div", {"data-lyrics-container": True})
-
-                            if element:
-                                source = "Genius"
-                                lyrics = element.get_text("\n")
-
-            lyrics_db = await Lyrics.filter(title__icontains=track_name).first()
-
-            if not lyrics_db:
-                lyrics_db = Lyrics(artist=artist_name, title=track_name, source=source, lyrics=lyrics)
+            if lyrics_db is None:
+                lyrics_db = Lyrics(artist=track.artist, title=track.title, source=source, lyrics=track.lyrics)
                 await lyrics_db.save()
 
-            return lyrics_db
+    return lyrics_db
 
 def convert(**items):
     objects = {
@@ -198,7 +172,7 @@ def convert(**items):
                     )
                 ),
                 streamable = track.artist.streamable,
-                ontour = track.artist.ontour,
+                on_tour = track.artist.on_tour or False,
                 stats = Dict(
                     listeners = track.artist.stats.listeners,
                     playcount = track.artist.stats.playcount,
@@ -247,11 +221,20 @@ def convert(**items):
                         size = image.size
                     ) for image in track.image
                 )
-            ),
+            ) if track.image else List(),
             album = Dict(
-                name = track.album.name,
-                mbid = track.album.mbid
-            ),
+                name = track.album.name or False,
+                mbid = track.album.mbid or False,
+                image = List(
+                    *(
+                        Dict(
+                            url = image.url,
+                            size = image.size
+                        ) for image in track.image
+                    )
+                ) if track.image else List(),
+                position = track.album.position or False
+            ) if track.album else False,
             title = track.title,
             url = track.url,
             date = Dict(
@@ -320,37 +303,43 @@ def table(names, rows):
 
     return text
 
-async def request(method, url, *, headers = None, data = None, proxy = None):
+async def request(method: str, url: str, *, headers: dict = None, data: dict = None, proxy: bool = False):
     proxy_address = random.choice(list(config.PROXIES.values()))
 
-    if proxy and proxy in config.PROXIES:
+    if proxy is True and proxy in config.PROXIES:
         proxy_address = config.PROXIES[proxy]
 
-    proxy = config.PROXY_TEMPLATE.format(proxy_address)
+    async with ClientSession(timeout=ClientTimeout(10)) as session:
+            async with session.request(method, url, headers=headers, json=data, proxy=config.PROXY_TEMPLATE.format(proxy_address)) as response:
+                length = response.content_length
 
-    proxies = {
-        "https://": proxy,
-        "http://": proxy
-    }
+                if length is not None and length > 10 * 1024 * 1024:
+                    return {
+                        "status": response.status,
+                        "text": "Content too large",
+                        "json": {}
+                    }
 
-    async with AsyncClient(proxies=proxies, timeout=Timeout(60)) as session:
-        response = await session.request(method, url, headers=headers, json=data)
+                content = await response.read()
 
-        try:
-            json = response.json()
-        except JSONDecodeError:
-            json = {}
+                json = Dict()
 
-        if isinstance(json, dict):
-            json = Dict(**json)
-        elif isinstance(json, list):
-            json = List(*json)
+                if response.content_type == "application/json":
+                    try:
+                        json = ujson.loads(content)
+                    except ujson.JSONDecodeError:
+                        json = {}
 
-        return {
-            "status": response.status_code,
-            "text": response.text,
-            "json": json
-        }
+                    if isinstance(json, dict):
+                        json = Dict(**json)
+                    elif isinstance(json, list):
+                        json = List(*json)
+
+                return {
+                    "status": response.status,
+                    "text": content.decode(response.get_encoding()),
+                    "json": json
+                }
 
 async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_url = None, content = None, embed: femcord.Embed = None):
     data = {}
@@ -417,75 +406,60 @@ async def get_modules(bot, guild, *, ctx = None, user = None, message_errors = F
 
             return {}
 
-        async with ClientSession() as session:
-            async with session.get(LASTFM_API_URL + f"?method=user.getRecentTracks&user={lastfm.username}&limit=2&extended=1&api_key={LASTFM_API_KEY}&format=json") as response:
-                if not response.status == 200:
-                    return await ctx.reply("Takie konto LastFM nie istnieje")
+        async with Client(LASTFM_API_KEY) as client:
+            try:
+                tracks = await client.recent_tracks(lastfm.username)
+            except exceptions.NotFound:
+                await ctx.reply("Takie konto LastFM nie istnieje")
+                return {}
 
-                data = await response.json()
-                data = data["recenttracks"]
-                tracks = data["track"]
-                lastfm_user = data["@attr"]
+            if not tracks.tracks:
+                await ctx.reply("Nie ma żadnych utworów w historii")
+                return {}
 
-                fs_data = {
-                    "tracks": [],
-                    "lastfm_user": {
-                        "username": lastfm_user["user"],
-                        "scrobbles": lastfm_user["total"],
-                    },
-                    "nowplaying": False
-                }
+            fs_data = {
+                "tracks": [],
+                "lastfm_user": {
+                    "username": tracks.username,
+                    "scrobbles": tracks.scrobbles
+                },
+                "nowplaying": False
+            }
 
-                if not tracks:
-                    await ctx.reply("Nie ma żadnych utworów")
-                    return {}
+            if len(tracks.tracks) == 3:
+                fs_data["nowplaying"] = True
 
-                if len(tracks) == 3:
-                    fs_data["nowplaying"] = True
+            async def append_track(index: int, track: Track):
+                track_info = await client.track_info(track.artist.name, track.title, lastfm.username)
+                artist_info = await client.artist_info(track.artist.name, lastfm.username)
 
-                async def append_track(index, track):
-                    async with session.get(LASTFM_API_URL + f"?method=track.getInfo&user={lastfm.username}&artist={quote_plus(track['artist']['name'])}&track={quote_plus(track['name'])}&api_key={LASTFM_API_KEY}&format=json") as response:
-                        data = await response.json()
-                        track_info = data["track"]
-                        del track_info["artist"]
+                fs_track = Track(**{
+                    "artist": artist_info,
+                    "image": track.image,
+                    "album": track.album,
+                    "title": track.title,
+                    "url": track.url,
+                    "duration": track.duration,
+                    "streamable": track.streamable,
+                    "listeners": track_info.listeners,
+                    "playcount": track_info.playcount,
+                    "scrobbles": track_info.scrobbles or 0,
+                    "tags": track_info.tags,
+                    "date": track.date
+                })
 
-                    async with session.get(LASTFM_API_URL + f"?method=artist.getInfo&user={lastfm.username}&artist={quote_plus(track['artist']['name'])}&api_key={LASTFM_API_KEY}&format=json") as response:
-                        data = await response.json()
-                        artist_info = data["artist"]
+                fs_data["tracks"].append((index, fs_track))
 
-                    cs_track = Track.from_raw({
-                        "artist": artist_info,
-                        "image": track["image"],
-                        "album": track["album"],
-                        "title": track["name"],
-                        "url": track["url"],
-                        "listeners": track_info["listeners"],
-                        "playcount": track_info["playcount"],
-                        "scrobbles": track_info.get("userplaycount", "0"),
-                        "tags": track_info["toptags"]["tag"],
-                        **(
-                            {
-                                "date": track["date"]
-                            }
-                            if "date" in track else
-                            {
+            for index, track in enumerate(tracks.tracks):
+                bot.loop.create_task(append_track(index, track))
 
-                            }
-                        )
-                    })
+            while len(fs_data["tracks"]) < 2:
+                await asyncio.sleep(0.1)
 
-                    fs_data["tracks"].append((index, cs_track))
+            fs_data["tracks"].sort(key=lambda track: track[0])
+            fs_data["tracks"] = [track[1] for track in fs_data["tracks"]]
 
-                for index, track in enumerate(tracks):
-                    bot.loop.create_task(append_track(index, track))
-
-                while len(fs_data["tracks"]) < 2:
-                    await asyncio.sleep(0.1)
-
-                fs_data["tracks"].sort(key=lambda track: track[0])
-                fs_data["tracks"] = [track[1] for track in fs_data["tracks"]]
-
-                return fs_data
+            return fs_data
 
     return {
         **modules,

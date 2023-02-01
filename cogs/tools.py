@@ -19,10 +19,10 @@ from femcord import commands
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from dateutil import parser
-from playwright.async_api import async_playwright
-import re, io
+import base64, re, io
 
-tiktok_pattern = re.compile(r"(?x)https?://(?:(?:www|m)\.(?:tiktok.com)\/(?:v|embed|trending)(?:\/)?(?:\?shareId=)?)(?P<id>[\da-z]+)")
+URL_PATTERN = re.compile(r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,69}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)")
+# tiktok_pattern = re.compile(r"(?x)https?://(?:(?:www|m)\.(?:tiktok.com)\/(?:v|embed|trending)(?:\/)?(?:\?shareId=)?)(?P<id>[\da-z]+)")
 
 class Tools(commands.Cog):
     name = "Narzędzia"
@@ -32,8 +32,8 @@ class Tools(commands.Cog):
 
     @commands.Listener
     async def on_ready(self):
-        with open("./assets/images/attacl.png", "rb") as f:
-            self.error_image = f.read()
+        # with open("./assets/images/attacl.png", "rb") as f:
+        #     self.error_image = f.read()
 
         async with ClientSession() as session:
             async with session.get("https://data.iana.org/rdap/dns.json") as response:
@@ -82,91 +82,64 @@ class Tools(commands.Cog):
 
     @commands.command(description="Robi screenshot strony", aliases=["ss"])
     async def screenshot(self, ctx: commands.Context, url):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
-
         async with femcord.Typing(ctx.message):
-            result = re.match(r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,69}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)", url)
+            result = URL_PATTERN.match(url)
 
             if not result:
                 return await ctx.reply("Podałeś nieprawidłowy adres url")
 
-            async with async_playwright() as p:
-                browser = await p.firefox.launch()
-                context = await browser.new_context(
-                    storage_state={
-                        "cookies": [
-                            {
-                                "name": "CONSENT",
-                                "value": "YES+0",
-                                "domain": ".google.com",
-                                "path": "/"
-                            },
-                            {
-                                "name": "CONSENT",
-                                "value": "YES+0",
-                                "domain": ".youtube.com",
-                                "path": "/"
-                            }
-                        ]
-                    }
-                )
-                page = await context.new_page()
+            async with ClientSession() as session:
+                async with session.post("http://localhost:6942/screenshot", json={
+                    "url": url
+                }) as response:
+                    if not response.status == 200:
+                        return await ctx.reply("Coś poszło nie tak")
 
-                try:
-                    await page.goto(url)
-                    await page.wait_for_load_state("networkidle")
-                    screenshot_bytes = await page.screenshot()
-                    content = await page.content()
+                    data = await response.json()
 
-                except Exception:
-                    screenshot_bytes = self.error_image
-
-                await browser.close()
-
-            image = io.BytesIO(screenshot_bytes)
+            image = io.BytesIO(base64.b64decode(data["screenshot"]))
             components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl")))
 
             message = await ctx.reply(files=[("image.png", image)], components=components)
 
-            async def curl(interaction):
-                await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
-                await self.bot.paginator(message.edit, ctx, BeautifulSoup(content, "html.parser").prettify(), embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
+        async def curl(interaction: femcord.types.Interaction):
+            await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
+            await self.bot.paginator(message.edit, ctx, BeautifulSoup(data["content"], "html.parser").prettify(), embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
 
-            async def on_timeout():
-                components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))
-                await message.edit(components=components)
+        async def on_timeout():
+            components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))
+            await message.edit(components=components)
 
-            await self.bot.wait_for("interaction_create", curl, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
+        await self.bot.wait_for("interaction_create", curl, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
 
-    @commands.command(description="Nagrywa filmik ze strony", aliases=["recban", "record"])
-    async def rec(self, ctx: commands.Context, url):
-        if not ctx.author.id in self.bot.owners:
-            return await ctx.reply("nie możesz!!1!")
+    # @commands.command(description="Nagrywa filmik ze strony", aliases=["recban", "record"])
+    # async def rec(self, ctx: commands.Context, url):
+    #     if not ctx.author.id in self.bot.owners:
+    #         return await ctx.reply("nie możesz!!1!")
 
-        async with femcord.Typing(ctx.message):
-            result = re.match(r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,69}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)", url)
+    #     async with femcord.Typing(ctx.message):
+    #         result = re.match(r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,69}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)", url)
 
-            if not result:
-                return await ctx.reply("Podałeś nieprawidłowy adres url")
+    #         if not result:
+    #             return await ctx.reply("Podałeś nieprawidłowy adres url")
 
-            async with async_playwright() as p:
-                browser = await p.firefox.launch()
-                context = await browser.new_context(
-                    record_video_dir="/tmp/",
-                    record_video_size={"width": 1920, "height": 1080},
-                    viewport={"width": 1920, "height": 1080}
-                )
-                page = await context.new_page()
+    #         async with async_playwright() as p:
+    #             browser = await p.firefox.launch()
+    #             context = await browser.new_context(
+    #                 record_video_dir="/tmp/",
+    #                 record_video_size={"width": 1920, "height": 1080},
+    #                 viewport={"width": 1920, "height": 1080}
+    #             )
+    #             page = await context.new_page()
 
-                await page.goto(url)
-                await page.wait_for_load_state("domcontentloaded")
+    #             await page.goto(url)
+    #             await page.wait_for_load_state("domcontentloaded")
 
-                await context.close()
+    #             await context.close()
 
-                await ctx.reply(files=[("video.webm", open(await page.video.path(), "rb"))])
+    #             await ctx.reply(files=[("video.webm", open(await page.video.path(), "rb"))])
 
-                await browser.close()
+    #             await browser.close()
 
 def setup(bot):
     bot.load_cog(Tools(bot))

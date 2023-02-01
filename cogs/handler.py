@@ -16,6 +16,7 @@ limitations under the License.
 
 import femcord
 from femcord import commands
+from femcord.http import Route
 import traceback, random
 
 class ErrorHandler(commands.Cog):

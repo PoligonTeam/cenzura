@@ -32,7 +32,7 @@ class Embed:
         if timestamp is not None:
             if isinstance(timestamp, int):
                 timestamp = datetime.fromtimestamp(timestamp)
-            self.timestamp: str = (timestamp - timedelta(hours=2)).isoformat()
+            self.timestamp = (timestamp - timedelta(hours=1)).isoformat()
 
     def __add__(self, embed: Embed) -> Embed:
         new_embed: Embed = Embed()

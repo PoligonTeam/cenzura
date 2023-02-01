@@ -46,6 +46,9 @@ class Help(commands.Cog):
 
     @commands.Listener
     async def on_interaction_create(self, interaction):
+        if interaction.message is None:
+            return
+
         if ("help", interaction.member.user.id, interaction.channel.id, interaction.message.id) in self.interactions:
             embed = femcord.Embed(title="Pomoc:", color=self.bot.embed_color)
 
