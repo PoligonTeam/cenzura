@@ -1,2 +1,4 @@
-### PoligonTeam/LastFM
-Retarded LastFM helper library :pray: mashallah wallahi
+# PoligonTeam/LastFM
+
+#### LastFM api "wrapper"
+

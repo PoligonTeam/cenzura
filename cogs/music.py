@@ -126,7 +126,7 @@ class Music(commands.Cog):
 
         tracks = await self.client.get_tracks(query)
 
-        if not tracks:
+        if tracks is None:
             return await ctx.reply("Nie znaleziono żadnych utworów")
 
         track: femlink.Track = tracks[0]

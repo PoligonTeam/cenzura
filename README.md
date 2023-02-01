@@ -85,7 +85,6 @@ cenzurabot is a multifunctional discord bot that is very cool
 * [Asyncpg](https://github.com/MagicStack/asyncpg)
 * [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/)
 * [Lavalink](https://github.com/freyacodes/Lavalink)
-* [Lavalink.py](https://github.com/Devoxin/Lavalink.py)
 * [Pillow](https://python-pillow.org/)
 * [Playwright](https://playwright.dev/python/)
 * [Psutil](https://github.com/giampaolo/psutil)

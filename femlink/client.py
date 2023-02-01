@@ -132,9 +132,9 @@ class Client:
                             await player.play(player.track)
                             continue
 
-                        player.track = None
-
-                        await player.skip()
+                        if data["reason"] in ("FINISHED", "LOAD_FAILED"):
+                            player.track = None
+                            await player.skip()
 
                     elif data["type"] == "TrackStuckEvent":
                         await player.play(player.track)
