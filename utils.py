@@ -67,6 +67,7 @@ async def update_lastfm_avatars():
                 await LastFM.filter(id=lastfm_user.id).update(avatar=data["image"][-1])
 
     users = LastFM.all()
+
     for user in await users:
         asyncio.create_task(get_lastfm_avatar(user))
 

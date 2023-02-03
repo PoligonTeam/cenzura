@@ -16,7 +16,21 @@ limitations under the License.
 
 import asyncio, aiohttp, json
 from .models import *
+from enum import Enum
 from typing import List
+
+class Opcodes(Enum):
+    PLAYER_UPDATE = "playerUpdate"
+    VOICE_UPDATE = "voiceUpdate"
+    STATS = "stats"
+    READY = "ready"
+    EVENT = "event"
+    PLAY = "play"
+    STOP = "stop"
+    PAUSE = "pause"
+    SEEK = "seek"
+    VOLUME = "volume"
+    FILTERS = "filters"
 
 class Player:
     def __init__(self, client: "Client", guild_id: str):
@@ -32,7 +46,7 @@ class Player:
 
     def play(self, track: Track):
         self.track = track
-        return self.client.send("play", guildId=self.guild_id, track=track.encoded)
+        return self.client.send(Opcodes.PLAY, guildId=self.guild_id, track=track.encoded)
 
     def add(self, track: Track):
         self.queue.append(track)
@@ -45,18 +59,18 @@ class Player:
 
     def stop(self):
         self.track = None
-        return self.client.send("stop", guildId=self.guild_id)
+        return self.client.send(Opcodes.STOP, guildId=self.guild_id)
 
     def pause(self):
         self.paused = True
-        return self.client.send("pause", guildId=self.guild_id, pause=self.paused)
+        return self.client.send(Opcodes.PAUSE, guildId=self.guild_id, pause=self.paused)
 
     def resume(self):
         self.paused = False
-        return self.client.send("pause", guildId=self.guild_id, pause=self.paused)
+        return self.client.send(Opcodes.PAUSE, guildId=self.guild_id, pause=self.paused)
 
     def seek(self, position: int):
-        return self.client.send("seek", guildId=self.guild_id, position=position)
+        return self.client.send(Opcodes.SEEK, guildId=self.guild_id, position=position)
 
     def set_volume(self, volume: int):
         if volume < 0 or volume > 1000:
@@ -64,14 +78,14 @@ class Player:
 
         self.volume = volume
 
-        return self.client.send("volume", guildId=self.guild_id, volume=volume)
+        return self.client.send(Opcodes.VOLUME, guildId=self.guild_id, volume=volume)
 
     def set_loop(self, loop: bool):
         self.loop = loop
 
     def set_filters(self, **filters):
         self.filters = filters
-        return self.client.send("filters", guildId=self.guild_id, **filters)
+        return self.client.send(Opcodes.FILTERS, guildId=self.guild_id, **filters)
 
 class Client:
     async def __new__(cls, *args):
@@ -101,8 +115,8 @@ class Client:
 
         self.receiver_task = self.loop.create_task(self.data_receiver())
 
-    def send(self, op: str, **kwargs):
-        return self.ws.send_json({"op": op, **kwargs})
+    def send(self, op: Opcodes, **kwargs):
+        return self.ws.send_json({"op": op.value, **kwargs})
 
     def get_player(self, guild_id: str) -> Player:
         for player in self.players:
@@ -116,15 +130,16 @@ class Client:
 
             if message.type is aiohttp.WSMsgType.text:
                 data = json.loads(message.data)
+                opcode = Opcodes(data["op"])
 
-                if data["op"] == "ready":
+                if opcode is Opcodes.READY:
                     self.session_id = data["sessionId"]
 
-                elif data["op"] == "playerUpdate":
+                elif opcode is Opcodes.PLAYER_UPDATE:
                     player = self.get_player(data["guildId"])
                     player.position = data["state"]["position"]
 
-                elif data["op"] == "event":
+                elif opcode is Opcodes.EVENT:
                     player = self.get_player(data["guildId"])
 
                     if data["type"] in ("TrackEndEvent", "TrackExceptionEvent"):
@@ -157,8 +172,7 @@ class Client:
 
         if data["channel_id"] is None:
             self._voice_state.clear()
-            del self.players[self.get_player(data["guild_id"])]
-            return
+            return self.players.remove(self.get_player(data["guild_id"]))
 
         if data["session_id"] == self._voice_state.get("sessionId"):
             return
@@ -169,7 +183,7 @@ class Client:
 
     async def voice_update(self):
         if "sessionId" in self._voice_state and "event" in self._voice_state:
-            await self.send("voiceUpdate", guildId=self._voice_state["event"]["guild_id"], sessionId=self._voice_state["sessionId"], event=self._voice_state["event"])
+            await self.send(Opcodes.VOICE_UPDATE, guildId=self._voice_state["event"]["guild_id"], sessionId=self._voice_state["sessionId"], event=self._voice_state["event"])
 
     async def get_tracks(self, identifier: str) -> List[Track]:
         async with self.session.get("http://%s:%d/v3/loadtracks?identifier=%s" % (self.host, self.port, identifier), headers=self.headers) as response:

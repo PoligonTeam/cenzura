@@ -226,11 +226,12 @@ class Music(commands.Cog):
         if not player.queue:
             return await ctx.reply("Kolejka jest pusta")
 
-        await ctx.reply("\n".join([f"`{track.info.title} - {track.info.artist}`" for track in player.queue]))
+        await ctx.reply("\n".join([f"`{track.info.artist} - {track.info.title} `" for track in player.queue]))
 
     @commands.command(description="Pokazuje informacje o odtwarzanym utworze", aliases=["np"])
     async def nowplaying(self, ctx):
         player: femlink.Player = self.client.get_player(ctx.guild.id)
+        get_time = lambda position, duration: f"{(position % 3600) // 60}:{position % 60:02d}/{(duration % 3600) // 60}:{duration % 60:02d}"
 
         if player is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
@@ -238,10 +239,14 @@ class Music(commands.Cog):
         if player.track is None:
             return await ctx.reply("Nie gram żadnego utworu")
 
-        position = int(player.position / 1000)
-        duration = int(player.track.info.length / 1000)
+        elif player.track.info.title == "radio poligon":
+            async with ClientSession() as session:
+                async with session.get("https://radio.poligon.lgbt/api/nowplaying/1") as response:
+                    data = await response.json()
 
-        await ctx.reply(f"Gram teraz `{player.track.info.title}` {(position % 3600) // 60}:{position % 60:02d}/{(duration % 3600) // 60}:{duration % 60:02d}")
+                    return await ctx.reply(f"Gram teraz `{data['now_playing']['song']['text']}` {get_time(data['now_playing']['elapsed'], data['now_playing']['duration'])}")
+
+        await ctx.reply(f"Gram teraz `{player.track.info.artist} - {player.track.info.title}` {get_time(int(player.position / 1000), int(player.track.info.length / 1000))}")
 
     @commands.command(description="Łączenie konta LastFM do bota")
     async def login(self, ctx: commands.Context):

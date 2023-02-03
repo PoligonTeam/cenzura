@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 from dateutil import parser
 import base64, re, io
 
-URL_PATTERN = re.compile(r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,69}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)")
+URL_PATTERN = re.compile(r"((http|https):\/\/)?(www\.)?[-a-z0-9@:%._\+~#=]{1,256}\.[a-z0-9()]{1,69}\b[-a-z0-9()@:%_\+.~#!?&//=]*", re.IGNORECASE)
 # tiktok_pattern = re.compile(r"(?x)https?://(?:(?:www|m)\.(?:tiktok.com)\/(?:v|embed|trending)(?:\/)?(?:\?shareId=)?)(?P<id>[\da-z]+)")
 
 class Tools(commands.Cog):
@@ -81,16 +81,20 @@ class Tools(commands.Cog):
                 await ctx.reply(embed=embed)
 
     @commands.command(description="Robi screenshot strony", aliases=["ss"])
-    async def screenshot(self, ctx: commands.Context, url):
+    async def screenshot(self, ctx: commands.Context, url: str, full_page: bool = False):
         async with femcord.Typing(ctx.message):
             result = URL_PATTERN.match(url)
 
-            if not result:
+            if result is None:
                 return await ctx.reply("Podałeś nieprawidłowy adres url")
+
+            if result.group(1) is None:
+                url = "https://" + url
 
             async with ClientSession() as session:
                 async with session.post("http://localhost:6942/screenshot", json={
-                    "url": url
+                    "url": url,
+                    "fullPage": full_page
                 }) as response:
                     if not response.status == 200:
                         return await ctx.reply("Coś poszło nie tak")

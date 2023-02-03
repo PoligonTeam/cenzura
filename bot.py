@@ -21,6 +21,7 @@ from femscript import run
 from tortoise import Tortoise
 from utils import modules, builtins
 from models import Guilds
+from scheduler import Scheduler
 from poligonlgbt import Poligon
 from datetime import datetime
 from typing import Callable, Union, Optional, List
@@ -44,23 +45,6 @@ class FakeCtx:
     async def reply(self, *args, **kwargs):
         pass
 
-class Schedule:
-    def __init__(self, task: Callable, interval: int, *, name: Optional[str] = None, args: tuple = (), kwargs: dict = {}, times: int = float("inf")):
-        self.task = task
-        self.interval = interval
-        self.timestamp = time.time() + interval
-        self.name = name
-        self.args = args
-        self.kwargs = kwargs
-        self.times = times
-        self.calls = 0
-
-    def __call__(self):
-        self.timestamp += self.interval
-        self.calls += 1
-
-        return self.task(*self.args, **self.kwargs)
-
 class Bot(commands.Bot):
     def __init__(self, *, start_time: float = time.time()):
         super().__init__(name="benzura", command_prefix=self.get_prefix, intents=femcord.Intents.all(), owners=config.OWNERS)
@@ -72,8 +56,8 @@ class Bot(commands.Bot):
         self.random_presence: bool = False
         self.presence_index: int = 0
         self.presence_indexes: List[int] = []
+        self.scheduler = Scheduler()
         self.poligon: Poligon = None
-        self.schedules: List[Schedule] = []
 
         self.embed_color = 0xb22487
         self.user_agent = "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.3) AppleWebkit/538.1 (KHTML, like Gecko) SamsungBrowser/1.0 TV Safari/538.1"
@@ -105,6 +89,7 @@ class Bot(commands.Bot):
 
     async def on_ready(self):
         customcommand_command = self.get_command("customcommand")
+        metadata_pattern = re.compile(r"# \w+: (\d+)")
 
         for guild in self.gateway.guilds:
             db_guild = await Guilds.filter(guild_id=guild.id).first()
@@ -116,12 +101,12 @@ class Bot(commands.Bot):
                 guild.owner = await guild.get_member(guild.owner)
 
             for custom_command in db_guild.custom_commands:
-                channel_id, author_id = re.findall(r"# \w+: (\d+)", custom_command)[2:4]
+                channel_id, author_id = metadata_pattern.findall(custom_command)[2:4]
                 fake_ctx = FakeCtx(self.gateway.copy, guild, guild.get_channel(channel_id), await guild.get_member(author_id), self.su_role)
 
                 await customcommand_command(fake_ctx, code=custom_command)
 
-        await self.create_schedule(self.update_presences, "10m", name="update_presences")()
+        await self.scheduler.create_schedule(self.update_presences, "10m", name="update_presences")()
 
         print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - self.start_time:.2f}s)")
 
@@ -141,10 +126,6 @@ class Bot(commands.Bot):
         self.poligon = await Poligon(config.POLIGON_LGBT_API_KEY, config.POLIGON_LGBT_UPLOAD_KEY)
 
         print("created poligon.lgbt client")
-
-        self.loop.create_task(self.scheduler())
-
-        print("created scheduler")
 
     async def update_presences(self):
         with open("presence.fem", "r") as file:
@@ -178,11 +159,11 @@ class Bot(commands.Bot):
                 }
             )
 
-        if not (schedule := self.get_schedules("update_presence")):
-            return await self.create_schedule(self.update_presence, self.presence_update_interval, name="update_presence")()
+        if not (schedules := self.scheduler.get_schedules("update_presence")):
+            return await self.scheduler.create_schedule(self.update_presence, self.presence_update_interval, name="update_presence")()
 
-        self.cancel_schedule(schedule[0])
-        await self.create_schedule(self.update_presence, self.presence_update_interval, name="update_presence")()
+        self.scheduler.cancel_schedules(schedules)
+        await self.scheduler.create_schedule(self.update_presence, self.presence_update_interval, name="update_presence")()
 
     async def update_presence(self):
         while not self.presences:
@@ -216,50 +197,6 @@ class Bot(commands.Bot):
         message.guild.prefix = db_guild.prefix
 
         return prefixes + [message.guild.prefix or config.PREFIX]
-
-    async def scheduler(self):
-        while True:
-            for schedule in self.schedules:
-                if schedule.timestamp <= time.time():
-                    self.loop.create_task(schedule())
-
-                    if schedule.calls >= schedule.times:
-                        self.schedules.remove(schedule)
-
-            await asyncio.sleep(1)
-
-    def get_schedules(self, name: Optional[str] = None, *, check: Optional[Callable] = None) -> List[Schedule]:
-        schedules = []
-
-        for schedule in self.schedules:
-            if (name and schedule.name == name) or (check and check(schedule)):
-                schedules.append(schedule)
-
-        return schedules
-
-    def create_schedule(self, task: Callable, interval: Union[datetime, str], *args: tuple, **kwargs: dict) -> Schedule:
-        if isinstance(interval, datetime):
-            interval = (interval - datetime.now()).total_seconds()
-            kwargs["times"] = 1
-        elif isinstance(interval, str):
-            interval = sum(int(unit[:-1]) * {"s": 1, "m": 60, "h": 3600, "d": 86400}[unit[-1]] for unit in re.findall(r"\d+[smhd]", interval))
-
-        schedule = Schedule(task, interval, *args, **kwargs)
-        self.schedules.append(schedule)
-
-        return schedule
-
-    def cancel_schedule(self, schedule: Optional[Schedule] = None, *, name: Optional[str] = None, check: Optional[Callable] = None):
-        if schedule is not None:
-            return self.schedules.remove(schedule)
-
-        schedules = self.get_schedules(name=name, check=check)
-
-        for schedule in schedules:
-            self.schedules.remove(schedule)
-
-    def clear_schedules(self):
-        self.schedules.clear()
 
     async def paginator(self, function: Callable, ctx: femcord.commands.Context, content: Optional[str] = None, **kwargs: dict):
         pages: list = kwargs.pop("pages", None)

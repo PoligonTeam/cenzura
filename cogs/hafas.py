@@ -1,7 +1,7 @@
 import femcord
 from femcord import commands
 from datetime import datetime, timedelta
-from hafasnew import HafasClient, Station, NotFound
+from hafas import HafasClient, Station, NotFound
 from utils import table
 
 class Hafas(commands.Cog):

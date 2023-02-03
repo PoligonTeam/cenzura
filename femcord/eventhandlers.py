@@ -72,6 +72,9 @@ async def thread_update(gateway, thread):
 
     index = get_index(guild.threads, thread.id, key=lambda t: t.id)
 
+    if index is None:
+        return
+
     old_thread = gateway.copy(guild.threads[index])
     guild.threads[index] = thread
 
