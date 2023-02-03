@@ -42,7 +42,7 @@ class Music(commands.Cog):
 
     async def on_load(self):
         if self.bot.gateway is not None:
-            self.client = await femlink.Client(self.bot.gateway.bot_user.id, "127.0.0.1", 6968, "Dupa123@")
+            self.client = await femlink.Client(self.bot.gateway.bot_user.id, LAVALINK_IP, LAVALINK_PORT, LAVALINK_PASSWORD)
 
             await asyncio.sleep(1)
             await self.connect("704439884340920441", "853657308152070144", mute=True, deaf=True)
