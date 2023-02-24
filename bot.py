@@ -25,12 +25,12 @@ from scheduler import Scheduler
 from poligonlgbt import Poligon
 from datetime import datetime
 from typing import Callable, Union, Optional, List
-import asyncio, uvloop, random, re, os, time, config, logging
+import asyncio, uvloop, socket, struct, json, random, re, os, time, config, logging
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 class FakeCtx:
-    def __init__(self, copy_function: Callable, guild: types.Guild, channel: types.Channel, member: types.Member, su_role: types.Role):
+    def __init__(self, copy_function: Callable, guild: types.Guild, channel: types.Channel, member: types.Member, su_role: types.Role) -> None:
         self.guild = guild
         self.channel = channel
         self.member = copy_function(member, deep=True)
@@ -39,14 +39,14 @@ class FakeCtx:
         self.member.roles.append(su_role)
         self.member.permissions = su_role.permissions
 
-    async def send(self, *args, **kwargs):
+    async def send(self, *args, **kwargs) -> None:
         pass
 
-    async def reply(self, *args, **kwargs):
+    async def reply(self, *args, **kwargs) -> None:
         pass
 
 class Bot(commands.Bot):
-    def __init__(self, *, start_time: float = time.time()):
+    def __init__(self, *, start_time: float = time.time()) -> None:
         super().__init__(name="benzura", command_prefix=self.get_prefix, intents=femcord.Intents.all(), owners=config.OWNERS)
 
         self.start_time = start_time
@@ -58,6 +58,7 @@ class Bot(commands.Bot):
         self.presence_indexes: List[int] = []
         self.scheduler = Scheduler()
         self.poligon: Poligon = None
+        self.socket: socket.socket = None
 
         self.embed_color = 0xb22487
         self.user_agent = "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.3) AppleWebkit/538.1 (KHTML, like Gecko) SamsungBrowser/1.0 TV Safari/538.1"
@@ -87,7 +88,7 @@ class Bot(commands.Bot):
 
         self.loop.run_until_complete(self.async_init())
 
-    async def on_ready(self):
+    async def on_ready(self) -> None:
         customcommand_command = self.get_command("customcommand")
         metadata_pattern = re.compile(r"# \w+: (\d+)")
 
@@ -108,14 +109,24 @@ class Bot(commands.Bot):
 
         await self.scheduler.create_schedule(self.update_presences, "10m", name="update_presences")()
 
+        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        self.socket.setblocking(False)
+        if os.path.exists(config.FEMBOT_SOCKET_PATH):
+            os.remove(config.FEMBOT_SOCKET_PATH)
+        self.socket.bind(config.FEMBOT_SOCKET_PATH)
+
+        receiver_schedule = self.scheduler.create_schedule(self.dashboard_receiver, "1s", name="dashboard_receiver")
+        self.scheduler.hide_schedules(receiver_schedule)
+
         print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - self.start_time:.2f}s)")
 
-    async def on_close(self):
+    async def on_close(self) -> None:
         await Tortoise.close_connections()
+        self.socket.close()
 
         print("closed db connection")
 
-    async def async_init(self):
+    async def async_init(self) -> None:
         logging.getLogger("tortoise").setLevel(logging.WARNING)
 
         await Tortoise.init(config=config.DB_CONFIG, modules={"models": ["app.models"]})
@@ -127,7 +138,65 @@ class Bot(commands.Bot):
 
         print("created poligon.lgbt client")
 
-    async def update_presences(self):
+    async def dashboard_receiver(self) -> None:
+        try:
+            data, _ = self.socket.recvfrom(4)
+            op = struct.unpack("<I", data)[0]
+
+            if op == 1:
+                for index, cog in enumerate(self.cogs):
+                    data = {
+                        "index": index,
+                        "cogs_count": len(self.cogs),
+                        "name": cog.name,
+                        "description": cog.description,
+                        "hidden": cog.hidden,
+                        "commands_count": len(cog.walk_commands()),
+                        "commands": []
+                    }
+
+                    data = json.dumps(data, separators=(",", ":")).encode()
+                    header_data = struct.pack("<II", 1, len(data))
+
+                    self.socket.sendto(header_data, config.DASHBOARD_SOCKET_PATH)
+                    self.socket.sendto(data, config.DASHBOARD_SOCKET_PATH)
+            elif op == 2:
+                for index, command in enumerate(self.walk_commands()):
+                    usage = []
+
+                    if command.usage is not None:
+                        arguments = command.usage.split(" ")
+
+                        for argument in arguments:
+                            if argument[0] == "(":
+                                usage.append([argument[1:-1], 0])
+                            elif argument[0] == "[":
+                                usage.append([argument[1:-1], 1])
+
+                    data = {
+                        "index": index,
+                        "commands_count": len(self.walk_commands()),
+                        "type": command.type.value,
+                        "parent": command.parent,
+                        "cog": command.cog.name,
+                        "name": command.name,
+                        "description": command.description,
+                        "usage": usage,
+                        "enabled": command.enabled,
+                        "hidden": command.hidden,
+                        "aliases": command.aliases,
+                        "guild_id": command.guild_id
+                    }
+
+                    data = json.dumps(data, separators=(",", ":")).encode()
+                    header_data = struct.pack("<II", 2, len(data))
+
+                    self.socket.sendto(header_data, config.DASHBOARD_SOCKET_PATH)
+                    self.socket.sendto(data, config.DASHBOARD_SOCKET_PATH)
+        except socket.error:
+            return
+
+    async def update_presences(self) -> None:
         with open("presence.fem", "r") as file:
             code = file.read()
 
@@ -165,7 +234,7 @@ class Bot(commands.Bot):
         self.scheduler.cancel_schedules(schedules)
         await self.scheduler.create_schedule(self.update_presence, self.presence_update_interval, name="update_presence")()
 
-    async def update_presence(self):
+    async def update_presence(self) -> None:
         while not self.presences:
             await asyncio.sleep(1)
 
@@ -198,7 +267,7 @@ class Bot(commands.Bot):
 
         return prefixes + [message.guild.prefix or config.PREFIX]
 
-    async def paginator(self, function: Callable, ctx: femcord.commands.Context, content: Optional[str] = None, **kwargs: dict):
+    async def paginator(self, function: Callable, ctx: femcord.commands.Context, content: Optional[str] = None, **kwargs: dict) -> None:
         pages: list = kwargs.pop("pages", None)
         prefix: str = kwargs.pop("prefix", "")
         suffix: str = kwargs.pop("suffix", "")
@@ -229,7 +298,7 @@ class Bot(commands.Bot):
         if page < 0:
             page = pages.index(pages[page])
 
-        def get_components(disabled: Optional[bool] = False):
+        def get_components(disabled: Optional[bool] = False) -> femcord.Components:
             return femcord.Components(
                 femcord.Row(
                     femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
@@ -244,7 +313,7 @@ class Bot(commands.Bot):
 
         canceled = False
 
-        async def change_page(interaction: femcord.types.Interaction):
+        async def change_page(interaction: femcord.types.Interaction) -> None:
             nonlocal page, canceled
 
             if interaction.data.custom_id == "first":

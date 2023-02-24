@@ -16,36 +16,33 @@ limitations under the License.
 
 from .enums import ButtonStyles, TextInputStyles
 from .types import Emoji
-from typing import TypeVar, Union, Optional, List
-
-Row = TypeVar("Row")
-Button = TypeVar("Button")
-SelectMenu = TypeVar("SelectMenu")
-Option = TypeVar("Option")
+from typing import Union, Optional, List
 
 class Components:
-    def __init__(self, *rows: List[Row]):
+    def __init__(self, *rows: List["Row"]) -> None:
         self.components = [row.__dict__ for row in rows]
 
-    def add_row(self, row: Row):
+    def add_row(self, row: "Row") -> None:
         self.components.append(row.__dict__)
 
 class Row:
-    def __init__(self, *items: List[Union[Button, SelectMenu]]):
+    def __init__(self, *items: List[Union["Button", "SelectMenu"]]) -> None:
         self.type = 1
         self.components = [item.__dict__ for item in items]
 
-    def add_item(self, item: Union[Button, SelectMenu]):
+    def add_item(self, item: Union["Button", "SelectMenu"]) -> None:
         self.components.append(item.__dict__)
 
 class Button:
-    def __init__(self, label: Optional[str] = None, *, custom_id: Optional[str] = None, style: ButtonStyles, url: Optional[str] = None, disabled: Optional[bool] = False, emoji: Optional[Emoji] = None):
+    def __init__(self, label: Optional[str] = None, *, custom_id: Optional[str] = None, style: Optional[ButtonStyles] = None, url: Optional[str] = None, disabled: Optional[bool] = False, emoji: Optional[Emoji] = None) -> None:
         self.type: int = 2
         self.label: str = label
-        self.style: int = style.value
+        if style:
+            self.style: int = style.value
         if custom_id:
             self.custom_id: str = custom_id
         if url:
+            self.style = ButtonStyles.LINK.value
             self.url: str = url
         if disabled:
             self.disabled: bool = disabled
@@ -53,7 +50,7 @@ class Button:
             self.emoji: dict = {"id": emoji.id, "name": emoji.name}
 
 class SelectMenu:
-    def __init__(self, *, custom_id: str, placeholder: str, min_values: Optional[int] = 1, max_values: Optional[int] = 1, disabled: Optional[bool] = False, options: List[Option]):
+    def __init__(self, *, custom_id: str, placeholder: str, min_values: int = 1, max_values: int = 1, disabled: bool = False, options: List["Option"]):
         self.type: int = 3
         self.custom_id: str = custom_id
         self.placeholder: str = placeholder
@@ -62,8 +59,8 @@ class SelectMenu:
         self.disabled: bool = disabled
         self.options: List[dict] = [option.__dict__ for option in options]
 
-    def add_option(self, option: Option):
-        self.components.append(option.__dict__)
+    def add_option(self, option: "Option"):
+        self.options.append(option.__dict__)
 
 class Option:
     def __init__(self, label: str, value: str, *, description: Optional[str] = None, emoji: Optional[Emoji] = None, default: Optional[bool] = False):
@@ -75,7 +72,7 @@ class Option:
         self.default: bool = default
 
 class TextInput:
-    def __init__(self, label: str, *, custom_id: str, style: TextInputStyles, min_length: Optional[int] = None, max_length: Optional[int] = None, required: Optional[bool] = True, value: Optional[str] = None, placeholder: Optional[str] = None):
+    def __init__(self, label: str, *, custom_id: str, style: TextInputStyles, min_length: Optional[int] = None, max_length: Optional[int] = None, required: bool = True, value: Optional[str] = None, placeholder: Optional[str] = None):
         self.type: int = 4
         self.label: str = label
         self.custom_id: str = custom_id

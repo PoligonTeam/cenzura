@@ -87,7 +87,7 @@ class Music(commands.Cog):
     async def on_raw_voice_state_update(self, data):
         await self.client.voice_state_update(data)
 
-    @commands.command(description="Łączy z kanałem głosowym", usage="join [wyciszony_mikrofon] [wyciszone_słuchawki]")
+    @commands.command(description="Łączy z kanałem głosowym", usage="[wyciszony_mikrofon] [wyciszone_słuchawki]")
     async def join(self, ctx: commands.Context, mute: int = 0, deaf: int = 0):
         channel = ctx.member.voice_state.channel
 
@@ -104,7 +104,7 @@ class Music(commands.Cog):
 
         await ctx.reply("Wyszedłem z kanału głosowego")
 
-    @commands.command(description="Odtwarza muzykę", usage="play [tytuł]")
+    @commands.command(description="Odtwarza muzykę", usage="[tytuł]")
     async def play(self, ctx: commands.Context, *, query):
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
@@ -126,7 +126,7 @@ class Music(commands.Cog):
 
         tracks = await self.client.get_tracks(query)
 
-        if tracks is None:
+        if not tracks:
             return await ctx.reply("Nie znaleziono żadnych utworów")
 
         track: femlink.Track = tracks[0]
@@ -178,7 +178,7 @@ class Music(commands.Cog):
         await player.resume()
         await ctx.reply("Wznawiam odtwarzanie")
 
-    @commands.command(description="Zmienia głośność", usage="volume [głośność]")
+    @commands.command(description="Zmienia głośność", usage="[głośność]")
     async def volume(self, ctx, volume: float):
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
@@ -265,7 +265,7 @@ class Music(commands.Cog):
 
                 try:
                     session = await client.get_session(token)
-                except (exceptions.UnauthorizedToken, exceptions.InvalidApiKey):
+                except (exceptions.UnauthorizedToken, exceptions.InvalidApiKey, exceptions.InvalidSignature):
                     if attempt == 8:
                         return await message.edit("Logowanie się nie powiodło... link się przedawnił lub coś poszło nie tak")
 

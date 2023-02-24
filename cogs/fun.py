@@ -17,6 +17,8 @@ limitations under the License.
 import femcord
 from femcord import commands, types, InvalidArgument, HTTPException
 from femcord.http import Route
+from femcord.permissions import Permissions
+from femcord.enums import Intents
 from femcord.utils import get_index
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup, ResultSet
@@ -30,9 +32,9 @@ import io, random, urllib.parse, json, re
 class Fun(commands.Cog):
     def __init__(self, bot):
         self.bot: commands.Bot = bot
-        self.garfield_emojis = {"0": "930949123979477043", "1": "930949123706880011", "2": "930949123757203456", "3": "930949123752984586",
-                                "4": "930949123752984587", "5": "930949124017238026", "6": "930949124109500436", "7": "930949125413941268",
-                                "8": "930949123732021258", "9": "930949123849461760", "a": "930949124151443546", "b": "930949123870429286",
+        self.garfield_emojis = {"0": "1072691610254585927", "1": "1072691612578234438", "2": "1072691613802954753", "3": "1072691615610712235",
+                                "4": "1072691617829494905", "5": "1072691620245413938", "6": "1072691622573248642", "7": "1072691624158695476",
+                                "8": "1072691627149238282", "9": "1072691628713717760", "a": "930949124151443546", "b": "930949123870429286",
                                 "c": "930949123836895312", "d": "930949123757203457", "e": "930949123866263572", "f": "930949124172419152",
                                 "g": "930949124017238027", "h": "930949124050808892", "i": "930949124046590032", "j": "930949123719430196",
                                 "k": "930949124147277894", "l": "930949124008849408", "m": "930949124835131402", "n": "930949124235362344",
@@ -46,6 +48,7 @@ class Fun(commands.Cog):
                                     "EARLY_SUPPORTER": "933476948338966578", "BUG_HUNTER_LEVEL_2": "933476948276019220",
                                     "VERIFIED_BOT_DEVELOPER": "933476948594790460", "CERTIFIED_MODERATOR": "933476947915333633",
                                     "ACTIVE_DEVELOPER": "1040346532144238652"}
+        self.APPLICATION_COMMAND_BADGE = "1072689600658673734"
         self.status_emojis = {"ONLINE": "977693019279077399", "IDLE": "977693019321028649", "DND": "977693019430076456",
                               "INVISIBLE": "977693019518160916", "OFFLINE": "977693019518160916", "MOBILEONLINE": "1002296215456714953",
                               "MOBILEIDLE": "1002296213913214976", "MOBILEDND": "1002296212503932988"}
@@ -443,7 +446,7 @@ class Fun(commands.Cog):
             if member.hoisted_role is not None:
                 color = member.hoisted_role.color
 
-        embed = femcord.Embed(title=f"Informacje o {user.username}{' (bot)' if user.bot else ''}:", color=color)
+        embed = femcord.Embed(title=f"Informacje o {user.username}:", color=color)
         embed.set_thumbnail(url=user.avatar_url)
 
         embed.add_field(name="ID:", value=user.id)
@@ -476,16 +479,51 @@ class Fun(commands.Cog):
         embed.add_field(name="Utworzył konto:" if not user.bot else "Stworzony dnia:", value=f"{femcord.types.t @ user.created_at} ({femcord.types.t['R'] @ user.created_at})")
         if user.public_flags:
             embed.add_field(name="Odznaki:", value=" ".join(f"<:{flag.name}:{self.public_flags_emojis[flag.name]}>" for flag in user.public_flags if flag.name in self.public_flags_emojis))
-        embed.add_field(name="Avatar:", value=f"[link]({user.avatar_url})")
+        embed.add_field(name="Zdjęcie profilowe:", value=f"[link]({user.avatar_url})")
         if user.bot is True:
-            embed.add_field(name="Zaproszenie:", value=f"[link](https://discord.com/oauth2/authorize?client_id={user.id}&scope=bot)")
+            link = f"https://discord.com/oauth2/authorize?client_id={user.id}&permissions=0&scope=bot"
+
+            data = await self.bot.http.request(Route("GET", "applications", user.id, "rpc"))
+
+            intents = []
+
+            if data["flags"] & 1 << 12:
+                intents.append(Intents.GUILD_PRESENCES)
+            if data["flags"] & 1 << 14:
+                intents.append(Intents.GUILD_MEMBERS)
+            if data["flags"] & 1 << 18:
+                intents.append(Intents.GUILD_MESSAGES)
+            if data["flags"] & 1 << 23:
+                embed.add_field(name="Odznaki:", value=f"<:APPLICATION_COMMAND_BADGE:{self.APPLICATION_COMMAND_BADGE}>")
+
+            if data["description"]:
+                embed.description = data["description"]
+            if "guild_id" in data:
+                guild_data = await self.bot.http.request(Route("GET", "guilds", data["guild_id"], "widget.json"))
+
+                if "code" not in guild_data:
+                    embed.add_field(name="Serwer:", value=f"{guild_data['name']} ({guild_data['id']})")
+            if "terms_of_service_url" in data:
+                embed.add_field(name="ToS:", value=data["terms_of_service_url"])
+            if "privacy_policy_url" in data:
+                embed.add_field(name="Polityka prywatności:", value=data["privacy_policy_url"])
+            if "tags" in data:
+                embed.add_field(name="Tagi:", value=", ".join(data["tags"]))
+            if intents:
+                embed.add_field(name="Intenty:", value=", ".join([intent.name for intent in intents]))
+            if "install_params" in data:
+                embed.add_field(name="Uprawnienia:", value=", ".join([permission.name for permission in Permissions.from_int(int(data["install_params"]["permissions"])).permissions]))
+                link = f"https://discord.com/oauth2/authorize?client_id={user.id}&permissions={data['install_params']['permissions']}&scope={'%20'.join(data['install_params']['scopes'])}"
 
         args = []
+        kwargs = {}
 
         if member is not None:
             args.append(types.m @ user)
+        if user.bot is True:
+            kwargs["components"] = femcord.Components(femcord.Row(femcord.Button("Dodaj bota", url=link)))
 
-        await ctx.reply(*args, embed=embed)
+        await ctx.reply(*args, embed=embed, **kwargs)
 
     @commands.command(description="Pokazuje informacje o serwerze", aliases=["si"])
     async def serverinfo(self, ctx: commands.Context):
@@ -499,16 +537,18 @@ class Fun(commands.Cog):
         embed.add_field(name="Role:", value=len(ctx.guild.roles), inline=True)
         embed.add_field(name="Emotki:", value=len(ctx.guild.emojis), inline=True)
         embed.add_field(name="Naklejki:", value=len(ctx.guild.stickers), inline=True)
+        embed.add_blank_field()
         embed.add_field(name="Został stworzony:", value=f"{femcord.types.t @ ctx.guild.created_at} ({femcord.types.t['R'] @ ctx.guild.created_at})")
         embed.add_field(name="Ulepszenia:", value=ctx.guild.premium_subscription_count, inline=True)
         embed.add_field(name="Poziom:", value=ctx.guild.premium_tier, inline=True)
-        if ctx.guild.vanity_url is not None:
-            embed.add_field(name="Własne zaproszenie:", value="discord.gg/" + ctx.guild.vanity_url)
         embed.add_blank_field()
+        if ctx.guild.vanity_url is not None:
+            embed.add_field(name="Własne zaproszenie:", value="discord.gg/" + ctx.guild.vanity_url, inline=ctx.guild.banner is None)
         embed.add_field(name="Ikona:", value=f"[link]({ctx.guild.icon_url})", inline=True)
         if ctx.guild.banner is not None:
             embed.add_field(name="Baner:", value=f"[link]({ctx.guild.banner_url})", inline=True)
             embed.set_image(url=ctx.guild.banner_url)
+            embed.add_blank_field()
 
         await ctx.reply(embed=embed)
 

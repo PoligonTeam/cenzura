@@ -14,23 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from datetime import datetime
 from .errors import InvalidArgument
+from datetime import datetime
+from typing import Callable, Iterable, Union, Any
 
 DISCORD_EPOCH = 1420070400000
 
-def parse_time(timestamp):
+def parse_time(timestamp: Union[str, datetime]) -> Union[datetime, None]:
     if isinstance(timestamp, str):
         timestamp = timestamp.replace(" ", "T")
         return datetime.fromisoformat(timestamp)
 
-def time_from_snowflake(snowflake):
-    snowflake = int(snowflake)
-    timestamp = ((snowflake >> 22) + DISCORD_EPOCH) / 1000
+def time_from_snowflake(snowflake: str) -> datetime:
+    _snowflake = int(snowflake)
+    timestamp = ((_snowflake >> 22) + DISCORD_EPOCH) / 1000
 
     return datetime.fromtimestamp(timestamp)
 
-def get_mime(data: bytes):
+def get_mime(data: bytes) -> str:
     if data[0:8] == b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A":
         return "image/png"
     elif data[0:3] == b"\xff\xd8\xff" or data[6:10] in (b"JFIF", b"Exif"):
@@ -42,7 +43,7 @@ def get_mime(data: bytes):
 
     raise InvalidArgument("Unsupported image type given")
 
-def get_index(iterable, value, *, key = None):
+def get_index(iterable: Iterable, value: Any, *, key: Union[Callable, None] = None) -> Union[int, None]:
     for i, v in enumerate(iterable):
         if key and key(v) == value:
             return i

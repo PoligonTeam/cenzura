@@ -20,13 +20,14 @@ from .embed import Embed
 from .components import Components
 from .http import Route
 from .enums import *
-from typing import TypeVar, Optional, Callable, Union, Sequence, List
+from typing import Optional, Callable, Union, Sequence, Dict, List, TYPE_CHECKING
 
-Client = TypeVar("Client")
+if TYPE_CHECKING:
+    from .client import Client
 
-def set_functions(client: Client):
+def set_functions(client: "Client"):
     @client.func_for(Guild)
-    async def fetch_member(self: Guild, member_id: str) -> Member:
+    async def fetch_member(self: Guild, member_id: str) -> Dict[str, str]:
         return await client.http.request(Route("GET", "guilds", self.id, "members", member_id))
 
     @client.func_for(Guild)
@@ -48,7 +49,7 @@ def set_functions(client: Client):
                         return cached_member
 
         if isinstance(member, str):
-            member = await self.fetch_member(member)
+            member: Dict = await self.fetch_member(member)
 
         if isinstance(user, dict):
             user = await client.gateway.get_user(user)

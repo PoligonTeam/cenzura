@@ -16,37 +16,40 @@ limitations under the License.
 
 from .enums import CommandTypes
 from ..utils import get_index
+from typing import TypeVar, Callable, Union, List, Dict
+
+Context = TypeVar("Context")
 
 class Command:
     def __init__(self, **kwargs):
-        self.type = kwargs.get("type")
-        self.parent = kwargs.get("parent", None)
-        self.cog = kwargs.get("cog", None)
+        self.type: CommandTypes = kwargs["type"]
+        self.parent: Union[str, None] = kwargs.get("parent", None)
+        self.cog: Union[Cog, None] = kwargs.get("cog", None)
 
-        self.name = kwargs.get("name") or kwargs.get("callback").__name__
-        self.description = kwargs.get("description")
-        self.usage = kwargs.get("usage")
-        self.enabled = kwargs.get("enabled", True)
-        self.hidden = kwargs.get("hidden", False)
-        self.aliases = kwargs.get("aliases", [])
-        self.guild_id = kwargs.get("guild_id", None)
-        self.other = kwargs.get("other", {})
-        self.callback = kwargs.get("callback")
+        self.callback: Callable = kwargs["callback"]
+        self.name: str = kwargs.get("name") or self.callback.__name__
+        self.description: Union[str, None] = kwargs.get("description")
+        self.usage: Union[str, None] = kwargs.get("usage")
+        self.enabled: bool = kwargs.get("enabled", True)
+        self.hidden: bool = kwargs.get("hidden", False)
+        self.aliases: List[str] = kwargs.get("aliases", [])
+        self.guild_id: Union[str, None] = kwargs.get("guild_id", None)
+        self.other: dict = kwargs.get("other", {})
 
-    async def __call__(self, context, *args, **kwargs):
+    async def __call__(self, context: Context, *args, **kwargs) -> None:
         if self.cog is not None:
             return await self.callback(self.cog, context, *args, **kwargs)
 
         return await self.callback(context, *args, **kwargs)
 
 class Group(Command):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
-        self.subcommands = []
+        self.subcommands: List[Command] = []
 
-    def command(self, **kwargs):
-        def decorator(func):
+    def command(self, **kwargs) -> Callable[..., Command]:
+        def decorator(func: Callable) -> Command:
             kwargs["type"] = CommandTypes.SUBCOMMAND
             kwargs["parent"] = self.name
             kwargs["callback"] = func
@@ -58,8 +61,8 @@ class Group(Command):
 
         return decorator
 
-    def group(self, **kwargs):
-        def decorator(func):
+    def group(self, **kwargs) -> Callable[..., "Group"]:
+        def decorator(func: Callable) -> "Group":
             kwargs["type"] = CommandTypes.GROUP
             kwargs["callback"] = func
 
@@ -70,7 +73,7 @@ class Group(Command):
 
         return decorator
 
-    def get_subcommand(self, command):
+    def get_subcommand(self, command: str) -> Union[Command, None]:
         index = get_index(self.subcommands, command, key=lambda c: c.name)
 
         if index is None:
@@ -83,31 +86,55 @@ class Group(Command):
 
         return self.subcommands[index]
 
+    def walk_subcommands(self) -> List[Command]:
+        commands = []
+
+        for command in self.subcommands:
+            if command.type == CommandTypes.GROUP:
+                commands.extend(command.walk_subcommands())
+
+            commands.append(command)
+
+        return commands
+
 class Listener:
-    def __init__(self, callback):
-        self.callback = callback
-        self.cog = None
+    def __init__(self, callback: Callable) -> None:
+        self.callback: Callable  = callback
+        self.cog: Union[Cog, None] = None
         self.__name__ = callback.__name__
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.callback!r}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.callback!r}"
 
-    async def __call__(self, *args, **kwargs):
+    async def __call__(self, *args, **kwargs) -> None:
         if self.cog is not None:
             return await self.callback(self.cog, *args, **kwargs)
 
         return await self.callback(*args, **kwargs)
 
 class Cog:
-    def __init__(self):
-        self.listeners = []
-        self.commands = []
+    name: str
+    description: Union[str, None]
+    hidden: bool
+    listeners: List[Listener]
+    commands: List[Command]
 
-    def on_load(self):
+    def on_load(self) -> None:
         pass
 
-    def on_unload(self):
+    def on_unload(self) -> None:
         pass
+
+    def walk_commands(self) -> List[Command]:
+        commands = []
+
+        for command in self.commands:
+            if command.type == CommandTypes.GROUP:
+                commands.extend(command.walk_subcommands())
+
+            commands.append(command)
+
+        return commands

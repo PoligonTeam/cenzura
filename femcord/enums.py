@@ -168,6 +168,10 @@ class ComponentTypes(Enum):
     BUTTON = 2
     SELECT_MENU = 3
     TEXT_INPUT = 4
+    USER_SELECT = 5
+    ROLE_SELECT = 6
+    MENTIONALBLE_SELECT = 7
+    CHANNEL_SELECT = 8
 
 class ButtonStyles(Enum):
     PRIMARY = 1

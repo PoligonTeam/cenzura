@@ -77,6 +77,12 @@ class Dev(commands.Cog):
 
         await self.bot.paginator(ctx.reply, ctx, str(result), prefix=prefix, suffix=suffix)
 
+    @commands.command(description="cenzura to bot, bot to cenzura")
+    async def generate_website_commands(self, ctx: commands.Context):
+        for command in self.bot.commands:
+            command.hidden
+
+
     @commands.command(description="cenzura to bot, bot to cenzura", usage="(komenda)", aliases=["src"])
     @commands.is_owner
     async def source(self, ctx: commands.Context, *, command):
@@ -93,9 +99,9 @@ class Dev(commands.Cog):
 
         await self.bot.paginator(ctx.reply, ctx, code, prefix="```py\n", suffix="```")
 
-    @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
+    @commands.command(description="cenzura to bot, bot to cenzura")
     @commands.is_owner
-    async def load(self, ctx: commands.Context, extensions):
+    async def load(self, ctx: commands.Context, extensions: str):
         loaded = []
 
         for extension in extensions.split():
@@ -105,9 +111,9 @@ class Dev(commands.Cog):
 
         await ctx.reply("\n".join("\N{INBOX TRAY} `%s`" % extension_name for extension_name in loaded))
 
-    @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
+    @commands.command(description="cenzura to bot, bot to cenzura")
     @commands.is_owner
-    async def reload(self, ctx: commands.Context, extensions):
+    async def reload(self, ctx: commands.Context, extensions: str):
         reloaded = []
 
         for extension in extensions.split():
@@ -118,9 +124,9 @@ class Dev(commands.Cog):
 
         await ctx.reply("\n".join("\N{CLOCKWISE RIGHTWARDS AND LEFTWARDS OPEN CIRCLE ARROWS} `%s`" % extension_name for extension_name in reloaded))
 
-    @commands.command(description="cenzura to bot, bot to cenzura", usage="(extenszyny)")
+    @commands.command(description="cenzura to bot, bot to cenzura")
     @commands.is_owner
-    async def unload(self, ctx: commands.Context, extensions):
+    async def unload(self, ctx: commands.Context, extensions: str):
         unloaded = []
 
         for extension in extensions.split():

@@ -17,12 +17,17 @@ limitations under the License.
 
 import re
 from ..types import *
+from typing import Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .bot import Bot
+    from .context import Context
 
 pattern = re.compile(r"\d{16,19}")
 
-def set_functions(bot):
+def set_functions(bot: "Bot"):
     @bot.func_for(User)
-    def from_arg(ctx, argument):
+    def from_arg(ctx: "Context", argument) -> User:
         result = pattern.search(argument)
 
         if result is not None:
@@ -31,7 +36,7 @@ def set_functions(bot):
         return bot.gateway.get_user(argument)
 
     @bot.func_for(Member)
-    def from_arg(ctx, argument):
+    def from_arg(ctx: "Context", argument) -> Member:
         result = pattern.search(argument)
 
         if result is not None:
@@ -40,7 +45,7 @@ def set_functions(bot):
         return ctx.guild.get_member(argument)
 
     @bot.func_for(Channel)
-    def from_arg(ctx, argument):
+    def from_arg(ctx: "Context", argument) -> Union[Channel, None]:
         result = pattern.search(argument)
 
         if result is not None:
@@ -49,7 +54,7 @@ def set_functions(bot):
         return ctx.guild.get_channel(argument)
 
     @bot.func_for(Role)
-    def from_arg(ctx, argument):
+    def from_arg(ctx: "Context", argument):
         result = pattern.search(argument)
 
         if result is not None:

@@ -25,52 +25,53 @@ from .context import Context
 from .typefunctions import set_functions
 from types import CoroutineType
 from dataclasses import is_dataclass
-from typing import Callable, Union, Iterable
+from typing import Callable, Union, Optional, Iterable, List, Any
+from types import ModuleType
 import importlib.util, inspect, traceback, sys
 
 class Bot(Client):
-    def __init__(self, *, name: str = None, command_prefix, intents: Intents = Intents.all(), messages_limit: int = 1000, owners: Iterable = []):
+    def __init__(self, *, name: Union[str, None] = None, command_prefix: Union[Callable, str], intents: Intents = Intents.all(), messages_limit: int = 1000, owners: Iterable[str] = []) -> None:
         super().__init__(intents = intents, messages_limit = messages_limit)
 
         self.name = name
-        self.original_prefix = self.command_prefix = command_prefix
-        self.owners = list(owners)
+        self.owners: Iterable[str] = list(owners)
+        self.original_prefix = self.command_prefix = command_prefix # TODO change prefix
 
         if not callable(self.command_prefix):
             async def command_prefix(self, message):
                 return self.original_prefix
 
-            self.command_prefix = command_prefix
+            self.command_prefix: Callable = command_prefix
 
-        self.extensions = []
-        self.cogs = []
-        self.commands = []
+        self.extensions: List[ModuleType] = []
+        self.cogs: List[Cog] = []
+        self.commands: List[Command] = []
 
-        self.before_call_functions = []
-        self.after_call_functions = []
+        self.before_call_functions: List[Callable] = []
+        self.after_call_functions: List[Callable] = []
 
         set_functions(self)
 
         @self.event
-        async def on_message_create(message):
+        async def on_message_create(message) -> None:
             if message.author.bot:
                 return
 
             await self.process_commands(message)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name or self.gateway.bot_user.username
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Bot name={str(self)!r}>"
 
-    def before_call(self, func):
+    def before_call(self, func) -> None:
         self.before_call_functions.append(func)
 
-    def after_call(self, func):
+    def after_call(self, func) -> None:
         self.after_call_functions.append(func)
 
-    def command(self, **kwargs):
+    def command(self, **kwargs) -> Callable[..., Command]:
         def decorator(func):
             kwargs["type"] = CommandTypes.COMMAND
             kwargs["callback"] = func
@@ -82,7 +83,7 @@ class Bot(Client):
 
         return decorator
 
-    def group(self, **kwargs):
+    def group(self, **kwargs) -> Callable[..., Group]:
         def decorator(func):
             kwargs["type"] = CommandTypes.GROUP
             kwargs["callback"] = func
@@ -94,7 +95,7 @@ class Bot(Client):
 
         return decorator
 
-    def get_command(self, command, guild_id = None):
+    def get_command(self, command: Command, guild_id: Optional[str] = None) -> Union[Command, None]:
         commands = self.commands
 
         if guild_id is not None:
@@ -112,7 +113,7 @@ class Bot(Client):
 
         return commands[index]
 
-    def remove_command(self, command: Union[Command, str]):
+    def remove_command(self, command: Union[Command, str]) -> None:
         if isinstance(command, str):
             index = get_index(self.commands, command, key=lambda command: command.name)
 
@@ -126,7 +127,18 @@ class Bot(Client):
 
         self.commands.remove(command)
 
-    def load_cog(self, cog):
+    def walk_commands(self) -> List[Command]:
+        commands = []
+
+        for command in self.commands:
+            commands.append(command)
+
+            if command.type == CommandTypes.GROUP:
+                commands += command.walk_subcommands()
+
+        return commands
+
+    def load_cog(self, cog: Cog) -> None:
         if cog.__class__ in (cog.__class__ for cog in self.cogs):
             raise CogAlreadyLoaded(cog.__class__.__name__)
 
@@ -150,7 +162,7 @@ class Bot(Client):
 
         cog.on_load()
 
-    def get_cog(self, cog):
+    def get_cog(self, cog: Cog) -> Union[Cog, None]:
         index = get_index(self.cogs, cog, key=lambda cog: cog.name)
 
         if index is None:
@@ -158,7 +170,7 @@ class Bot(Client):
 
         return self.cogs[index]
 
-    def unload_cog(self, cog: Union[Cog, str]):
+    def unload_cog(self, cog: Union[Cog, str]) -> None:
         if isinstance(cog, str):
             index = get_index(self.cogs, cog, key=lambda cog: cog.__class__.__name__)
 
@@ -177,7 +189,7 @@ class Bot(Client):
 
         self.cogs.remove(cog)
 
-    def load_extension(self, name):
+    def load_extension(self, name: str) -> None:
         name = importlib.util.resolve_name(name, None)
 
         if name in (name.__name__ for name in self.extensions):
@@ -187,6 +199,8 @@ class Bot(Client):
 
         if spec is None:
             raise ExtensionNotFound(name)
+        elif spec.loader is None:
+            raise ExtensionNotLoaded(name)
 
         extension = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(extension)
@@ -198,7 +212,7 @@ class Bot(Client):
 
         self.extensions.append(extension)
 
-    def get_extension(self, extension):
+    def get_extension(self, extension: ModuleType) -> Union[ModuleType, None]:
         index = get_index(self.extensions, extension, key=lambda command: command.__name__)
 
         if index is None:
@@ -206,7 +220,7 @@ class Bot(Client):
 
         return self.extensions[index]
 
-    def unload_extension(self, name):
+    def unload_extension(self, name: str) -> None:
         name = importlib.util.resolve_name(name, None)
         index = get_index(self.extensions, name, key=lambda extension: extension.__name__)
 
@@ -244,14 +258,14 @@ class Bot(Client):
 
         context = Context(self, message)
 
-        command_object = self.get_command(command)
+        command_object: Union[Command, Group, None] = self.get_command(command)
         skip_arguments = 1
 
         if command_object and command_object.guild_id and not context.guild.id == command_object.guild_id:
             command_object = self.get_command(command, guild_id=context.guild.id)
 
         while command_object and arguments and command_object.type is CommandTypes.GROUP:
-            command_object = command_object.get_subcommand(arguments[0])
+            command_object = command_object.get_subcommand(arguments[0]) # type: ignore # TODO: Fix this
             arguments = arguments[1:]
 
         if command_object is None:
@@ -310,7 +324,7 @@ class Bot(Client):
 
                 try:
                     if is_dataclass(annotation) is True:
-                        annotation = getattr(annotation, "from_arg", annotation)
+                        annotation: Any = getattr(annotation, "from_arg", annotation)
                         parsed_argument = annotation(context, arguments[index])
                     else:
                         parsed_argument = annotation(arguments[index])

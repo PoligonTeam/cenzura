@@ -67,7 +67,7 @@ class MusixmatchClient:
 
             track = track_list[0]["track"]
 
-            return Lyrics(track["artist_name"], track["track_name"], track["track_share_url"])
+            return Lyrics(track["artist_name"], track["track_name"], track["track_share_url"].split("?")[0])
 
     async def get_lyrics(self, name: str) -> Lyrics:
         track = await self.search_track(name)

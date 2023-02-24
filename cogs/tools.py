@@ -16,10 +16,10 @@ limitations under the License.
 
 import femcord
 from femcord import commands
+from api_client import ApiClient, ApiError
 from aiohttp import ClientSession
-from bs4 import BeautifulSoup
 from dateutil import parser
-import base64, re, io
+import re
 
 URL_PATTERN = re.compile(r"((http|https):\/\/)?(www\.)?[-a-z0-9@:%._\+~#=]{1,256}\.[a-z0-9()]{1,69}\b[-a-z0-9()@:%_\+.~#!?&//=]*", re.IGNORECASE)
 # tiktok_pattern = re.compile(r"(?x)https?://(?:(?:www|m)\.(?:tiktok.com)\/(?:v|embed|trending)(?:\/)?(?:\?shareId=)?)(?P<id>[\da-z]+)")
@@ -80,6 +80,16 @@ class Tools(commands.Cog):
 
                 await ctx.reply(embed=embed)
 
+    @commands.command(description="Pobiera film z youtube - max 2 minuty", usage="(link)", aliases=["yt", "youtube"])
+    async def ytdl(self, ctx: commands.Context, url: str):
+        async with ApiClient() as client:
+            try:
+                data = await client.ytdl(url)
+            except ApiError as e:
+                return await ctx.reply(e)
+
+        await ctx.reply(files=[("video.mp4", data.video)])
+
     @commands.command(description="Robi screenshot strony", aliases=["ss"])
     async def screenshot(self, ctx: commands.Context, url: str, full_page: bool = False):
         async with femcord.Typing(ctx.message):
@@ -91,24 +101,19 @@ class Tools(commands.Cog):
             if result.group(1) is None:
                 url = "https://" + url
 
-            async with ClientSession() as session:
-                async with session.post("http://localhost:6942/screenshot", json={
-                    "url": url,
-                    "fullPage": full_page
-                }) as response:
-                    if not response.status == 200:
-                        return await ctx.reply("Coś poszło nie tak")
+            async with ApiClient() as client:
+                try:
+                    data = await client.screenshot(url, full_page)
+                except ApiError as e:
+                    return await ctx.reply(e)
 
-                    data = await response.json()
-
-            image = io.BytesIO(base64.b64decode(data["screenshot"]))
             components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl")))
 
-            message = await ctx.reply(files=[("image.png", image)], components=components)
+            message = await ctx.reply(files=[("image.png", data.image)], components=components)
 
         async def curl(interaction: femcord.types.Interaction):
             await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
-            await self.bot.paginator(message.edit, ctx, BeautifulSoup(data["content"], "html.parser").prettify(), embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
+            await self.bot.paginator(message.edit, ctx, data.content, embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
 
         async def on_timeout():
             components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))

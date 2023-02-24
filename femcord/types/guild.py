@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from dataclasses import modified_dataclass
-from typing import Sequence
+from dataclasses import modified_dataclass # type: ignore
+from typing import Optional, List, Dict
 from ..enums import *
 from ..utils import *
 from ..errors import InvalidArgument
@@ -27,6 +27,7 @@ from .member import Member
 from datetime import datetime
 
 CDN_URL = "https://cdn.discordapp.com"
+EXTENSIONS = ("png", "jpg", "jpeg", "webp", "gif")
 
 @modified_dataclass
 class WelcomeScreenChannel:
@@ -36,18 +37,18 @@ class WelcomeScreenChannel:
     emoji_name: str
 
     @classmethod
-    def from_raw(cls, channels, channel):
-        channel["channel"] = [channel := [channel for channel in channels if channel.id == channel["channel_id"]], channel if len(channel) >= 1 else None][1]
+    def from_raw(cls, channels: List[Channel], channel: Dict):
+        channel["channel"] = [_channel := [_channel for _channel in channels if _channel.id == channel["channel_id"]], _channel if len(_channel) >= 1 else None][1]
 
         return cls(**channel)
 
 @modified_dataclass
 class WelcomeScreen:
     description: str
-    welcome_channels: Sequence[WelcomeScreenChannel]
+    welcome_channels: List[WelcomeScreenChannel]
 
     @classmethod
-    def from_raw(cls, channels, welcomescreen):
+    def from_raw(cls, channels: List[Channel], welcomescreen: Dict):
         welcomescreen["welcome_channels"] = [WelcomeScreenChannel.from_raw(channels, channel) for channel in welcomescreen["welcome_channels"]]
 
         return cls(**welcomescreen)
@@ -64,15 +65,15 @@ class Guild:
     verification_level: VerificationLevel
     default_message_notifications: DefaultMessageNotification
     explicit_content_filter: ExplicitContentFilter
-    roles: Sequence[Role]
-    features: Sequence[str]
+    roles: List[Role]
+    features: List[str]
     mfa_level: MfaLevel
     joined_at: datetime
     large: bool
     member_count: int
-    members: Sequence[Member]
-    channels: Sequence[Channel]
-    threads: Sequence[Channel]
+    members: List[Member]
+    channels: List[Channel]
+    threads: List[Channel]
     description: str
     banner: str
     banner_url: str
@@ -80,22 +81,22 @@ class Guild:
     premium_subscription_count: int
     preferred_locale: str
     nsfw_level: NSFWLevel
-    stickers: Sequence[Sticker]
+    stickers: List[Sticker]
     premium_progress_bar_enabled: bool
     created_at: datetime
-    owner: Member = None
-    afk_channel: Channel = None
-    system_channel: Channel = None
-    rules_channel: Channel = None
-    vanity_url: str = None
-    public_updates_channel: Channel = None
-    emojis: Sequence[Emoji] = None
-    icon_hash: str = None
-    widget_enabled: bool = None
-    widget_channel: Channel = None
-    approximate_member_count: int = None
-    welcome_screen: WelcomeScreen = None
-    me: Member = None
+    owner: Optional[Member] = None
+    afk_channel: Optional[Channel] = None
+    system_channel: Optional[Channel] = None
+    rules_channel: Optional[Channel] = None
+    vanity_url: Optional[str] = None
+    public_updates_channel: Optional[Channel] = None
+    emojis: Optional[List[Emoji]] = None
+    icon_hash: Optional[str] = None
+    widget_enabled: Optional[bool] = None
+    widget_channel: Optional[Channel] = None
+    approximate_member_count: Optional[int] = None
+    welcome_screen: Optional[WelcomeScreen] = None
+    me: Optional[Member] = None
 
     __CHANGE_KEYS__ = (
         (
@@ -124,13 +125,13 @@ class Guild:
         )
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<Guild id={!r} name={!r} owner={!r}>".format(self.id, self.name, self.owner)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<Guild id={!r} name={!r} owner={!r}>".format(self.id, self.name, self.owner)
 
-    def get_channel(self, channel_id_or_name):
+    def get_channel(self, channel_id_or_name: str) -> Union[Channel, None]:
         if not channel_id_or_name:
             return
 
@@ -138,7 +139,7 @@ class Guild:
             if channel.name.lower() == channel_id_or_name.lower() or channel.id == channel_id_or_name:
                 return channel
 
-    def get_role(self, role_id_or_name):
+    def get_role(self, role_id_or_name: str) -> Union[Role, None]:
         if not role_id_or_name:
             return
 
@@ -146,15 +147,18 @@ class Guild:
             if role.name.lower() == role_id_or_name.lower() or role.id == role_id_or_name:
                 return role
 
-    def get_emoji(self, emoji_name_or_id):
+    def get_emoji(self, emoji_name_or_id: str) -> Union[Emoji, None]:
         if not emoji_name_or_id:
+            return
+
+        if self.emojis is None:
             return
 
         for emoji in self.emojis:
             if emoji.name.lower() == emoji_name_or_id.lower() or emoji.id == emoji_name_or_id:
                 return emoji
 
-    def get_sticker(self, sticker_name_or_id):
+    def get_sticker(self, sticker_name_or_id: str) -> Union[Sticker, None]:
         if not sticker_name_or_id:
             return
 
@@ -162,20 +166,20 @@ class Guild:
             if sticker.name.lower() == sticker_name_or_id.lower() or sticker.id == sticker_name_or_id:
                 return sticker
 
-    def icon_as(self, extension):
-        if not extension in ("png", "jpg", "jpeg", "webp", "gif"):
+    def icon_as(self, extension: str) -> str:
+        if not extension in EXTENSIONS:
             raise InvalidArgument("Invalid extension")
 
         return CDN_URL + "/icons/%s/%s.%s" % (self.id, self.icon, extension)
 
-    def banner_as(self, extension):
-        if not extension in ("png", "jpg", "jpeg", "webp", "gif"):
+    def banner_as(self, extension: str) -> str:
+        if not extension in EXTENSIONS:
             raise InvalidArgument("Invalid extension")
 
         return CDN_URL + "/banners/%s/%s.%s" % (self.id, self.banner, extension)
 
     @classmethod
-    def from_raw(cls, guild):
+    def from_raw(cls, guild: Dict) -> "Guild":
         icon_url = CDN_URL + "/icons/%s/%s.%s" % (guild["id"], guild["icon"], "gif" if guild["icon"] and guild["icon"][:2] == "a_" else "png")
         banner_url = CDN_URL + "/banners/%s/%s.%s" % (guild["id"], guild["banner"], "gif" if guild["banner"] and guild["banner"][:2] == "a_" else "png")
 
