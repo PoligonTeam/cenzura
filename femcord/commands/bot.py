@@ -384,6 +384,7 @@ class Bot(Client):
                 await command(context, *args, **kwargs)
             except Exception as error:
                 context.arguments = arguments
+                context.error = error
 
                 if not on_error:
                     return traceback.print_exc()

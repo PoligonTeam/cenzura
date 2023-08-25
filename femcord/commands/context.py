@@ -41,6 +41,7 @@ class Context:
 
         self.command: Command = None
         self.arguments: List[str] = []
+        self.error: Exception = None
 
     def __str__(self):
         return "<Context guild={!r} channel={!r} message={!r} command={!r} arguments={!r}>".format(self.guild, self.channel, self.message, self.command, self.arguments)

@@ -15,7 +15,7 @@ limitations under the License.
 """
 
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import Union, List, Dict
 from datetime import datetime
 from urllib.parse import quote_plus
 
@@ -55,8 +55,8 @@ class ArtistBioLinks:
     def from_dict(cls, data: Dict):
         data["name"] = data.pop("#text")
         data["url"] = data.pop("href")
-        return cls(**data)
 
+        return cls(**data)
 
 @dataclass
 class ArtistBio:
@@ -86,11 +86,11 @@ class Artist:
     bio: str = None
 
     @classmethod
-    def from_dict(cls, data: Dict):
+    def from_dict(cls, data: Union[Dict, str]):
         if isinstance(data, str):
             data = {
                 "name": data,
-                "url": f"https://www.last.fm/music/{quote_plus(data)}",
+                "url": "https://www.last.fm/music/" + quote_plus(data),
             }
 
             return cls(**data)

@@ -17,6 +17,6 @@ limitations under the License.
 from enum import Enum
 
 class CommandTypes(Enum):
-    COMMAND = 0
+    COMMAND = 1
     GROUP = 2
     SUBCOMMAND = 3

@@ -18,7 +18,7 @@ import aiohttp, asyncio, json, random
 from .types import Player, Bug
 
 class Client:
-    URL = "wss://ws.korrumzthegame.wtf"
+    URL = "wss://ktg.poligon.lgbt"
 
     def __init__(self, username, x: int, y: int, pull_requests: int, image_number: int):
         self.loop = asyncio.get_event_loop()
@@ -84,7 +84,8 @@ class Client:
         await self.identify()
 
         async for message in self.ws:
-            if message.type in (aiohttp.WSMsgType.error, aiohttp.WSMsgType.closed): break
+            if message.type in (aiohttp.WSMsgType.error, aiohttp.WSMsgType.closed):
+                break
 
             if message.type == aiohttp.WSMsgType.text:
                 data = json.loads(message.data)

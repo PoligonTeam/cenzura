@@ -21,24 +21,19 @@ from datetime import datetime
 import psutil, time
 
 class About(commands.Cog):
-    name = "O bocie"
-
     def __init__(self, bot):
         self.bot: commands.Bot = bot
-        self.process = psutil.Process()
 
     async def get_ping_text(self):
-        text = f"Obecny ping: `{self.bot.gateway.latency}ms`"
+        data = await self.bot.get_latency_data()
 
-        if self.bot.gateway.last_latencies:
-            text += f"\nPoprzednie: {', '.join('`' + str(ping) + 'ms`' for ping in self.bot.gateway.last_latencies[-5:])}"
-            text += f"\nŚrednia: `{(sum(self.bot.gateway.last_latencies) + self.bot.gateway.latency) // (len(self.bot.gateway.last_latencies) + 1)}ms`"
+        text = f"Current latency: `{data['gateway']}ms`"
 
-        before = time.perf_counter()
-        await self.bot.http.request(Route("GET", "users", "@me"))
-        after = time.perf_counter()
+        if data.get("previous"):
+            text += f"\nPrevious: {', '.join('`' + str(ping) + 'ms`' for ping in data['previous'])}"
+            text += f"\nAverage: `{data['average']}ms`"
 
-        text += f"\nPing REST: `{round((after - before) * 1000)}ms`"
+        text += f"\nREST latency: `{data['rest']}ms`"
 
         return text
 
@@ -46,20 +41,20 @@ class About(commands.Cog):
     async def ping(self, ctx: commands.Context):
         await ctx.reply(await self.get_ping_text())
 
-    @commands.command(description="Statystyki bota", aliases=["stats", "botinfo"])
+    @commands.command(description="Bot statistics", aliases=["stats", "botinfo"])
     async def botstats(self, ctx: commands.Context):
         diff = datetime.now() - self.bot.started_at
-        memory = psutil.virtual_memory()
+        stats = await self.bot.get_stats()
 
-        description = f"Serwery: `{len(self.bot.gateway.guilds)}`\n" \
-                      f"Użytkownicy: `{len(self.bot.gateway.users)}`\n\n" \
-                      f"Komendy: `{len(self.bot.walk_commands())}`\n\n" \
-                      f"RAM: `{self.process.memory_full_info().rss / 1000 / 1000:.1f} MB ({(memory.total - memory.available) / 1000 / 1000 / 1000:.1f} GB / {memory.total / 1000 / 1000 / 1000:.1f} GB)`\n" \
-                      f"Procesor: `{psutil.cpu_percent()}%`\n\n" + \
+        description = f"Guilds: `{stats['guilds']}`\n" \
+                      f"Users: `{stats['users']}`\n\n" \
+                      f"Commands: `{stats['commands']}`\n\n" \
+                      f"RAM: `{stats['ram']['current'] / 1000 / 1000:.1f} MB ({(stats['ram']['total'] - stats['ram']['available']) / 1000 / 1000 / 1000:.1f} GB / {stats['ram']['total'] / 1000 / 1000 / 1000:.1f} GB)`\n" \
+                      f"CPU: `{stats['cpu']}%`\n\n" + \
                       await self.get_ping_text() + "\n\n" \
-                      f"Czas online: `{diff.days} dni, {(diff.days * 24 + diff.seconds) // 3600} godzin, {(diff.seconds % 3600) // 60} minut, {diff.seconds % 60} sekund`\n\n"
+                      f"Uptime: `{diff.days} days, {(diff.days * 24 + diff.seconds // 3600) % 24} hours, {(diff.seconds % 3600) // 60} minutes, {diff.seconds % 60} seconds`"
 
-        await ctx.reply(embed=femcord.Embed(title="Statystyki bota:", description=description, color=self.bot.embed_color))
+        await ctx.reply(embed=femcord.Embed(title="Bot statistics:", description=description, color=self.bot.embed_color))
 
 def setup(bot):
     bot.load_cog(About(bot))

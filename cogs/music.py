@@ -21,9 +21,13 @@ from utils import *
 from aiohttp import ClientSession
 from models import LastFM
 from config import *
-from typing import Union
+from typing import Union, TYPE_CHECKING
+from azuracast import NowPlaying
 from lastfm import exceptions
 import hashlib, datetime, asyncio, femlink, re, os
+
+if TYPE_CHECKING:
+    from bot import Bot
 
 soundcloud_pattern = re.compile(r"(https?:\/\/)?(www.)?(m\.)?soundcloud\.com/.+/.+")
 
@@ -31,7 +35,7 @@ class Music(commands.Cog):
     name = "Muzyka"
 
     def __init__(self, bot):
-        self.bot = bot
+        self.bot: "Bot" = bot
         self.client: femlink.Client = None
         self.templates = {}
         self.milestones = [50, 100, 250, 420, 500, 1000, 1337, 2500, 5000, 10000, 25000, 50000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 450000, 500000, 600000, 700000, 800000, 900000, 1000000, 2000000, 3000000, 4000000, 5000000]
@@ -63,7 +67,7 @@ class Music(commands.Cog):
                 user.user_id: user for user in (await LastFM.all())
             }
 
-    def connect(self, guild, channel = None, *, mute = False, deaf = False):
+    def connect(self, guild, channel = None, *, mute = False, deaf = False) -> None:
         return self.bot.gateway.ws.send(femcord.enums.Opcodes.VOICE_STATE_UPDATE, {
             "guild_id": guild.id if isinstance(guild, types.Guild) else guild,
             "channel_id": channel.id if isinstance(channel, types.Channel) else channel,
@@ -71,24 +75,28 @@ class Music(commands.Cog):
             "self_deaf": deaf
         })
 
-    def sign(self, method, token):
+    def sign(self, method, token) -> str:
         string = "api_key" + LASTFM_API_KEY + "method" + method + "token" + token + LASTFM_API_SECRET
         return hashlib.md5(string.encode("utf-8")).hexdigest()
 
+    def progress_bar(self, progress: int, length: int) -> str:
+        get_time = lambda position, duration: f"{(position % 3600) // 60}:{position % 60:02d}/{(duration % 3600) // 60}:{duration % 60:02d}"
+        return "[" + "=" * int(progress / length * 20) + "-" * (20 - int(progress / length * 20)) + "] " + get_time(progress, length)
+
     @commands.Listener
-    async def on_ready(self):
+    async def on_ready(self) -> None:
         await self.on_load()
 
     @commands.Listener
-    async def on_voice_server_update(self, data):
+    async def on_voice_server_update(self, data: dict) -> None:
         await self.client.voice_server_update(data)
 
     @commands.Listener
-    async def on_raw_voice_state_update(self, data):
+    async def on_raw_voice_state_update(self, data) -> None:
         await self.client.voice_state_update(data)
 
     @commands.command(description="Łączy z kanałem głosowym", usage="[wyciszony_mikrofon] [wyciszone_słuchawki]")
-    async def join(self, ctx: commands.Context, mute: int = 0, deaf: int = 0):
+    async def join(self, ctx: commands.Context, mute: int = 0, deaf: int = 0) -> None:
         channel = ctx.member.voice_state.channel
 
         if channel is None:
@@ -99,13 +107,13 @@ class Music(commands.Cog):
         await ctx.reply("Dołączyłem na kanał głosowy")
 
     @commands.command(description="Rozłącza z kanału głosowego")
-    async def leave(self, ctx: commands.Context):
+    async def leave(self, ctx: commands.Context) -> None:
         await self.connect(ctx.guild, None)
 
         await ctx.reply("Wyszedłem z kanału głosowego")
 
     @commands.command(description="Odtwarza muzykę", usage="[tytuł]")
-    async def play(self, ctx: commands.Context, *, query):
+    async def play(self, ctx: commands.Context, *, query: str) -> None:
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None:
@@ -120,7 +128,8 @@ class Music(commands.Cog):
 
         if query == r"%radio":
             query = "https://radio.poligon.lgbt/listen/station_1/radio.mp3"
-
+        elif ctx.author.id in self.bot.owners or ctx.guild.id == "704439884340920441":
+            pass
         elif not soundcloud_pattern.match(query):
             query = "scsearch:" + query
 
@@ -138,48 +147,48 @@ class Music(commands.Cog):
         player.add(track)
         await ctx.reply("Dodano do kolejki `" + track.info.title + " - " + track.info.artist + "`")
 
-    @commands.command(description="Pomija utwór")
-    async def skip(self, ctx):
+    @commands.command(description="Skips a track")
+    async def skip(self, ctx: commands.Context) -> None:
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
 
         await player.skip()
-        await ctx.reply("Pominięto utwór")
+        await ctx.reply("Skipped")
 
-    @commands.command(description="Zatrzymuje odtwarzanie")
-    async def stop(self, ctx):
+    @commands.command(description="Stops playback")
+    async def stop(self, ctx: commands.Context) -> None:
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None or player.track is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
 
         await player.stop()
-        await ctx.reply("Zatrzymałem odtwarzanie")
+        await ctx.reply("Stopped playback")
 
-    @commands.command(description="Pauzuje odtwarzanie")
+    @commands.command(description="Pauses playback")
     async def pause(self, ctx):
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None or player.track is None:
-            return await ctx.reply("Nie gram na żadnym kanale głosowym")
+            return await ctx.reply("No audio playing")
 
         await player.pause()
-        await ctx.reply("Pauzuje odtwarzanie")
+        await ctx.reply("Paused playback")
 
-    @commands.command(description="Wznawia odtwarzanie")
-    async def resume(self, ctx):
+    @commands.command(description="Resumes playback")
+    async def resume(self, ctx) -> None:
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None or player.track is None:
-            return await ctx.reply("Nie gram na żadnym kanale głosowym")
+            return await ctx.reply("No audio playing")
 
         await player.resume()
-        await ctx.reply("Wznawiam odtwarzanie")
+        await ctx.reply("Resumed playback")
 
-    @commands.command(description="Zmienia głośność", usage="[głośność]")
-    async def volume(self, ctx, volume: float):
+    @commands.command(description="Changes volume of audio", usage="[głośność]")
+    async def volume(self, ctx, volume: float) -> None:
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None:
@@ -192,22 +201,22 @@ class Music(commands.Cog):
 
         await ctx.reply(f"Ustawiono głośność na {volume:.1f}%")
 
-    @commands.command()
-    async def bassboost(self, ctx: commands.Context):
+    @commands.command(description="Toggles bassboost")
+    async def bassboost(self, ctx: commands.Context) -> None:
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None:
-            return await ctx.reply("Nie gram na żadnym kanale głosowym")
+            return await ctx.reply("No audio playing")
 
         if player.filters.get("equalizer"):
             await player.set_filters(equalizer=None)
-            return await ctx.reply("Wyłączyłem bassboost")
+            return await ctx.reply("Turned off bassboost")
 
         await player.set_filters(equalizer=[{"band": 0, "gain": 0.15}, {"band": 1, "gain": 0.2}, {"band": 2, "gain": 0.0}, {"band": 3, "gain": 0.0}, {"band": 4, "gain": 0.0}, {"band": 5, "gain": 0.0}, {"band": 6, "gain": 0.0}, {"band": 7, "gain": 0.0}, {"band": 8, "gain": 0.0}, {"band": 9, "gain": 0.0}, {"band": 10, "gain": 0.0}, {"band": 11, "gain": 0.0}, {"band": 12, "gain": 0.0}, {"band": 13, "gain": 0.0}, {"band": 14, "gain": 0.0}])
-        await ctx.reply("Włączyłem bassboost")
+        await ctx.reply("Turned on bassboost")
 
     @commands.command(description="Włącza/wyłącza pętlę utworu")
-    async def loop(self, ctx):
+    async def loop(self, ctx) -> None:
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None:
@@ -217,7 +226,7 @@ class Music(commands.Cog):
         await ctx.reply("Włączono pętlę" if player.loop is True else "Wyłączono pętlę")
 
     @commands.command(description="Pokazuje kolejkę utworów")
-    async def queue(self, ctx: commands.Context):
+    async def queue(self, ctx: commands.Context) -> None:
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 
         if player is None:
@@ -229,9 +238,8 @@ class Music(commands.Cog):
         await ctx.reply("\n".join([f"`{track.info.artist} - {track.info.title} `" for track in player.queue]))
 
     @commands.command(description="Pokazuje informacje o odtwarzanym utworze", aliases=["np"])
-    async def nowplaying(self, ctx):
+    async def nowplaying(self, ctx: commands.Context) -> None:
         player: femlink.Player = self.client.get_player(ctx.guild.id)
-        get_time = lambda position, duration: f"{(position % 3600) // 60}:{position % 60:02d}/{(duration % 3600) // 60}:{duration % 60:02d}"
 
         if player is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
@@ -240,13 +248,35 @@ class Music(commands.Cog):
             return await ctx.reply("Nie gram żadnego utworu")
 
         elif player.track.info.title == "radio poligon":
-            async with ClientSession() as session:
-                async with session.get("https://radio.poligon.lgbt/api/nowplaying/1") as response:
-                    data = await response.json()
+            return await self.nowplayingradio(ctx)
 
-                    return await ctx.reply(f"Gram teraz `{data['now_playing']['song']['text']}` {get_time(data['now_playing']['elapsed'], data['now_playing']['duration'])}")
+        await ctx.reply(f"Gram teraz `{player.track.info.artist} - {player.track.info.title}`\n {self.progress_bar(player.position // 1000, player.track.info.length // 1000)}")
 
-        await ctx.reply(f"Gram teraz `{player.track.info.artist} - {player.track.info.title}` {get_time(int(player.position / 1000), int(player.track.info.length / 1000))}")
+    @commands.command(description="Pokazuje informacje o odtwarzanym utworze w radiu poligon", aliases=["npr", "radiopoligon", "poligon"])
+    async def nowplayingradio(self, ctx: commands.Context) -> None:
+        async with ClientSession() as session:
+            async with session.get("https://radio.poligon.lgbt/api/nowplaying/1") as response:
+                data = await response.json()
+                now_playing = NowPlaying.from_dict(data)
+                song = now_playing.now_playing
+
+                if now_playing.live.is_live is True:
+                    streamer = now_playing.live.streamer_name
+
+                    return await ctx.reply(
+                        "Live" + (" by **" + streamer + "**" if streamer is not None else "") + ":\n" +
+                        song.song.formatted_text
+                    )
+
+                next_song = now_playing.playing_next.song
+
+                await ctx.reply(
+                    "Gram teraz:\n" +
+                    song.song.formatted_text +
+                    (self.progress_bar(song.elapsed, song.duration) + "\n" if now_playing.live.is_live is False else "") +
+                    "\nNastępnie:\n" +
+                    next_song.formatted_text
+                )
 
     @commands.command(description="Łączenie konta LastFM do bota")
     async def login(self, ctx: commands.Context):

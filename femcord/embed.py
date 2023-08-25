@@ -15,12 +15,12 @@ limitations under the License.
 """
 
 from datetime import datetime, timedelta
-from typing import TypeVar, Optional
+from typing import TypeVar, Optional, Union
 
 Embed = TypeVar("Embed")
 
 class Embed:
-    def __init__(self, *, title: Optional[str] = None, url: Optional[str] = None, description: Optional[str] = None, color: Optional[int] = None, timestamp: Optional[datetime] = None):
+    def __init__(self, *, title: Optional[str] = None, url: Optional[str] = None, description: Optional[str] = None, color: Optional[int] = None, timestamp: Optional[Union[datetime, int]] = None):
         if title is not None:
             self.title: str = title
         if url is not None:
@@ -30,9 +30,7 @@ class Embed:
         if color is not None:
             self.color: str = color
         if timestamp is not None:
-            if isinstance(timestamp, int):
-                timestamp = datetime.fromtimestamp(timestamp)
-            self.timestamp = (timestamp - timedelta(hours=1)).isoformat()
+            self.set_timestamp(timestamp)
 
     def __add__(self, embed: Embed) -> Embed:
         new_embed: Embed = Embed()
@@ -52,6 +50,28 @@ class Embed:
                 setattr(new_embed, key, new_value)
 
         return new_embed
+
+    def set_title(self, title: str) -> Embed:
+        self.title = title
+
+        return self
+
+    def set_description(self, description: str) -> Embed:
+        self.description = description
+
+        return self
+
+    def set_color(self, color: int) -> Embed:
+        self.color = color
+
+        return self
+
+    def set_timestamp(self, timestamp: int) -> Embed:
+        if isinstance(timestamp, int):
+            timestamp = datetime.fromtimestamp(timestamp)
+        self.timestamp = (timestamp - timedelta(hours=2)).isoformat()
+
+        return self
 
     def set_image(self, *, url: str) -> Embed:
         self.image = {"url": url}

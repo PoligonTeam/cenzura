@@ -42,6 +42,9 @@ class Attachment:
     description: str = None
     ephemeral: bool = None
     content_type: str = None
+    waveform: str = None
+    duration_secs: float = None
+    flags: object = None
 
 @modified_dataclass
 class MessageReference:

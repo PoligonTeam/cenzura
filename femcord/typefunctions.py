@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+import asyncio
 from .http import Route
 from .types import *
 from .embed import Embed
@@ -72,10 +73,10 @@ def set_functions(client: "Client"):
 
     @client.func_for(Channel)
     async def send(self: Channel, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], stickers: Optional[List[Sticker]] = None, other: Optional[dict] = {}) -> Message:
-        resp = await client.http.send_message(self.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, stickers=stickers, other=other)
+        response = await client.http.send_message(self.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, stickers=stickers, other=other)
 
-        if resp is not None:
-            return await Message.from_raw(client.gateway, resp)
+        if response is not None:
+            return await Message.from_raw(client.gateway, response)
 
     @client.func_for(Message)
     async def reply(self: Message, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = [], components: Optional[Components] = None, files: Optional[list] = None, mentions: Optional[list] = [], stickers: Optional[List[Sticker]] = None, other: Optional[dict] = {}) -> Message:
@@ -89,10 +90,10 @@ def set_functions(client: "Client"):
         if isinstance(self.channel, Channel):
             channel_id = self.channel.id
 
-        resp = await client.http.edit_message(channel_id, self.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, stickers=stickers, other=other)
+        response = await client.http.edit_message(channel_id, self.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, stickers=stickers, other=other)
 
-        if resp is not None:
-            return await Message.from_raw(client.gateway, resp)
+        if response is not None:
+            return await Message.from_raw(client.gateway, response)
 
     @client.func_for(Message)
     async def delete(self: Message):
@@ -105,13 +106,13 @@ def set_functions(client: "Client"):
     @client.func_for(User)
     async def send(self: User, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], other: Optional[dict] = {}) -> Message:
         if self.dm is None:
-            resp = await client.http.open_dm(self.id)
-            self.dm = Channel.from_raw(resp)
+            response = await client.http.open_dm(self.id)
+            self.dm = Channel.from_raw(response)
 
-        resp = await client.http.send_message(self.dm.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)
+        response = await client.http.send_message(self.dm.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)
 
-        if resp is not None:
-            return await Message.from_raw(client.gateway, resp)
+        if response is not None:
+            return await Message.from_raw(client.gateway, response)
 
     @client.func_for(Member)
     async def kick(self: Member, reason: Optional[str] = None):
@@ -139,10 +140,10 @@ def set_functions(client: "Client"):
 
     @client.func_for(Channel)
     async def get_messages(self: Channel, *, around: Optional[int] = None, before: Optional[int] = None, after: Optional[int] = None, limit: Optional[int] = None) -> List[Message]:
-        resp = await client.http.get_messages(self.id, around=around, before=before, after=after, limit=limit)
+        response = await client.http.get_messages(self.id, around=around, before=before, after=after, limit=limit)
 
-        if resp is not None:
-            return [await Message.from_raw(client.gateway, message) for message in resp]
+        if response is not None:
+            return [await Message.from_raw(client.gateway, message) for message in response]
 
     @client.func_for(Channel)
     async def purge(self: Channel, *, limit: Optional[int] = None, messages: Optional[Sequence[Union[Message, str]]] = [], key: Optional[Callable[[Message], bool]] = None) -> List[dict]:

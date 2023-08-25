@@ -104,7 +104,7 @@ class Admin(commands.Cog):
 
     @commands.group(description="Pomoc komendy set", aliases=["ustaw"])
     async def set(self, ctx: commands.Context):
-        cog = self.bot.get_cog("Help")
+        cog = self.bot.get_cog(ctx.command.cog.name)
         embed = cog.get_help_embed(ctx.command)
 
         await ctx.reply(embed=embed)
@@ -135,7 +135,7 @@ class Admin(commands.Cog):
         if code == "get_code()":
             return await self.bot.paginator(ctx.reply, ctx, guild_db.welcome_message, prefix="```py\n", suffix="```")
         elif code == "emit()":
-            events = self.bot.get_cog("Events")
+            events = self.bot.get_cog(ctx.command.cog.name)
             return await events.on_guild_member_add(ctx.guild, ctx.member)
 
         if (match := re.match(r"(<#)?(\d+)>? ([\s\S]+)", code)) is not None:
@@ -172,7 +172,7 @@ class Admin(commands.Cog):
         if code == "get_code()":
             return await self.bot.paginator(ctx.reply, ctx, guild_db.leave_message, prefix="```py\n", suffix="```")
         elif code == "emit()":
-            events = self.bot.get_cog("Events")
+            events = self.bot.get_cog(ctx.command.cog.name)
             return await events.on_guild_member_remove(ctx.guild, ctx.author)
 
         if (match := re.match(r"(<#)?(\d+)>? ([\s\S]+)", code)) is not None:

@@ -28,10 +28,10 @@ CDN_URL = "https://cdn.discordapp.com"
 class User:
     id: str
     username: str
-    discriminator: str
     avatar: str
     avatar_url: str
     created_at: datetime
+    global_name: str = None
     public_flags: Sequence[PublicFlags] = None
     bot: bool = None
     system: bool = None
@@ -56,10 +56,10 @@ class User:
     dm: Channel = None
 
     def __str__(self):
-        return "{}#{}".format(self.username, self.discriminator)
+        return self.username
 
     def __repr__(self):
-        return "<User id={!r} username={!r} discriminator={!r} public_flags={!r}>".format(self.id, self.username, self.discriminator, self.public_flags)
+        return "<User id={!r} username={!r} public_flags={!r}>".format(self.id, self.username, self.public_flags)
 
     def avatar_as(self, extension):
         if not extension in ("png", "jpg", "jpeg", "webp", "gif"):
@@ -75,7 +75,7 @@ class User:
         avatar_url = CDN_URL + "/avatars/%s/%s.%s" % (user["id"], user["avatar"], "gif" if user["avatar"] and user["avatar"][:2] == "a_" else "png")
 
         if user["avatar"] is None:
-            avatar_url = CDN_URL + "/embed/avatars/%s.png" % (int(user["discriminator"]) % 5)
+            avatar_url = CDN_URL + "/embed/avatars/%s.png" % ((int(user["id"]) >> 22) % 5)
 
         user["avatar_url"] = avatar_url
         user["created_at"] = time_from_snowflake(user["id"])

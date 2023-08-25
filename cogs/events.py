@@ -16,15 +16,26 @@ limitations under the License.
 
 import femcord
 from femcord import commands
+from femcord.commands import Context
 from femcord.types import Guild, Member, User, Message
 from femcord.http import Route
 from femscript import run
+from typing import TYPE_CHECKING
+from lokiclient import LokiClient
 from utils import *
 from models import Guilds
 
+if TYPE_CHECKING:
+    from bot import Bot
+
 class Events(commands.Cog):
     def __init__(self, bot):
-        self.bot: commands.Bot = bot
+        self.bot: Bot = bot
+
+        @bot.before_call
+        async def after_call(ctx: Context) -> None:
+            if ctx.error is None:
+                self.bot.loki.add_command_log(ctx)
 
     @commands.Listener
     async def on_guild_create(self, guild: Guild):
@@ -33,14 +44,20 @@ class Events(commands.Cog):
         if not exists:
             await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[], database={}, permissions={}, schedules=[])
 
+        await self.bot.loki.add_guild_log(guild)
+
     @commands.Listener
     async def on_guild_delete(self, guild: Guild):
         await Guilds.filter(guild_id=guild.id).delete()
+        await self.bot.loki.add_guild_log(guild, leave=True)
 
     @commands.Listener
     async def on_guild_member_add(self, guild: Guild, member: Member):
         if guild.id == "704439884340920441":
-            await self.bot.http.request(Route("PATCH", "guilds", guild.id, "members", member.user.id), data={"nick": get_random_username()})
+            try:
+                await self.bot.http.request(Route("PATCH", "guilds", guild.id, "members", member.user.id), data={"nick": get_random_username()})
+            except femcord.HTTPException:
+                pass
 
         if not hasattr(guild, "welcome_message"):
             db_guild = await Guilds.filter(guild_id=guild.id).first()
@@ -124,7 +141,7 @@ class Events(commands.Cog):
 
         if message.guild.me and message.guild.me.user in message.mentions and not message.message_reference and len(message.content.split()) == 1:
             if message.content in (await self.bot.get_prefix(self.bot, message))[:4]:
-                return await message.reply(f"Prefix na tym serwerze to `{(await self.bot.get_prefix(self.bot, message))[-1]}`")
+                return await message.reply(f"Prefix on this server is `{(await self.bot.get_prefix(self.bot, message))[-1]}`")
 
 def setup(bot):
     bot.load_cog(Events(bot))

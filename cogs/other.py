@@ -20,7 +20,8 @@ from femscript import Lexer, Parser, run, Dict
 from utils import *
 from types import CoroutineType
 from models import Guilds
-import re, datetime
+from typing import List
+import re, datetime, femscript_rs
 
 class CustomCommands(commands.Cog):
     name = "Komendy serwerowe"
@@ -108,6 +109,162 @@ class Other(commands.Cog):
             return await ctx.reply(embed=result)
 
         result = str(result)
+
+        prefix_suffix = "```"
+
+        if len(result) < 100:
+            prefix_suffix = ""
+
+        await self.bot.paginator(ctx.reply, ctx, result, prefix=prefix_suffix, suffix=prefix_suffix)
+
+    def to_token(self, item: object):
+        token = {
+            "type": "Unknown",
+            "value": "",
+            "number": 0.0,
+            "list": []
+        }
+
+        types = {
+            str: "Str",
+            int: "Int",
+            bool: "Bool",
+            type(None): "None",
+            List: "List",
+            dict: "Scope"
+        }
+
+        if (_type := type(item)) in types:
+            token["type"] = types[_type]
+        else:
+            token["type"] = "PyObject"
+
+        match token["type"]:
+            case "Str":
+                token["value"] = item
+            case "Int" | "Bool":
+                token["number"] = float(item)
+            case "List":
+                token["list"] = [self.to_token(x) for x in item]
+            case "None":
+                pass
+            case _:
+                token["pyobject"] = item
+
+        return token
+
+    def to_variable(self, name: str, value: dict, variables: List[dict] = None):
+        variable = {
+            "name": name,
+            "value": value
+        }
+
+        if variables:
+            variable["variables"] = variables
+
+        return variable
+
+    @commands.command(description="pisaju skrypt w rewrite", usage="(kod)", aliases=["fsr"])
+    async def femscriptrewrite(self, ctx: commands.Context, *, code):
+        def walk(result):
+            match result["type"]:
+                case "Str":
+                    result = result["value"]
+                case "Int":
+                    result = result["number"]
+                case "Bool":
+                    result = "true" if result["number"] else "false"
+                case "List":
+                    new_result = []
+
+                    for item in result["list"]:
+                        new_result.append(walk(item))
+
+                    result = new_result
+                case "None":
+                    result = "none"
+                case _:
+                    if "pyobject" in result:
+                        result = result["pyobject"]
+                    else:
+                        result = result["value"]
+
+            return result
+
+        fake_token = self.to_token("MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ")
+
+        logs = []
+        queue = []
+
+        def log(name, args, scope):
+            logs.append(walk(args[0]))
+
+            return self.to_token(None)
+
+        def reply(name, args, scope):
+            message = {}
+
+            for arg in args:
+                arg = walk(arg)
+
+                if isinstance(arg, str):
+                    message["content"] = arg
+                elif isinstance(arg, femcord.Embed):
+                    message["embed"] = arg
+
+            queue.append(message)
+
+            return self.to_token(None)
+
+        def embed(name, args, scope):
+            return self.to_token(femcord.Embed())
+
+        variables = [
+            self.to_variable("author", self.to_token(f"<Author id={ctx.author.id!r} username={ctx.author.username!r}>"), [
+                self.to_variable("id", self.to_token(ctx.author.id)),
+                self.to_variable("username", self.to_token(ctx.author.username)),
+                self.to_variable("avatar_url", self.to_token(ctx.author.avatar_url)),
+                self.to_variable("bot",self.to_token(ctx.author.bot))
+            ]),
+            self.to_variable("bot", self.to_token("fembot"), [
+                self.to_variable("token", fake_token),
+                self.to_variable("gateway", self.to_token("<femcord.gateway.Gateway object at 0x7f0b1eb40ed0>"), [
+                    self.to_variable("token", fake_token)
+                ]),
+                self.to_variable("http", self.to_token("<femcord.http.HTTP object at 0x7f0b1e770610>"), [
+                    self.to_variable("token", fake_token)
+                ])
+            ])
+        ]
+
+        functions = [
+            {
+                "name": "log",
+                "func": log
+            },
+            {
+                "name": "Embed",
+                "func": embed
+            },
+            {
+                "name": "reply",
+                "func": reply
+            }
+        ]
+
+        tokens = femscript_rs.generate_tokens(code)
+        ast = femscript_rs.generate_ast(tokens)
+        result = walk(femscript_rs.execute_ast(ast, variables, functions))
+
+        for message in queue:
+            await ctx.reply(**message)
+
+        if isinstance(result, femcord.Embed):
+            return await ctx.reply(embed=result)
+
+        result = str(result)
+
+        result = "\n".join([f"{index}. {log}" for index, log in enumerate(logs, 1)]) + "\n\n" + result
 
         prefix_suffix = "```"
 
@@ -274,6 +431,7 @@ class Other(commands.Cog):
                 "User": "user"
             }
         )
+
         await parser.parse()
 
         if return_text is not None:

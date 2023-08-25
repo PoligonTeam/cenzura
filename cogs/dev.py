@@ -16,16 +16,20 @@ limitations under the License.
 
 import femcord
 from femcord import commands, types
-from typing import Union
+from datetime import datetime, timedelta
+from typing import Union, TYPE_CHECKING
 import asyncio, time, ast, inspect, models
+
+if TYPE_CHECKING:
+    from bot import Bot
 
 class Dev(commands.Cog):
     hidden = True
 
-    def __init__(self, bot):
-        self.bot: commands.Bot = bot
+    def __init__(self, bot) -> None:
+        self.bot: Bot = bot
 
-    def insert_returns(self, body):
+    def insert_returns(self, body: list) -> None:
         if isinstance(body[-1], ast.Expr):
             body[-1] = ast.Return(body[-1].value)
             ast.fix_missing_locations(body[-1])
@@ -37,23 +41,25 @@ class Dev(commands.Cog):
         if isinstance(body[-1], ast.With):
             self.insert_returns(body[-1].body)
 
-    async def _eval(self, code, env = {}):
+    def _eval(self, code: str, env: dict = None) -> asyncio.Future:
+        env = {} or env
+
         content = "\n".join(f"    {x}" for x in code.splitlines())
-        body = f"async def penis():\n{content}"
+        body = f"async def _eval():\n{content}"
 
         parsed = ast.parse(body)
         body = parsed.body[0].body
 
         self.insert_returns(body)
 
-        exec(compile(parsed, filename="dupa", mode="exec"), env)
+        exec(compile(parsed, filename="_eval", mode="exec"), env)
 
-        return await eval("penis()", env)
+        return eval("_eval()", env)
 
-    @commands.command(description="cenzura to bot, bot to cenzura", usage="(kod)")
+    @commands.command(description="cenzura is a bot, the bot is cenzura", usage="(code)")
     async def eval(self, ctx: commands.Context, *, code):
         if not ctx.author.id in self.bot.owners:
-            return await self.bot.get_command("femscript")(ctx, code=code)
+            return await self.bot.get_command("femscriptrewrite")(ctx, code=code)
 
         result = await self._eval(code, {
             "femcord": femcord,
@@ -77,13 +83,31 @@ class Dev(commands.Cog):
 
         await self.bot.paginator(ctx.reply, ctx, str(result), prefix=prefix, suffix=suffix)
 
-    @commands.command(description="cenzura to bot, bot to cenzura")
-    async def generate_website_commands(self, ctx: commands.Context):
-        for command in self.bot.commands:
-            command.hidden
+    @commands.command(description="cenzura is a bot, the bot is cenzura")
+    @commands.is_owner
+    async def command_stats(self, ctx: commands.Context, *, command: commands.Command = None):
+        query = "{type=\"command\"}" if not command else f"{{type=\"command\", command=\"{command.name}\"}}"
 
+        stats = await self.bot.loki.get_logs(query, start=(datetime.utcnow() - timedelta(days=1)).timestamp(), limit=1000)
+        streams = stats["data"]["result"]
+        command_names = [stream["stream"]["command"] for stream in streams]
 
-    @commands.command(description="cenzura to bot, bot to cenzura", usage="(komenda)", aliases=["src"])
+        commands = dict.fromkeys(command_names, 0)
+
+        for command in commands.keys():
+            commands[command] = len([command_name for command_name in command_names if command_name == command])
+
+        commands = {
+            k: v for k, v in sorted(commands.items(), key=lambda item: item[1], reverse=True)
+        }
+
+        description = "\n".join(f"{command}: {count}" for command, count in commands.items())
+
+        embed = femcord.Embed(title="Command stats", description=description, color=self.bot.embed_color)
+
+        await ctx.reply(embed=embed)
+
+    @commands.command(description="cenzura is a bot, the bot is cenzura", usage="(command)", aliases=["src"])
     @commands.is_owner
     async def source(self, ctx: commands.Context, *, command):
         command = command.split(" ")
@@ -99,7 +123,7 @@ class Dev(commands.Cog):
 
         await self.bot.paginator(ctx.reply, ctx, code, prefix="```py\n", suffix="```")
 
-    @commands.command(description="cenzura to bot, bot to cenzura")
+    @commands.command(description="cenzura is a bot, the bot is cenzura")
     @commands.is_owner
     async def load(self, ctx: commands.Context, extensions: str):
         loaded = []
@@ -111,7 +135,7 @@ class Dev(commands.Cog):
 
         await ctx.reply("\n".join("\N{INBOX TRAY} `%s`" % extension_name for extension_name in loaded))
 
-    @commands.command(description="cenzura to bot, bot to cenzura")
+    @commands.command(description="cenzura is a bot, the bot is cenzura")
     @commands.is_owner
     async def reload(self, ctx: commands.Context, extensions: str):
         reloaded = []
@@ -124,7 +148,7 @@ class Dev(commands.Cog):
 
         await ctx.reply("\n".join("\N{CLOCKWISE RIGHTWARDS AND LEFTWARDS OPEN CIRCLE ARROWS} `%s`" % extension_name for extension_name in reloaded))
 
-    @commands.command(description="cenzura to bot, bot to cenzura")
+    @commands.command(description="cenzura is a bot, the bot is cenzura")
     @commands.is_owner
     async def unload(self, ctx: commands.Context, extensions: str):
         unloaded = []
@@ -136,7 +160,7 @@ class Dev(commands.Cog):
 
         await ctx.reply("\n".join("\N{OUTBOX TRAY} `%s`" % extension_name for extension_name in unloaded))
 
-    @commands.command(description="cenzura to bot, bot to cenzura", usage="[użytkownik] (komenda) [argumenty]")
+    @commands.command(description="cenzura is a bot, the bot is cenzura", usage="[user] (command) [arguments]")
     @commands.is_owner
     async def su(self, ctx: commands.Context, member: Union[types.Member, str], command = None, *, args = None):
         if isinstance(member, str):
@@ -171,7 +195,7 @@ class Dev(commands.Cog):
 
         await self.bot.process_commands(fake_message, before_call_functions=before_call, after_call_functions=after_call)
 
-    @commands.command(description="cenzura to bot, bot to cenzura", usage="(komenda) [argumenty]")
+    @commands.command(description="cenzura is a bot, the bot is cenzura", usage="(command) [arguments]")
     @commands.is_owner
     async def perf(self, ctx: commands.Context, command, *, args = None):
         fake_message = self.bot.gateway.copy(ctx.message)
@@ -197,7 +221,7 @@ class Dev(commands.Cog):
         while after is None:
             await asyncio.sleep(0.01)
 
-        await ctx.reply(f"Wykonano w `{after - before:.2f}s`")
+        await ctx.reply(f"Executed in `{after - before:.2f}s`")
 
 def setup(bot):
     bot.load_cog(Dev(bot))

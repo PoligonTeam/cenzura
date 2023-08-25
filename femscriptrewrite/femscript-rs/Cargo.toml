@@ -1,0 +1,14 @@
+[package]
+name = "femscript-rs"
+version = "0.1.0"
+authors = ["czubix"]
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+name = "femscript_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1.0.71"
+pyo3 = { version = "0.18.3", features = ["extension-module"] }

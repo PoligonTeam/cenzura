@@ -18,9 +18,14 @@ from .types import *
 from .enums import *
 from .utils import *
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .gateway import Gateway
+
 CDN_URL = "https://cdn.discordapp.com"
 
-async def channel_create(gateway, channel):
+async def channel_create(gateway: "Gateway", channel):
     if "guild_id" not in channel:
         return
 
@@ -31,7 +36,7 @@ async def channel_create(gateway, channel):
 
     return channel,
 
-async def channel_update(gateway, channel):
+async def channel_update(gateway: "Gateway", channel):
     if "guild_id" not in channel:
         return
 
@@ -45,7 +50,7 @@ async def channel_update(gateway, channel):
 
     return old_channel, channel
 
-async def channel_delete(gateway, channel):
+async def channel_delete(gateway: "Gateway", channel):
     if "guild_id" not in channel:
         return
 
@@ -58,7 +63,7 @@ async def channel_delete(gateway, channel):
 
     return channel,
 
-async def thread_create(gateway, thread):
+async def thread_create(gateway: "Gateway", thread):
     guild = gateway.get_guild(thread["guild_id"])
     thread = Channel.from_raw(thread)
 
@@ -66,7 +71,7 @@ async def thread_create(gateway, thread):
 
     return thread,
 
-async def thread_update(gateway, thread):
+async def thread_update(gateway: "Gateway", thread):
     guild = gateway.get_guild(thread["guild_id"])
     thread = Channel.from_raw(thread)
 
@@ -80,7 +85,7 @@ async def thread_update(gateway, thread):
 
     return old_thread, thread
 
-async def thread_delete(gateway, thread):
+async def thread_delete(gateway: "Gateway", thread):
     guild = gateway.get_guild(thread["guild_id"])
 
     index = get_index(guild.threads, thread["id"], key=lambda t: t.id)
@@ -90,7 +95,7 @@ async def thread_delete(gateway, thread):
 
     return thread,
 
-async def guild_create(gateway, guild):
+async def guild_create(gateway: "Gateway", guild):
     guild = Guild.from_raw(guild)
     gateway.guilds.append(guild)
 
@@ -109,8 +114,12 @@ async def guild_create(gateway, guild):
 
     return guild,
 
-async def guild_members_chunk(gateway, chunk):
+async def guild_members_chunk(gateway: "Gateway", chunk):
     guild = gateway.get_guild(chunk["guild_id"])
+
+    # gateway.member_chunks.append(chunk)
+
+    # return None,
 
     for member in chunk["members"]:
         member = await guild.get_member(member)
@@ -129,12 +138,15 @@ async def guild_members_chunk(gateway, chunk):
         gateway.requested_guilds.append(chunk["guild_id"])
 
         if gateway.request_members and not gateway.request_members[0] in gateway.requested_guilds:
-            await gateway.ws.send(Opcodes.REQUEST_GUILD_MEMBERS, {"guild_id": gateway.request_members[0], "query": "", "limit": 0, "presences": gateway.intents.has(Intents.GUILD_PRESENCES)})
-            del gateway.request_members[0]
+            await gateway.ws.send(Opcodes.REQUEST_GUILD_MEMBERS, {"guild_id": gateway.request_members.pop(0), "query": "", "limit": 0, "presences": gateway.intents.has(Intents.GUILD_PRESENCES)})
+
+    # if not gateway.dispatched_ready and len(gateway.requested_guilds) == len(gateway.guilds):
+    #     print(2)
 
     return chunk,
 
-async def presence_update(gateway, presence):
+async def presence_update(gateway: "Gateway", presence):
+    # return None,
     guild = gateway.get_guild(presence["guild_id"])
     member = await guild.get_member(presence["user"]["id"])
 
@@ -142,7 +154,7 @@ async def presence_update(gateway, presence):
 
     return member,
 
-async def guild_update(gateway, guild):
+async def guild_update(gateway: "Gateway", guild):
     index = get_index(gateway.guilds, guild["id"], key=lambda g: g.id)
 
     old_guild = gateway.copy(gateway.guilds[index])
@@ -191,7 +203,7 @@ async def guild_update(gateway, guild):
 
     return old_guild, guild_object
 
-async def guild_delete(gateway, guild):
+async def guild_delete(gateway: "Gateway", guild):
     guild = gateway.get_guild(guild["id"])
 
     if guild is None:
@@ -202,19 +214,19 @@ async def guild_delete(gateway, guild):
 
     return guild,
 
-async def guild_ban_add(gateway, ban):
+async def guild_ban_add(gateway: "Gateway", ban):
     guild = gateway.get_guild(ban["guild_id"])
     user = await gateway.get_user(ban["user"])
 
     return guild, user
 
-async def guild_ban_remove(gateway, ban):
+async def guild_ban_remove(gateway: "Gateway", ban):
     guild = gateway.get_guild(ban["guild_id"])
     user = await gateway.get_user(ban["user"])
 
     return guild, user
 
-async def guild_emojis_update(gateway, emojis):
+async def guild_emojis_update(gateway: "Gateway", emojis):
     guild = gateway.get_guild(emojis["guild_id"])
 
     old_emojis = gateway.copy(guild.emojis)
@@ -222,7 +234,7 @@ async def guild_emojis_update(gateway, emojis):
 
     return old_emojis, guild.emojis
 
-async def guild_stickers_update(gateway, stickers):
+async def guild_stickers_update(gateway: "Gateway", stickers):
     guild = gateway.get_guild(stickers["guild_id"])
 
     old_stickers = gateway.copy(guild.stickers)
@@ -230,7 +242,7 @@ async def guild_stickers_update(gateway, stickers):
 
     return old_stickers, guild.stickers
 
-async def guild_member_add(gateway, member):
+async def guild_member_add(gateway: "Gateway", member):
     guild = gateway.get_guild(member["guild_id"])
     del member["guild_id"]
 
@@ -238,7 +250,7 @@ async def guild_member_add(gateway, member):
 
     return guild, member
 
-async def guild_member_update(gateway, member):
+async def guild_member_update(gateway: "Gateway", member):
     if not gateway.guilds: return
 
     guild = gateway.get_guild(member["guild_id"])
@@ -270,7 +282,7 @@ async def guild_member_update(gateway, member):
 
     return guild, old_member, member
 
-async def guild_member_remove(gateway, user):
+async def guild_member_remove(gateway: "Gateway", user):
     guild = gateway.get_guild(user["guild_id"])
 
     user = await gateway.get_user(user["user"])
@@ -282,7 +294,7 @@ async def guild_member_remove(gateway, user):
 
     return guild, user
 
-async def guild_role_create(gateway, role):
+async def guild_role_create(gateway: "Gateway", role):
     guild = gateway.get_guild(role["guild_id"])
 
     role = Role.from_raw(role["role"])
@@ -290,7 +302,7 @@ async def guild_role_create(gateway, role):
 
     return guild, role
 
-async def guild_role_update(gateway, role):
+async def guild_role_update(gateway: "Gateway", role):
     guild = gateway.get_guild(role["guild_id"])
     role = Role.from_raw(role["role"])
 
@@ -301,7 +313,7 @@ async def guild_role_update(gateway, role):
 
     return guild, old_role, role
 
-async def guild_role_delete(gateway, role):
+async def guild_role_delete(gateway: "Gateway", role):
     guild = gateway.get_guild(role["guild_id"])
 
     role = guild.get_role(role["role_id"])
@@ -311,10 +323,10 @@ async def guild_role_delete(gateway, role):
 
     return guild, role
 
-async def interaction_create(gateway, interaction):
+async def interaction_create(gateway: "Gateway", interaction):
     return await Interaction.from_raw(gateway, interaction),
 
-async def message_create(gateway, message):
+async def message_create(gateway: "Gateway", message):
     message = await Message.from_raw(gateway, message)
 
     gateway.messages.append(message)
@@ -324,7 +336,7 @@ async def message_create(gateway, message):
 
     return message,
 
-async def message_update(gateway, message):
+async def message_update(gateway: "Gateway", message):
     index = get_index(gateway.messages, message["id"], key=lambda m: m.id)
 
     if index is None:
@@ -348,7 +360,7 @@ async def message_update(gateway, message):
 
     return old_message, new_message
 
-async def message_delete(gateway, message):
+async def message_delete(gateway: "Gateway", message):
     index = get_index(gateway.messages, message["id"], key=lambda m: m.id)
 
     if index is None:
@@ -359,7 +371,7 @@ async def message_delete(gateway, message):
 
     return message,
 
-async def message_delete_bulk(gateway, message):
+async def message_delete_bulk(gateway: "Gateway", message):
     messages = []
 
     for message_id in message["ids"]:
@@ -372,7 +384,7 @@ async def message_delete_bulk(gateway, message):
 
     return messages,
 
-async def message_reaction_add(gateway, reaction):
+async def message_reaction_add(gateway: "Gateway", reaction):
     guild = gateway.get_guild(reaction["guild_id"])
     channel = guild.get_channel(reaction["channel_id"])
     user = await gateway.get_user(reaction["user_id"])
@@ -396,7 +408,7 @@ async def message_reaction_add(gateway, reaction):
 
     return guild, channel, user, message, emoji
 
-async def message_reaction_remove(gateway, reaction):
+async def message_reaction_remove(gateway: "Gateway", reaction):
     guild = gateway.get_guild(reaction["guild_id"])
     channel = guild.get_channel(reaction["channel_id"])
     user = await gateway.get_user(reaction["user_id"])
@@ -420,7 +432,7 @@ async def message_reaction_remove(gateway, reaction):
 
     return guild, channel, user, message, emoji
 
-async def message_reaction_remove_all(gateway, reaction):
+async def message_reaction_remove_all(gateway: "Gateway", reaction):
     guild = gateway.get_guild(reaction["guild_id"])
     channel = guild.get_channel(reaction["channel_id"])
 
@@ -433,7 +445,7 @@ async def message_reaction_remove_all(gateway, reaction):
 
     return guild, channel, message
 
-async def message_reaction_remove_emoji(gateway, reaction):
+async def message_reaction_remove_emoji(gateway: "Gateway", reaction):
     guild = gateway.get_guild(reaction["guild_id"])
     channel = guild.get_channel(reaction["channel_id"])
     emoji = Emoji.from_raw(reaction["emoji"])
@@ -447,7 +459,7 @@ async def message_reaction_remove_emoji(gateway, reaction):
 
     return guild, channel, message, emoji
 
-async def voice_state_update(gateway, voice_state):
+async def voice_state_update(gateway: "Gateway", voice_state):
     guild = None
     channel = None
     member = None

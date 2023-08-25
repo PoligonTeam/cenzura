@@ -1,12 +1,10 @@
 uvloop
 aiohttp
-asyncpg
 beautifulsoup4
 lxml
 Pillow
 playwright
 psutil
 pyfiglet
-tortoise-orm
+tortoise-orm[asyncpg]
 yt-dlp
-ujson

@@ -14,11 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import aiohttp
-import base64
-import bs4
-import io
-from contextlib import asynccontextmanager # TODO: implement this
+import aiohttp, base64, bs4, io
 from dataclasses import dataclass
 from types import TracebackType
 from typing import Optional, Union, Type, TypedDict, Dict
@@ -88,8 +84,8 @@ class ApiError(Exception):
         self.url = url
 
 class ApiClient:
-    def __init__(self, error_map: Dict[str, str] = ERROR_MAP) -> None:
-        self.session = aiohttp.ClientSession(base_url="http://localhost:6942")
+    def __init__(self, base_url: str, error_map: Dict[str, str] = ERROR_MAP) -> None:
+        self.session = aiohttp.ClientSession(base_url=base_url)
         self.error_map = error_map
 
     async def __aenter__(self) -> "ApiClient":
@@ -119,9 +115,9 @@ class ApiClient:
             raise ApiError(self.error_map["unexpected_status"], url)
 
     async def screenshot(self, url: str, full_page: Optional[bool] = False) -> ScreenshotResponse:
-        data: ScreenshotResponseDict = await self._post("/screenshot", json={"url": url, "full_page": full_page})
+        data = await self._post("/screenshot", json={"url": url, "full_page": full_page})
         return ScreenshotResponse.from_dict(data)
 
     async def ytdl(self, url: str) -> YoutubeResponse:
-        data: YoutubeResponseDict = await self._post("/ytdl", json={"url": url})
+        data = await self._post("/ytdl", json={"url": url})
         return YoutubeResponse.from_dict(data)

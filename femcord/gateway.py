@@ -18,7 +18,7 @@ import asyncio
 from .websocket import WebSocket
 from .http import Route, HTTP
 from .intents import Intents
-from .enums import Opcodes
+from .enums import Opcodes, Intents as IntentsEnum
 from .types import Guild, Channel, User, Message, Presence
 from . import eventhandlers
 from types import CoroutineType
@@ -65,6 +65,7 @@ class Gateway:
         self.intents: Intents = client.intents
         self.token: str = client.token
         self.bot: bool = client.bot
+        self.ws: "WebSocket" =  None
         self.heartbeat: Heartbeat = None
         self.latency: int = None
         self.last_latencies: List[int] = []
@@ -84,6 +85,7 @@ class Gateway:
         self.requested_guilds: List[str] = []
         self.users: List[User] = []
         self.request_members: List[str] = []
+        self.member_chunks: List[dict] = []
 
         self.messages_limit: int = client.messages_limit
         self.messages: List[Message] = []
@@ -91,7 +93,7 @@ class Gateway:
         self.dispatched_ready: bool = False
         self.presence: Presence = None
 
-        self.copied_objects: list = []
+        self.copied_objects: List[object] = []
 
         await WebSocket(self, client)
 
@@ -126,9 +128,9 @@ class Gateway:
         identify_data = {
             "token": self.token,
             "properties": {
-                "$os": sys.platform,
-                "$browser": "femcord",
-                "$device": "femcord"
+                "os": sys.platform,
+                "browser": "femcord",
+                "device": "femcord"
             }
         }
 
@@ -209,6 +211,9 @@ class Gateway:
 
                 if len(self.unavailable_guilds) <= len(self.guilds):
                     self.dispatched_ready = True
+
+                    # for guild in self.guilds[:50]:
+                    #     await self.ws.send(Opcodes.REQUEST_GUILD_MEMBERS, {"guild_id": guild.id, "query": "", "limit": 0, "presences": self.intents.has(IntentsEnum.GUILD_PRESENCES)})
 
                     return await self.dispatch("ready")
 

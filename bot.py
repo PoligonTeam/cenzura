@@ -16,18 +16,28 @@ limitations under the License.
 
 import femcord
 from femcord import commands, types
+from femcord.http import Route
 from femcord.permissions import Permissions
 from femscript import run
 from tortoise import Tortoise
 from utils import modules, builtins
+from lokiclient import LokiClient
 from models import Guilds
 from scheduler import Scheduler
 from poligonlgbt import Poligon
 from datetime import datetime
+from enum import Enum
 from typing import Callable, Union, Optional, List
-import asyncio, uvloop, socket, struct, json, random, re, os, time, config, logging
+import asyncio, uvloop, socket, struct, json, random, psutil, re, os, time, config, logging
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
+class Opcodes(Enum):
+    COGS = 1
+    COMMANDS = 2
+    DEFAULT_PREFIX = 3
+    STATS = 4
+    BOT = 5
 
 class FakeCtx:
     def __init__(self, copy_function: Callable, guild: types.Guild, channel: types.Channel, member: types.Member, su_role: types.Role) -> None:
@@ -47,7 +57,7 @@ class FakeCtx:
 
 class Bot(commands.Bot):
     def __init__(self, *, start_time: float = time.time()) -> None:
-        super().__init__(name="benzura", command_prefix=self.get_prefix, intents=femcord.Intents.all(), owners=config.OWNERS)
+        super().__init__(name="fembot", command_prefix=self.get_prefix, intents=femcord.Intents().all(), owners=config.OWNERS)
 
         self.start_time = start_time
 
@@ -56,12 +66,17 @@ class Bot(commands.Bot):
         self.random_presence: bool = False
         self.presence_index: int = 0
         self.presence_indexes: List[int] = []
-        self.scheduler = Scheduler()
+        self.scheduler: Scheduler = Scheduler()
+        self.loki: LokiClient = LokiClient(config.LOKI_BASE_URL, self.scheduler)
         self.poligon: Poligon = None
         self.socket: socket.socket = None
 
         self.embed_color = 0xb22487
         self.user_agent = "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.3) AppleWebkit/538.1 (KHTML, like Gecko) SamsungBrowser/1.0 TV Safari/538.1"
+
+        self.local_api_base_url = config.LOCAL_API_BASE_URL
+
+        self.process = psutil.Process()
 
         self.su_role: types.Role = types.Role(
             id = "su",
@@ -118,11 +133,12 @@ class Bot(commands.Bot):
         receiver_schedule = self.scheduler.create_schedule(self.dashboard_receiver, "1s", name="dashboard_receiver")
         self.scheduler.hide_schedules(receiver_schedule)
 
-        print(f"logged in {self.gateway.bot_user.username}#{self.gateway.bot_user.discriminator} ({time.time() - self.start_time:.2f}s)")
+        print(f"logged in {self.gateway.bot_user.username} ({time.time() - self.start_time:.2f}s)")
 
     async def on_close(self) -> None:
         await Tortoise.close_connections()
         self.socket.close()
+        await self.loki.send()
 
         print("closed db connection")
 
@@ -138,14 +154,58 @@ class Bot(commands.Bot):
 
         print("created poligon.lgbt client")
 
+    async def get_latency_data(self):
+        before = time.perf_counter()
+        await self.http.request(Route("GET", "users", "@me"))
+        after = time.perf_counter()
+
+        return {
+            "gateway": self.gateway.latency,
+            **(
+                {
+                    "previous": self.gateway.last_latencies[-5:],
+                    "average": (sum(self.gateway.last_latencies) + self.gateway.latency) // (len(self.gateway.last_latencies) + 1)
+                }
+                if self.gateway.last_latencies else
+                {
+
+                }
+            ),
+            "rest": round((after - before) * 1000)
+        }
+
+    async def get_stats(self):
+        memory = psutil.virtual_memory()
+
+        return {
+            "guilds": len(self.gateway.guilds),
+            "users": len(self.gateway.users),
+            "commands": len(self.walk_commands()),
+            "ram": {
+                "current": self.process.memory_full_info().rss,
+                "total": memory.total,
+                "available": memory.available
+            },
+            "cpu": psutil.cpu_percent(),
+            "latencies": await self.get_latency_data(),
+            "timestamp": self.started_at.timestamp()
+        }
+
+    def send_packet(self, op: Opcodes, data: dict) -> None:
+        data = json.dumps(data, separators=(",", ":")).encode()
+        header_data = struct.pack("<II", op.value, len(data))
+
+        self.socket.sendto(header_data, config.DASHBOARD_SOCKET_PATH)
+        self.socket.sendto(data, config.DASHBOARD_SOCKET_PATH)
+
     async def dashboard_receiver(self) -> None:
         try:
             data, _ = self.socket.recvfrom(4)
-            op = struct.unpack("<I", data)[0]
+            op = Opcodes(struct.unpack("<I", data)[0])
 
-            if op == 1:
+            if op is Opcodes.COGS:
                 for index, cog in enumerate(self.cogs):
-                    data = {
+                    self.send_packet(Opcodes.COGS, {
                         "index": index,
                         "cogs_count": len(self.cogs),
                         "name": cog.name,
@@ -153,15 +213,11 @@ class Bot(commands.Bot):
                         "hidden": cog.hidden,
                         "commands_count": len(cog.walk_commands()),
                         "commands": []
-                    }
+                    })
+            elif op is Opcodes.COMMANDS:
+                commands = self.walk_commands()
 
-                    data = json.dumps(data, separators=(",", ":")).encode()
-                    header_data = struct.pack("<II", 1, len(data))
-
-                    self.socket.sendto(header_data, config.DASHBOARD_SOCKET_PATH)
-                    self.socket.sendto(data, config.DASHBOARD_SOCKET_PATH)
-            elif op == 2:
-                for index, command in enumerate(self.walk_commands()):
+                for index, command in enumerate(commands):
                     usage = []
 
                     if command.usage is not None:
@@ -173,9 +229,9 @@ class Bot(commands.Bot):
                             elif argument[0] == "[":
                                 usage.append([argument[1:-1], 1])
 
-                    data = {
+                    self.send_packet(Opcodes.COMMANDS, {
                         "index": index,
-                        "commands_count": len(self.walk_commands()),
+                        "commands_count": len(commands),
                         "type": command.type.value,
                         "parent": command.parent,
                         "cog": command.cog.name,
@@ -186,13 +242,19 @@ class Bot(commands.Bot):
                         "hidden": command.hidden,
                         "aliases": command.aliases,
                         "guild_id": command.guild_id
-                    }
-
-                    data = json.dumps(data, separators=(",", ":")).encode()
-                    header_data = struct.pack("<II", 2, len(data))
-
-                    self.socket.sendto(header_data, config.DASHBOARD_SOCKET_PATH)
-                    self.socket.sendto(data, config.DASHBOARD_SOCKET_PATH)
+                    })
+            elif op is Opcodes.DEFAULT_PREFIX:
+                self.send_packet(Opcodes.DEFAULT_PREFIX, {
+                    "default_prefix": config.PREFIX
+                })
+            elif op is Opcodes.STATS:
+                self.send_packet(Opcodes.STATS, await self.get_stats())
+            elif op is Opcodes.BOT:
+                self.send_packet(Opcodes.BOT, {
+                    "id": self.gateway.bot_user.id,
+                    "username": self.gateway.bot_user.username,
+                    "avatar": self.gateway.bot_user.avatar,
+                })
         except socket.error:
             return
 
@@ -208,7 +270,7 @@ class Bot(commands.Bot):
             def set_random_presence(value: bool):
                 self.random_presence = value
 
-            def add_presence(name: str, *, status_type: femcord.StatusTypes = femcord.StatusTypes.ONLINE, activity_type: femcord.ActivityTypes = femcord.ActivityTypes.PLAYING):
+            def add_presence(name: str = None, *, status_type: femcord.StatusTypes = femcord.StatusTypes.ONLINE, activity_type: femcord.ActivityTypes = femcord.ActivityTypes.PLAYING, state: str = None):
                 self.presences.append(presence := femcord.Presence(status_type, activities=[femcord.Activity(name, activity_type)]))
                 return presence
 

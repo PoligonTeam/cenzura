@@ -22,7 +22,7 @@ from models import Artists, Guilds, LastFM, Lyrics
 from config import LASTFM_API_URL, LASTFM_API_KEY
 from lastfm import Client, Track, exceptions
 from lyrics import GeniusClient, MusixmatchClient, TrackNotFound, LyricsNotFound, Lyrics as LyricsTrack
-import asyncio, config, random, ujson
+import asyncio, config, random, json
 
 CHARS = (("\u200b", ("0", "1", "2", "3")), ("\u200c", ("4", "5", "6", "7")), ("\u200d", ("8", "9", "A", "B")), ("\u200e", ("C", "D", "E", "F")))
 SEPARATOR = "\u200f"
@@ -128,7 +128,6 @@ def convert(**items):
             owner = Dict(
                 id = guild.owner.user.id,
                 username = guild.owner.user.username,
-                discriminator = guild.owner.user.discriminator,
                 avatar_url = guild.owner.user.avatar_url or False,
                 bot = guild.owner.user.bot
             ),
@@ -156,7 +155,6 @@ def convert(**items):
         types.User: lambda user: Dict(
             id = user.id,
             username = user.username,
-            discriminator = user.discriminator,
             avatar_url = user.avatar_url,
             bot = user.bot or False
         ),
@@ -304,43 +302,43 @@ def table(names, rows):
 
     return text
 
-async def request(method: str, url: str, *, headers: dict = None, data: dict = None, proxy: bool = False):
+async def request(method: str, url: str, *, headers: dict = None, cookies: dict = None, data: dict = None, proxy: bool = False):
     proxy_address = random.choice(list(config.PROXIES.values()))
 
     if proxy is True and proxy in config.PROXIES:
         proxy_address = config.PROXIES[proxy]
 
     async with ClientSession(timeout=ClientTimeout(10)) as session:
-            async with session.request(method, url, headers=headers, json=data, proxy=config.PROXY_TEMPLATE.format(proxy_address)) as response:
-                length = response.content_length
+        async with session.request(method, url, headers=headers, cookies=cookies, json=data, proxy=config.PROXY_TEMPLATE.format(proxy_address)) as response:
+            length = response.content_length
 
-                if length is not None and length > 10 * 1024 * 1024:
-                    return {
-                        "status": response.status,
-                        "text": "Content too large",
-                        "json": {}
-                    }
-
-                content = await response.read()
-
-                json = Dict()
-
-                if response.content_type == "application/json":
-                    try:
-                        json = ujson.loads(content)
-                    except ujson.JSONDecodeError:
-                        json = {}
-
-                    if isinstance(json, dict):
-                        json = Dict(**json)
-                    elif isinstance(json, list):
-                        json = List(*json)
-
+            if length is not None and length > 10 * 1024 * 1024:
                 return {
                     "status": response.status,
-                    "text": content.decode(response.get_encoding()),
-                    "json": json
+                    "text": "Content too large",
+                    "json": {}
                 }
+
+            content = await response.read()
+
+            data = Dict()
+
+            if response.content_type == "application/json":
+                try:
+                    data = json.loads(content)
+                except json.JSONDecodeError:
+                    data = {}
+
+                if isinstance(json, dict):
+                    data = Dict(**json)
+                elif isinstance(json, list):
+                    data = List(*json)
+
+            return {
+                "status": response.status,
+                "text": content.decode(response.get_encoding()),
+                "json": data
+            }
 
 async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_url = None, content = None, embed: femcord.Embed = None):
     data = {}
@@ -354,7 +352,7 @@ async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_
     if embed:
         data["embeds"] = [embed.__dict__]
 
-    await request("POST", femcord.http.Http.URL + "/webhooks/" + webhook_id + "/" + webhook_token, data=data)
+    await request("POST", femcord.http.HTTP.URL + "/webhooks/" + webhook_id + "/" + webhook_token, data=data)
 
 def void(*args, **kwargs):
     return False
@@ -430,32 +428,39 @@ async def get_modules(bot, guild, *, ctx = None, user = None, message_errors = F
             if len(tracks.tracks) == 3:
                 fs_data["nowplaying"] = True
 
-            async def append_track(index: int, track: Track):
+            async def append_track(index: int, track: Track) -> None:
                 track_info = await client.track_info(track.artist.name, track.title, lastfm.username)
                 artist_info = await client.artist_info(track.artist.name, lastfm.username)
 
-                fs_track = Track(**{
-                    "artist": artist_info,
-                    "image": track.image,
-                    "album": track.album,
-                    "title": track.title,
-                    "url": track.url,
-                    "duration": track.duration,
-                    "streamable": track.streamable,
-                    "listeners": track_info.listeners,
-                    "playcount": track_info.playcount,
-                    "scrobbles": track_info.scrobbles or 0,
-                    "tags": track_info.tags,
-                    "date": track.date
-                })
+                fs_track = Track(
+                    artist = artist_info,
+                    image = track.image,
+                    album = track.album,
+                    title = track.title,
+                    url = track.url,
+                    duration = track.duration,
+                    streamable = track.streamable,
+                    listeners = track_info.listeners,
+                    playcount = track_info.playcount,
+                    scrobbles = track_info.scrobbles or "0",
+                    tags = track_info.tags,
+                    date = track.date
+                )
 
                 fs_data["tracks"].append((index, fs_track))
 
-            for index, track in enumerate(tracks.tracks):
+            for index, track in enumerate(tracks.tracks[:2]):
                 bot.loop.create_task(append_track(index, track))
+
+            count = 0
 
             while len(fs_data["tracks"]) < 2:
                 await asyncio.sleep(0.1)
+
+                count += 1
+
+                if count > 100:
+                    break
 
             fs_data["tracks"].sort(key=lambda track: track[0])
             fs_data["tracks"] = [track[1] for track in fs_data["tracks"]]
@@ -474,13 +479,16 @@ async def get_modules(bot, guild, *, ctx = None, user = None, message_errors = F
             "variables": database
         },
         "lastfm": {
-            "variables": {
-                **convert(tracks=(lfm := await lastfm()).get("tracks", [])),
-                "lastfm_user": lfm.get("lastfm_user"),
-                "nowplaying": lfm.get("nowplaying")
-            }
-        }
-        if ctx is not None else {
-            "variables": {}
+            "variables": (
+                {
+                    **convert(tracks=(lfm := await lastfm()).get("tracks", [])),
+                    "lastfm_user": lfm.get("lastfm_user"),
+                    "nowplaying": lfm.get("nowplaying")
+                }
+                if ctx is not None else
+                {
+
+                }
+            )
         }
     }

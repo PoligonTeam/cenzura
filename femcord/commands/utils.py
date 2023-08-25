@@ -46,6 +46,8 @@ def has_permissions(*permissions):
     def decorator(func):
         def check_function(self, ctx):
             for permission in permissions:
+                if ctx.guild.owner.user.id == ctx.author.id:
+                    return True
                 if not ctx.member.permissions.has(permission):
                     return False
 

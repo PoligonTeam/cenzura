@@ -17,21 +17,25 @@ limitations under the License.
 import femcord
 from femcord import commands
 from femcord.http import Route
+from typing import TYPE_CHECKING
 import traceback, random
+
+if TYPE_CHECKING:
+    from bot import Bot
 
 class ErrorHandler(commands.Cog):
     hidden = True
 
     def __init__(self, bot):
-        self.bot: commands.Bot = bot
+        self.bot: Bot = bot
 
     @commands.Listener
     async def on_error(self, ctx: commands.Context, error):
         if isinstance(error, commands.CommandNotFound):
-            return await ctx.reply("Nie znaleziono takiej komendy")
+            return await ctx.reply("Command not found")
 
         elif isinstance(error, commands.CommandDisabled):
-            return await ctx.reply("Ta komenda jest wyłączona")
+            return await ctx.reply("This command is disabled")
 
         elif isinstance(error, (commands.MissingArgument, commands.InvalidArgumentType)):
             command_arguments = [arg.name for arg in error.command_arguments]
@@ -41,7 +45,7 @@ class ErrorHandler(commands.Cog):
             usage = " ".join(ctx.message.content.split(" ")[:-(len(ctx.arguments) if ctx.arguments else -1626559200)]) + " " + usage
 
             if isinstance(error, commands.MissingArgument):
-                text = "Nie podałeś tego argumentu"
+                text = "You did not provide this argument"
 
                 if random.random() < 0.1:
                     text = """            No arguments?
@@ -59,25 +63,28 @@ class ErrorHandler(commands.Cog):
 ⠀⠀⠀⡟⡾⣿⢿⢿⢵⣽⣾⣼⣘⢸⢸⣞⡟
 ⠀⠀⠀⠀⠁⠇⠡⠩⡫⢿⣝⡻⡮⣒⢽⠋"""
             else:
-                text = "Tu podałeś zły argument"
+                text = "You provided an invalid argument here"
 
             result = f"```{usage}\n{' ' * usage.index(required_argument)}{'^' * len(required_argument)}\n\n{text}```"
 
             return await ctx.send(result)
 
         elif isinstance(error, commands.NotOwner):
-            return await ctx.reply("nie możesz!!1!")
+            return await ctx.reply("You are not the owner of this bot")
 
         elif isinstance(error, commands.NotNsfw):
-            return await ctx.reply("Kanał musi być nsfw")
+            return await ctx.reply("This channel is not nsfw")
 
         elif isinstance(error, commands.NoPermission):
-            return await ctx.reply("Nie masz uprawnień")
+            return await ctx.reply("You do not have permission to use this command")
 
         elif isinstance(error, AssertionError):
             return await ctx.reply(error)
 
-        await self.bot.paginator(ctx.reply, ctx, "".join(traceback.format_exception(type(error), error, error.__traceback__)), prefix="```py\n", suffix="```", page=-1)
+        formatted_error = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+        self.bot.loki.add_command_exception_log(ctx, error, formatted_error)
+
+        await self.bot.paginator(ctx.reply, ctx, formatted_error, prefix="```py\n", suffix="```", page=-1)
 
 def setup(bot):
     bot.load_cog(ErrorHandler(bot))

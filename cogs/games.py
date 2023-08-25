@@ -22,12 +22,10 @@ from typing import Union
 import asyncio, random
 
 class Games(commands.Cog):
-    name = "Gry"
-
     def __init__(self, bot):
         self.bot: commands.Bot = bot
 
-    @commands.command(description="https://korrumzthegame.wtf", usage="[nazwa] [numer_awataru_1-20]", aliases=["ktg"])
+    @commands.command(description="https://korrumzthegame.wtf", usage="[name] [avatar-number_1-20]", aliases=["ktg"])
     async def korrumzthegame(self, ctx: commands.Context, username: Union[int, str] = None, avatar: int = None):
         if isinstance(username, int) and avatar is None:
             avatar = username
@@ -64,7 +62,7 @@ class Games(commands.Cog):
 
         renderer.update()
 
-        embed = femcord.Embed(title="Pull requesty:", color=self.bot.embed_color)
+        embed = femcord.Embed(title="Pull requests:", color=self.bot.embed_color)
         embed.set_thumbnail(url=f"https://korrumzthegame.wtf/images/player{renderer.client.image_number}.png")
         embed.set_image(url=f"attachment://image.png")
         embed.set_footer(text="korrumzthegame.wtf")
@@ -79,7 +77,7 @@ class Games(commands.Cog):
         async def on_select(interaction):
             if interaction.data.custom_id == "close":
                 await renderer.client.close()
-                return await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, "Dziękujemy za gre", embed=femcord.Embed(), components=femcord.Components(), files=[], other={"attachments": []})
+                return await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, "Thank you for playing", embed=femcord.Embed(), components=femcord.Components(), files=[], other={"attachments": []})
 
             await renderer.client.move(interaction.data.custom_id)
 
@@ -92,7 +90,7 @@ class Games(commands.Cog):
 
         async def on_timeout():
             await renderer.client.close()
-            await message.edit("Sesja wygasła", embeds=[], components=[], files=[], other={"attachments": []})
+            await message.edit("Session expired", embeds=[], components=[], files=[], other={"attachments": []})
 
         await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
 

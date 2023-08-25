@@ -56,14 +56,14 @@ class Fun(commands.Cog):
         self.results = {}
         self.urls = {}
 
-    @commands.command(description="arwatar", usage="[użytkownik]")
+    @commands.command(description="User avatar", usage="[user]")
     async def avatar(self, ctx: commands.Context, user: types.User = None):
         user = user or ctx.author
         image = await self.bot.http.session.get(user.avatar_url)
 
         await ctx.reply(files=[("avatar." + ("gif" if user.avatar[:2] == "a_" else "png"), await image.content.read())])
 
-    @commands.command(description="Pokazuje w ilu procentach użytkownicy się kochają", usage="(użytkownik) [użytkownik]", aliases=["love"])
+    @commands.command(description="Shows the percentage of love between users", usage="(user) [user]", aliases=["love"])
     async def ship(self, ctx: commands.Context, user: types.User, user2: types.User = None):
         user2 = user2 or ctx.author
 
@@ -89,16 +89,16 @@ class Fun(commands.Cog):
 
         percent = get_int(user, user2)
 
-        await ctx.reply(f"**{user.username}** + **{user2.username}** = **{user.username[:len(user.username) // 2].lower()}{user2.username[len(user2.username) // 2:].lower()}**\nIch miłość jest równa **{percent}%**!", files=[("ship.png", image.getvalue())])
+        await ctx.reply(f"**{user.username}** + **{user2.username}** = **{user.username[:len(user.username) // 2].lower()}{user2.username[len(user2.username) // 2:].lower()}**\nTheir love is equal **{percent}%**!", files=[("ship.png", image.getvalue())])
 
-    @commands.command(description="pies", aliases=["pies", "ars", "6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"])
+    @commands.command(description="dog", aliases=["ars", "6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"])
     async def dog(self, ctx: commands.Context):
         alias = ctx.message.content.split()[0][len((await self.bot.get_prefix(self.bot, ctx.message))[-1]):]
 
         if alias in ("6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"):
-            return await ctx.reply("niżej to pies", files=[("dog.png", open("./assets/images/6vz.png", "rb")), ("dog2.png", open("./assets/images/6vz2.png", "rb"))])
+            return await ctx.reply(files=[("dog.png", open("./assets/images/6vz.png", "rb")), ("dog2.png", open("./assets/images/6vz2.png", "rb"))])
         elif alias == "ars":
-            return await ctx.reply("niżej to pies", files=[("dog.jpg", open("./assets/images/ars.jpg", "rb"))])
+            return await ctx.reply(files=[("dog.jpg", open("./assets/images/ars.jpg", "rb"))])
 
         response = await self.bot.http.session.get("https://some-random-api.ml/img/dog")
         response_data = await response.json()
@@ -114,12 +114,12 @@ class Fun(commands.Cog):
 
         await ctx.reply(files=[("dog." + extension, content)])
 
-    @commands.command(description="kot", aliases=["kot", "mesik", "<@563718132863074324>", "<@!563718132863074324>"])
+    @commands.command(description="cat", aliases=["mesik", "<@563718132863074324>", "<@!563718132863074324>"])
     async def cat(self, ctx: commands.Context):
         alias = ctx.message.content.split()[0][len((await self.bot.get_prefix(self.bot, ctx.message))[-1]):]
 
         if alias in ("mesik", "<@563718132863074324>", "<@!563718132863074324>"):
-            return await ctx.reply("niżej to kot", files=[("cat.jpg", open("./assets/images/mesik.jpg", "rb")), ("cat2.png", open("./assets/images/mesik2.jpg", "rb"))])
+            return await ctx.reply(files=[("cat.jpg", open("./assets/images/mesik.jpg", "rb")), ("cat2.png", open("./assets/images/mesik2.jpg", "rb"))])
 
         image = await self.bot.http.session.get("https://cataas.com/cat" + ("/gif" if random.random() > .5 else ""))
         content = await image.content.read()
@@ -133,7 +133,7 @@ class Fun(commands.Cog):
 
         await ctx.reply(files=[("cat." + extension, content)])
 
-    @commands.command(description=".i.", usage="(tekst)", aliases=["ascii"])
+    @commands.command(description=".i.", usage="(text)", aliases=["ascii"])
     async def figlet(self, ctx: commands.Context, *, text):
         figlet = Figlet().renderText("\n".join(text.split()))
 
@@ -148,7 +148,7 @@ class Fun(commands.Cog):
 
         await ctx.reply("```" + figlet + "```")
 
-    @commands.command(description="dżej", usage="[użytkownik]")
+    @commands.command(description="gay", usage="[user]")
     async def howgay(self, ctx: commands.Context, user: types.User = None):
         user = user or ctx.author
 
@@ -157,19 +157,19 @@ class Fun(commands.Cog):
 
         await ctx.reply("https://charts.idrlabs.com/graphic/sexual-orientation?p=%d,%d&l=PL" % (y, x))
 
-    @commands.command(description="Achievement Get!", usage="(tekst)")
+    @commands.command(description="Achievement Get!", usage="(text)")
     async def achievement(self, ctx: commands.Context, *, text: replace_chars):
         if len(text) > 23:
-            return await ctx.reply(f"Tekst jest za długi (`{len(text)}/23`)")
+            return await ctx.reply(f"Provided text is too long (`{len(text)}/23`)")
 
         image = await self.bot.http.session.get(f"https://minecraftskinstealer.com/achievement/{random.randint(1, 40)}/Achievement+Get%21/{text}")
 
         await ctx.reply(files=[("achievement.png", await image.content.read())])
 
-    @commands.command(description="Wysyła tekst w emotkach garfielda", usage="(tekst)")
+    @commands.command(description="Replaces text with garfield emojis", usage="(text)")
     async def garfield(self, ctx: commands.Context, *, text: replace_chars):
         if len(text) > 60:
-            return await ctx.reply(f"Tekst jest za długi (`{len(text)}`/`60`)")
+            return await ctx.reply(f"Provided text is too long (`{len(text)}`/`60`)")
 
         garfield_text = ""
 
@@ -183,20 +183,20 @@ class Fun(commands.Cog):
 
         await ctx.reply(garfield_text)
 
-    @commands.command(description="Ukrywa niewidzialny tekst w tekście", usage="(pokazany_tekst) | (ukryty_tekst)", other={"embed": femcord.Embed().set_image(url="https://cdn.poligon.lgbt/riEyNGVIuO.png")})
+    @commands.command(description="Adds a hidden message to text", usage="(text) | (hidden_text)", other={"embed": femcord.Embed().set_image(url="https://cdn.poligon.lgbt/riEyNGVIuO.png")})
     async def encode(self, ctx: commands.Context, *, text: replace_chars):
         text = text.split(" | ")
         text[1] = text[1].replace(" ", "_")
 
         if 2 > len(text):
-            return await ctx.reply("Nie podałeś ukrytego tekstu")
+            return await ctx.reply("You did not provide the hidden text")
 
         if len(text[0]) < 2:
-            return await ctx.reply(f"Tekst jest za krótki (`{len(text[0])}/2`)")
+            return await ctx.reply(f"Provided text is too short (`{len(text[0])}/2`)")
 
         await ctx.reply(text[0][0] + encode_text(text[1]) + text[0][1:])
 
-    @commands.command(description="Pokazuje niewidzialny tekst", usage="(tekst)", other={"embed": femcord.Embed().set_image(url="https://cdn.poligon.lgbt/fsdKWwqWKx.png")})
+    @commands.command(description="Reveals the hidden message from text", usage="(text)", other={"embed": femcord.Embed().set_image(url="https://cdn.poligon.lgbt/fsdKWwqWKx.png")})
     async def decode(self, ctx: commands.Context, *, text):
         allowed_chars = [group[0] for group in CHARS] + [SEPARATOR]
         new_text = ""
@@ -311,7 +311,7 @@ class Fun(commands.Cog):
     #     message = await ctx.reply("```0```", components=components)
     #     self.interactions.append(("calc", ctx.author.id, ctx.channel.id, message.id))
 
-    @commands.command(description="nie widać mnie", usage="[użytkownik/tekst/obrazek]")
+    @commands.command(description="inside joke", usage="[user/text/image]")
     async def cantseeme(self, ctx: commands.Context, *, arg: Union[types.User, str] = None):
         arg = arg or ctx.author
 
@@ -327,7 +327,7 @@ class Fun(commands.Cog):
 
         if isinstance(arg, str):
             if len(arg) > 105:
-                 return await ctx.reply(f"Tekst jest za długi (`{len(arg)}/105`)")
+                 return await ctx.reply(f"Provided text is too long (`{len(arg)}/105`)")
 
             if len(arg) > 15:
                 arg = "\n".join(arg[x:x+15] for x in range(0, len(arg), 15))
@@ -352,7 +352,7 @@ class Fun(commands.Cog):
 
         await ctx.reply(files=[("cantseeme.png", image.getvalue())])
 
-    @commands.command(description="lgbt", usage="[użytkownik]", aliases=["lgbt"])
+    @commands.command(description="lgbt", usage="[user]", aliases=["lgbt"])
     async def gay(self, ctx: commands.Context, user: types.User = None):
         user = user or ctx.author
 
@@ -374,7 +374,7 @@ class Fun(commands.Cog):
 
         await ctx.reply(files=[("gay.png", image.getvalue())])
 
-    @commands.command(description="losowy mem z jbzd", aliases=["mem"])
+    @commands.command(description="Random meme from jbzd", aliases=["mem"])
     @commands.is_nsfw
     async def meme(self, ctx: commands.Context):
         memes = []
@@ -387,11 +387,11 @@ class Fun(commands.Cog):
 
         await ctx.reply(random.choice(memes)["src"])
 
-    @commands.command(description="\U0001F633", usage="[użytkownik]")
+    @commands.command(description="\U0001F633", usage="[user]")
     async def dick(self, ctx: commands.Context, user: types.User = None):
         await self.figlet(ctx, text=f".i. {get_int(user or ctx.author) // 5}")
 
-    @commands.command(description="taobao aliexpress i chiny", usage="(produkt)", aliases=["aliexpress"])
+    @commands.command(description="taobao, aliexpress, and china", usage="(product)", aliases=["aliexpress"])
     async def taobao(self, ctx: commands.Context, *, product):
         response = await self.bot.http.session.get("https://pl.aliexpress.com/wholesale?SearchText=" + urllib.parse.quote_plus(product))
         soup = BeautifulSoup(await response.content.read(), "lxml")
@@ -401,25 +401,25 @@ class Fun(commands.Cog):
 
         random_product = random.choice(item_list)
 
-        await ctx.reply(f"\"{random_product['title']['displayTitle']}\"\nhttps://aliexpress.com/item/{random_product['productId']}.html\n\n*z aliexpress.com*")
+        await ctx.reply(f"\"{random_product['title']['displayTitle']}\"\nhttps://aliexpress.com/item/{random_product['productId']}.html\n\n*from aliexpress.com*")
 
-    @commands.command(description="shopee wyszukiwarka", usage="(produkt)", aliases=["shopenis", "fakeali", "alisexpress"])
-    async def shopee(self, ctx: commands.Context, *, product):
-        response = (await (await self.bot.http.session.get("https://shopee.pl/api/v4/search/search_items?by=relevancy&keyword=" + urllib.parse.quote_plus(product) + "&limit=60&newest=0&order=desc&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2")).json())["items"]
+    # @commands.command(description="shopee wyszukiwarka", usage="(produkt)", aliases=["shopenis", "fakeali", "alisexpress"])
+    # async def shopee(self, ctx: commands.Context, *, product):
+    #     response = (await (await self.bot.http.session.get("https://shopee.pl/api/v4/search/search_items?by=relevancy&keyword=" + urllib.parse.quote_plus(product) + "&limit=60&newest=0&order=desc&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2")).json())["items"]
 
-        if len(response) == 0:
-            return await ctx.reply("Nie ma takiego produktu :cry:")
+    #     if len(response) == 0:
+    #         return await ctx.reply("Nie ma takiego produktu :cry:")
 
-        random_product = random.choice(response)['item_basic']
+    #     random_product = random.choice(response)['item_basic']
 
-        embed = femcord.Embed(title=f"{str(format(random_product['price'] / 100000, '.2f'))}PLN | {random_product['name']}", url=f"https://shopee.pl/{random_product['name'].replace(' ', '-')}-i.{random_product['shopid']}.{random_product['itemid']}")
-        embed.set_thumbnail(url=f"https://cf.shopee.pl/file/{random_product['image']}")
-        embed.set_author(name="shopee.pl")
-        embed.set_footer(text="Your preferred online shopping platform.")
+    #     embed = femcord.Embed(title=f"{str(format(random_product['price'] / 100000, '.2f'))}PLN | {random_product['name']}", url=f"https://shopee.pl/{random_product['name'].replace(' ', '-')}-i.{random_product['shopid']}.{random_product['itemid']}")
+    #     embed.set_thumbnail(url=f"https://cf.shopee.pl/file/{random_product['image']}")
+    #     embed.set_author(name="shopee.pl")
+    #     embed.set_footer(text="Your preferred online shopping platform.")
 
-        await ctx.reply(f"\"{random_product['name']}\"\nhttps://shopee.pl/{random_product['name'].replace(' ', '-')}-i.{random_product['shopid']}.{random_product['itemid']} *z shopee.pl*", embed=embed)
+    #     await ctx.reply(f"\"{random_product['name']}\"\nhttps://shopee.pl/{random_product['name'].replace(' ', '-')}-i.{random_product['shopid']}.{random_product['itemid']} *z shopee.pl*", embed=embed)
 
-    @commands.command(description="losowa tapeta z tapetus.pl", aliases=["tapeta"])
+    @commands.command(description="Random wallpaper from tapetus.pl", aliases=["tapeta"])
     async def tapetus(self, ctx: commands.Context):
         response = await self.bot.http.session.get(f"https://tapetus.pl/,st_{random.randint(0, 5527)}.php")
         soup = BeautifulSoup(await response.content.read(), "lxml")
@@ -429,7 +429,7 @@ class Fun(commands.Cog):
 
         await ctx.reply("https://tapetus.pl/obrazki/n/" + image["href"][:-3].replace(",", "_") + "jpg")
 
-    @commands.command(description="Pokazuje informacje o użytkowniku", usage="[użytkownik]", aliases=["ui", "user", "cotozacwel", "kimtykurwajestes"])
+    @commands.command(description="Shows information about user", usage="[user]", aliases=["ui", "user", "cotozacwel", "kimtykurwajestes"])
     async def userinfo(self, ctx: commands.Context, user: Union[types.Member, types.User] = None):
         user = user or ctx.member
 
@@ -446,16 +446,16 @@ class Fun(commands.Cog):
             if member.hoisted_role is not None:
                 color = member.hoisted_role.color
 
-        embed = femcord.Embed(title=f"Informacje o {user.username}:", color=color)
+        embed = femcord.Embed(title=f"Information about {user.global_name or user.username}:", color=color)
         embed.set_thumbnail(url=user.avatar_url)
 
         embed.add_field(name="ID:", value=user.id)
-        embed.add_field(name="Nazwa użytkownika z tagiem:", value=str(user))
+        embed.add_field(name="Username:", value=user.username)
         if member is not None:
             if member.nick is not None:
-                embed.add_field(name="Nick na serwerze:", value=member.nick)
+                embed.add_field(name="Nickname:", value=member.nick)
             if member.roles[1:]:
-                embed.add_field(name="Role:", value=" ".join(types.m @ role for role in member.roles[1:]))
+                embed.add_field(name="Roles:", value=" ".join(types.m @ role for role in member.roles[1:]))
             if member.presence:
                 text = ""
                 client_status = member.presence.client_status
@@ -475,15 +475,18 @@ class Fun(commands.Cog):
                         break
                 if text:
                     embed.add_field(name="Status:", value=text)
-            embed.add_field(name="Dołączył na serwer:", value=f"{femcord.types.t @ member.joined_at} ({femcord.types.t['R'] @ member.joined_at})")
-        embed.add_field(name="Utworzył konto:" if not user.bot else "Stworzony dnia:", value=f"{femcord.types.t @ user.created_at} ({femcord.types.t['R'] @ user.created_at})")
+            embed.add_field(name="Date joined:", value=f"{femcord.types.t @ member.joined_at} ({femcord.types.t['R'] @ member.joined_at})")
+        embed.add_field(name="Date created:", value=f"{femcord.types.t @ user.created_at} ({femcord.types.t['R'] @ user.created_at})")
         if user.public_flags:
-            embed.add_field(name="Odznaki:", value=" ".join(f"<:{flag.name}:{self.public_flags_emojis[flag.name]}>" for flag in user.public_flags if flag.name in self.public_flags_emojis))
-        embed.add_field(name="Zdjęcie profilowe:", value=f"[link]({user.avatar_url})")
+            embed.add_field(name="Badges:", value=" ".join(f"<:{flag.name}:{self.public_flags_emojis[flag.name]}>" for flag in user.public_flags if flag.name in self.public_flags_emojis))
+        embed.add_field(name="Avatar:", value=f"[link]({user.avatar_url})")
         if user.bot is True:
             link = f"https://discord.com/oauth2/authorize?client_id={user.id}&permissions=0&scope=bot"
 
-            data = await self.bot.http.request(Route("GET", "applications", user.id, "rpc"))
+            try:
+                data = await self.bot.http.request(Route("GET", "applications", user.id, "rpc"))
+            except femcord.errors.HTTPException:
+                data = {"flags": 0, "description": None}
 
             intents = []
 
@@ -494,7 +497,7 @@ class Fun(commands.Cog):
             if data["flags"] & 1 << 18:
                 intents.append(Intents.GUILD_MESSAGES)
             if data["flags"] & 1 << 23:
-                embed.add_field(name="Odznaki:", value=f"<:APPLICATION_COMMAND_BADGE:{self.APPLICATION_COMMAND_BADGE}>")
+                embed.add_field(name="Badges:", value=f"<:APPLICATION_COMMAND_BADGE:{self.APPLICATION_COMMAND_BADGE}>")
 
             if data["description"]:
                 embed.description = data["description"]
@@ -502,17 +505,17 @@ class Fun(commands.Cog):
                 guild_data = await self.bot.http.request(Route("GET", "guilds", data["guild_id"], "widget.json"))
 
                 if "code" not in guild_data:
-                    embed.add_field(name="Serwer:", value=f"{guild_data['name']} ({guild_data['id']})")
+                    embed.add_field(name="Guild:", value=f"{guild_data['name']} ({guild_data['id']})")
             if "terms_of_service_url" in data:
                 embed.add_field(name="ToS:", value=data["terms_of_service_url"])
             if "privacy_policy_url" in data:
-                embed.add_field(name="Polityka prywatności:", value=data["privacy_policy_url"])
+                embed.add_field(name="Privacy Policy:", value=data["privacy_policy_url"])
             if "tags" in data:
-                embed.add_field(name="Tagi:", value=", ".join(data["tags"]))
+                embed.add_field(name="Tags:", value=", ".join(data["tags"]))
             if intents:
-                embed.add_field(name="Intenty:", value=", ".join([intent.name for intent in intents]))
+                embed.add_field(name="Intents:", value=", ".join([intent.name for intent in intents]))
             if "install_params" in data:
-                embed.add_field(name="Uprawnienia:", value=", ".join([permission.name for permission in Permissions.from_int(int(data["install_params"]["permissions"])).permissions]))
+                embed.add_field(name="Permissions:", value=", ".join([permission.name for permission in Permissions.from_int(int(data["install_params"]["permissions"])).permissions]))
                 link = f"https://discord.com/oauth2/authorize?client_id={user.id}&permissions={data['install_params']['permissions']}&scope={'%20'.join(data['install_params']['scopes'])}"
 
         args = []
@@ -521,38 +524,38 @@ class Fun(commands.Cog):
         if member is not None:
             args.append(types.m @ user)
         if user.bot is True:
-            kwargs["components"] = femcord.Components(femcord.Row(femcord.Button("Dodaj bota", url=link)))
+            kwargs["components"] = femcord.Components(femcord.Row(femcord.Button("Invite bot", url=link)))
 
         await ctx.reply(*args, embed=embed, **kwargs)
 
-    @commands.command(description="Pokazuje informacje o serwerze", aliases=["si"])
+    @commands.command(description="Shows information about the guild", aliases=["si"])
     async def serverinfo(self, ctx: commands.Context):
-        embed = femcord.Embed(title=f"Informacje o {ctx.guild.name}:", color=self.bot.embed_color)
+        embed = femcord.Embed(title=f"Information about {ctx.guild.name}:", color=self.bot.embed_color)
         embed.set_thumbnail(url=ctx.guild.icon_url)
 
-        embed.add_field(name="Właściciel:", value=types.m @ ctx.guild.owner)
+        embed.add_field(name="Owner:", value=types.m @ ctx.guild.owner)
         embed.add_field(name="ID:", value=ctx.guild.id)
-        embed.add_field(name="Użytkownicy:", value=len(ctx.guild.members), inline=True)
-        embed.add_field(name="Kanały:", value=len(ctx.guild.channels), inline=True)
-        embed.add_field(name="Role:", value=len(ctx.guild.roles), inline=True)
-        embed.add_field(name="Emotki:", value=len(ctx.guild.emojis), inline=True)
-        embed.add_field(name="Naklejki:", value=len(ctx.guild.stickers), inline=True)
+        embed.add_field(name="Users:", value=len(ctx.guild.members), inline=True)
+        embed.add_field(name="Channels:", value=len(ctx.guild.channels), inline=True)
+        embed.add_field(name="Roles:", value=len(ctx.guild.roles), inline=True)
+        embed.add_field(name="Emojis:", value=len(ctx.guild.emojis), inline=True)
+        embed.add_field(name="Stickers:", value=len(ctx.guild.stickers), inline=True)
         embed.add_blank_field()
-        embed.add_field(name="Został stworzony:", value=f"{femcord.types.t @ ctx.guild.created_at} ({femcord.types.t['R'] @ ctx.guild.created_at})")
-        embed.add_field(name="Ulepszenia:", value=ctx.guild.premium_subscription_count, inline=True)
-        embed.add_field(name="Poziom:", value=ctx.guild.premium_tier, inline=True)
+        embed.add_field(name="Date created:", value=f"{femcord.types.t @ ctx.guild.created_at} ({femcord.types.t['R'] @ ctx.guild.created_at})")
+        embed.add_field(name="Boosts:", value=ctx.guild.premium_subscription_count, inline=True)
+        embed.add_field(name="Level:", value=ctx.guild.premium_tier, inline=True)
         embed.add_blank_field()
         if ctx.guild.vanity_url is not None:
-            embed.add_field(name="Własne zaproszenie:", value="discord.gg/" + ctx.guild.vanity_url, inline=ctx.guild.banner is None)
-        embed.add_field(name="Ikona:", value=f"[link]({ctx.guild.icon_url})", inline=True)
+            embed.add_field(name="Custom url:", value="discord.gg/" + ctx.guild.vanity_url, inline=ctx.guild.banner is None)
+        embed.add_field(name="Icon:", value=f"[link]({ctx.guild.icon_url})", inline=True)
         if ctx.guild.banner is not None:
-            embed.add_field(name="Baner:", value=f"[link]({ctx.guild.banner_url})", inline=True)
+            embed.add_field(name="Banner:", value=f"[link]({ctx.guild.banner_url})", inline=True)
             embed.set_image(url=ctx.guild.banner_url)
             embed.add_blank_field()
 
         await ctx.reply(embed=embed)
 
-    @commands.command(description="Pokazuje informacje o zaproszeniu", usage="(zaproszenie)", aliases=["ii"])
+    @commands.command(description="Shows information about invite", usage="(invite)", aliases=["ii"])
     async def inviteinfo(self, ctx: commands.Context, invite):
         invite = invite.split("/")[-1]
 
@@ -560,21 +563,21 @@ class Fun(commands.Cog):
             data = await self.bot.http.request(Route("GET", "invites", invite + "?with_counts=true"))
             guild = data["guild"]
         except HTTPException:
-            return await ctx.reply("Takie zaproszenie nie istnieje")
+            return await ctx.reply("This invite does not exists")
 
-        embed = femcord.Embed(title=f"Informacje o {invite}:", color=self.bot.embed_color)
+        embed = femcord.Embed(title=f"Information about {invite}:", color=self.bot.embed_color)
 
         embed.add_field(name="ID:", value=guild["id"])
-        embed.add_field(name="Nazwa:", value=guild["name"])
+        embed.add_field(name="Name:", value=guild["name"])
         if guild["description"] is not None:
-            embed.add_field(name="Opis:", value=guild["description"])
-        embed.add_field(name="Ulepszenia:", value=guild["premium_subscription_count"])
+            embed.add_field(name="Description:", value=guild["description"])
+        embed.add_field(name="Boosts:", value=guild["premium_subscription_count"])
         if guild["nsfw_level"] > 0:
-            embed.add_field(name="Poziom NSFW:", value=guild["nsfw_level"])
-        embed.add_field(name="Przybliżona liczba użytkowników:", value=data["approximate_member_count"])
+            embed.add_field(name="NSFW Level:", value=guild["nsfw_level"])
+        embed.add_field(name="Approximate member count:", value=data["approximate_member_count"])
         if guild["icon"] is not None:
             embed.set_thumbnail(url=f"https://cdn.discordapp.com/icons/{guild['id']}/{guild['icon']}.png")
-            embed.add_field(name="Ikona:", value=f"[link](https://cdn.discordapp.com/icons/{guild['id']}/{guild['icon']}.png)", inline=True)
+            embed.add_field(name="Icon:", value=f"[link](https://cdn.discordapp.com/icons/{guild['id']}/{guild['icon']}.png)", inline=True)
         if guild["banner"] is not None:
             embed.set_image(url=f"https://cdn.discordapp.com/banners/{guild['id']}/{guild['banner']}.png")
             embed.add_field(name="Banner:", value=f"[link](https://cdn.discordapp.com/banners/{guild['id']}/{guild['banner']}.png)", inline=True)
@@ -583,7 +586,7 @@ class Fun(commands.Cog):
 
         await ctx.reply(embed=embed)
 
-    @commands.command(description="Informacje o koncie TruckersMP", usage="(nazwa)", aliases=["tmp", "ets2", "ets"], other={"embed": femcord.Embed(description="\nNazwa: `steamid64`, `nazwa steam`")})
+    @commands.command(description="Information about TruckersMP account", usage="(name)", aliases=["tmp", "ets2", "ets"], other={"embed": femcord.Embed(description="\nName: `steamid64`, `steam name`")})
     async def truckersmp(self, ctx: commands.Context, *, _id):
         if not re.match(r"^\d+$", _id):
             response = await self.bot.http.session.get("https://steamcommunity.com/id/" + _id, headers={"User-Agent": self.bot.user_agent})
@@ -592,29 +595,29 @@ class Fun(commands.Cog):
                 soup = BeautifulSoup(await response.content.read(), "lxml")
                 _id = json.loads(soup.find_all("script", {"type": "text/javascript"}, text=re.compile("g_rgProfileData"))[0].string.splitlines()[1][20:-1])["steamid"]
             except json.decoder.JSONDecodeError:
-                return await ctx.reply("Nie znaleziono takiego konta steam")
+                return await ctx.reply("No such steam account was found")
 
         response = await self.bot.http.session.get("https://api.truckersmp.com/v2/player/" + _id)
         response = await response.json()
 
         if response["error"]:
-            return await ctx.reply("Nie znaleziono takiego konta TruckersMP")
+            return await ctx.reply("No such TruckersMP account was found")
 
         response = response["response"]
 
         embed = femcord.Embed(title=f"Informacje o {response['name']}:", color=self.bot.embed_color)
         embed.set_thumbnail(url=response["avatar"])
         embed.add_field(name="ID:", value=response["id"])
-        embed.add_field(name="ID Steam64:", value=response["steamID64"])
+        embed.add_field(name="Steam64 ID:", value=response["steamID64"])
         embed.add_field(name="Nick:", value=response["name"])
-        embed.add_field(name="Utworzył konto:", value=femcord.types.t @ datetime.strptime(response["joinDate"], "%Y-%m-%d %H:%M:%S"))
+        embed.add_field(name="Created date:", value=femcord.types.t @ datetime.strptime(response["joinDate"], "%Y-%m-%d %H:%M:%S"))
         if response["banned"]:
-            embed.add_field(name="Zbanowany:", value="Tak")
+            embed.add_field(name="Banned:", value="Yes")
         if response["patreon"]["isPatron"]:
-            embed.add_field(name="Supporter Patreon:", value="Tak")
+            embed.add_field(name="Patreon support:", value="Yes")
         if response["vtc"]["inVTC"]:
-            embed.add_field(name="Nazwa firmy:", value=response["vtc"]["name"])
-            embed.add_field(name="Tag firmy:", value=response["vtc"]["tag"])
+            embed.add_field(name="Company name:", value=response["vtc"]["name"])
+            embed.add_field(name="Company tags:", value=response["vtc"]["tag"])
 
         await ctx.reply(embed=embed)
 
@@ -624,35 +627,35 @@ class Fun(commands.Cog):
         soup = BeautifulSoup(await response.content.read(), "lxml")
         text = soup.find_all(tag, attributes)
 
-        if not text:
-            return "Nie znaleziono takiego słowa"
+        if text is None:
+            return "No such word was found"
 
         text = text[0].get_text()
 
         return f"**{word}**\n{re.findall(expression, text)[-1]}\n*z <{url.replace(' ', '%20')}>*"
 
-    @commands.group(description="Słownik", aliases=["definition", "word", "dict", "def"])
+    @commands.group(description="Dictionary", aliases=["definition", "word", "dict", "def"])
     async def dictionary(self, ctx: commands.Context):
         pass
 
-    @dictionary.command(usage="(słowo)", aliases=["pl"])
+    @dictionary.command(usage="(word)", aliases=["pl"])
     async def polish(self, ctx: commands.Context, *, word):
         await ctx.reply(await self.fetch(word, "https://sjp.pwn.pl/szukaj/" + word + ".html", "div", {"class": "znacz"}, r"[\w,. ]+"))
 
-    @dictionary.command(usage="(słowo)", aliases=["en"])
+    @dictionary.command(usage="(word)", aliases=["en"])
     async def english(self, ctx: commands.Context, *, word):
         await ctx.reply(await self.fetch(word, "https://dictionary.cambridge.org/pl/dictionary/english/" + word, "div", {"class": "def"}, r"[\w,. ]+"))
 
-    @dictionary.command(usage="(słowo)", aliases=["es"])
+    @dictionary.command(usage="(word)", aliases=["es"])
     async def spanish(self, ctx: commands.Context, *, word):
         await ctx.reply(await self.fetch(word, "https://dictionary.cambridge.org/pl/dictionary/spanish-english/" + word, "div", {"class": "def"}, r"[\w,. ]+"))
 
-    @dictionary.command(usage="(słowo)")
+    @dictionary.command(usage="(word)")
     @commands.is_nsfw
     async def urban(self, ctx: commands.Context, *, word):
         await ctx.reply(await self.fetch(word, "https://www.urbandictionary.com/define.php?term=" + word, "div", {"class": "meaning"}, r".+"))
 
-    @commands.command(description="Informacje o memie z KnowYourMeme", usage="(nazwa)", aliases=["kym", "meme"])
+    @commands.command(description="Information about meme from KnowYourMeme", usage="(name)", aliases=["kym", "meme"])
     @commands.is_nsfw
     async def knowyourmeme(self, ctx: commands.Context, *, name):
         async with ClientSession() as session:
@@ -660,7 +663,7 @@ class Fun(commands.Cog):
                 data = await response.json()
 
                 if not data["results"]:
-                    return await ctx.reply("Nie znaleziono takiego mema")
+                    return await ctx.reply("No such meme was found")
 
                 async with session.get("https://knowyourmeme.com" + data["results"][0]["url"]) as response:
                     content = await response.content.read()
@@ -669,45 +672,45 @@ class Fun(commands.Cog):
                     text: ResultSet = soup.find_all("section", {"class": "bodycopy"})[0]
                     about = text.find("h2", {"id": "about"}).find_next("p").get_text()
 
-                    await ctx.reply(f"**Informacje o {urllib.parse.unquote(data['results'][0]['name'])}**\n\n{about}\n\n*z <https://knowyourmeme.com{data['results'][0]['url']}>*")
+                    await ctx.reply(f"**Information about {urllib.parse.unquote(data['results'][0]['name'])}**\n\n{about}\n\n*z <https://knowyourmeme.com{data['results'][0]['url']}>*")
 
-    @commands.command(description="Informacje o użytkowniku GitHub", usage="(nazwa użytkownika)", aliases=["gh"])
+    @commands.command(description="Information about gihub account", usage="(user_name)", aliases=["gh"])
     async def github(self, ctx: commands.Context, *, name):
         async with ClientSession() as session:
             async with session.get(f"https://api.github.com/users/{name}") as response:
                 if not response.status == 200:
-                    return await ctx.reply("Nie znaleziono takiego użytkownika")
+                    return await ctx.reply("No such github account was found")
 
                 data = await response.json()
 
-                embed = femcord.Embed(title=f"Informacje o {data['login']}:", color=self.bot.embed_color)
+                embed = femcord.Embed(title=f"Information about {data['login']}:", color=self.bot.embed_color)
                 embed.add_field(name="ID:", value=data["id"], inline=True)
-                embed.add_field(name="Nazwa:", value=data["name"], inline=True)
+                embed.add_field(name="Name:", value=data["name"], inline=True)
                 embed.add_blank_field()
                 if data["avatar_url"]:
                     embed.set_thumbnail(url=data["avatar_url"])
-                embed.add_field(name="Liczba obserwujących:", value=data["followers"], inline=True)
-                embed.add_field(name="Liczba obserwowanych:", value=data["following"], inline=True)
+                embed.add_field(name="Followers count:", value=data["followers"], inline=True)
+                embed.add_field(name="Following count:", value=data["following"], inline=True)
                 embed.add_blank_field()
-                embed.add_field(name="Liczba publicznych repozytoriów:", value=data["public_repos"], inline=True)
-                embed.add_field(name="Liczba publicznych gistów:", value=data["public_gists"], inline=True)
+                embed.add_field(name="Public repositories count:", value=data["public_repos"], inline=True)
+                embed.add_field(name="Public gists count:", value=data["public_gists"], inline=True)
                 embed.add_blank_field()
-                embed.add_field(name="Utworzył konto:", value=femcord.types.t @ datetime.strptime(data["created_at"], "%Y-%m-%dT%H:%M:%SZ"), inline=True)
-                embed.add_field(name="Ostatnia aktualizacja:", value=femcord.types.t @ datetime.strptime(data["updated_at"], "%Y-%m-%dT%H:%M:%SZ"), inline=True)
+                embed.add_field(name="Created date:", value=femcord.types.t @ datetime.strptime(data["created_at"], "%Y-%m-%dT%H:%M:%SZ"), inline=True)
+                embed.add_field(name="Last update:", value=femcord.types.t @ datetime.strptime(data["updated_at"], "%Y-%m-%dT%H:%M:%SZ"), inline=True)
                 embed.add_blank_field()
                 if data["bio"]:
                     embed.add_field(name="Bio:", value=data["bio"])
 
                 await ctx.reply(embed=embed)
 
-    @commands.command(description="zgadnij kto to", aliases=["ktoto", "coto"])
+    @commands.command(description="guess who it is")
     async def who(self, ctx: commands.Context):
         members = []
 
         members_with_pfp = [member for member in ctx.guild.members if member.user.avatar]
 
         if len(members_with_pfp) < 10:
-            return await ctx.reply("Na tym serwerze nie ma wymaganej ilości użytkowników z avatarem")
+            return await ctx.reply("There is not enough users with avatar on this server")
 
         while not len(members) == 10:
             member = random.choice(members_with_pfp)
@@ -722,7 +725,7 @@ class Fun(commands.Cog):
         if correct.hoisted_role is not None:
             color = correct.hoisted_role.color
 
-        embed = femcord.Embed(title="Zgadnij kto to:", color=color)
+        embed = femcord.Embed(title="Guess who it is:", color=color)
         embed.set_image(url=correct.user.avatar_url)
 
         def get_components():
@@ -730,7 +733,7 @@ class Fun(commands.Cog):
                 femcord.Row(
                     femcord.SelectMenu(
                         custom_id = "members",
-                        placeholder = "Wybierz użytkownika",
+                        placeholder = "Choose a member",
                         options = [
                             femcord.Option(member.user.username, member.user.id) for member in members
                         ]
@@ -746,20 +749,20 @@ class Fun(commands.Cog):
             selected_member = members[get_index(members, interaction.data.values[0], key=lambda member: member.user.id)]
 
             if selected_member == correct:
-                return await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, f"{types.m @ interaction.member} zgadł!", embeds=[], components={})
+                return await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, f"{types.m @ interaction.member} guessed!", embeds=[], components={})
             elif len(members) == 4:
-                return await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, "Nie udało sie nikomu zgadnąć", embeds=[], components={})
+                return await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, "No one guessed", embeds=[], components={})
             else:
                 members.remove(selected_member)
                 await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=get_components())
                 await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60 * 5, on_timeout=on_timeout)
 
         async def on_timeout():
-            await message.edit("Nie udało się nikomu zgadnąć", embeds=[], components=[])
+            await message.edit("No one guessed", embeds=[], components=[])
 
         await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60 * 5, on_timeout=on_timeout)
 
-    @commands.command(description="losowy nick")
+    @commands.command(description="Random nickname")
     async def nick(self, ctx):
         await ctx.reply(get_random_username())
 

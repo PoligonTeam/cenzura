@@ -16,7 +16,7 @@ limitations under the License.
 
 import femcord
 from femcord import commands
-import socket
+import socket, aiohttp
 
 class SmartHome(commands.Cog):
     hidden = True
@@ -24,31 +24,78 @@ class SmartHome(commands.Cog):
     def __init__(self, bot):
         self.bot: commands.Bot = bot
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.address = "192.168.100.67", 8317
+        self.address = "192.168.100.4", 8080
+
+    @commands.group()
+    @commands.is_owner
+    async def leds(self, ctx):
+        cog = self.bot.get_cog(ctx.command.cog.name)
+        embed = cog.get_help_embed(ctx.command)
+
+        await ctx.reply(embed=embed)
+
+    @leds.command()
+    @commands.is_owner
+    async def on(self, ctx):
+        self.socket.sendto(bytearray([0x7e, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0xef]), self.address)
+
+        await ctx.reply("ok")
+
+    @leds.command()
+    @commands.is_owner
+    async def off(self, ctx):
+        self.socket.sendto(bytearray([0x7e, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0xef]), self.address)
+
+        await ctx.reply("ok")
+
+    @leds.command()
+    async def color(self, ctx, r, g = None, b = None):
+        if g is not None and b is None:
+            return await ctx.reply("You did not provide 'b' argument")
+
+        if g is None:
+            if r[0] == "#":
+                r = r[1:]
+            r, g, b = [int(r[x:x+2], 16) for x in (0, 2, 4)]
+
+        if r is not None and g is not None and b is not None:
+            r, g, b = [int(x) for x in (r, g, b)]
+
+        self.socket.sendto(bytearray([0x7e, 0x00, 0x05, 0x03, r, g, b, 0x00, 0xef]), self.address)
+
+        await ctx.reply("ok")
 
     @commands.command()
     @commands.is_owner
     async def mute(self, ctx):
-        self.socket.sendto(b"\x01\x00", self.address)
-        await ctx.reply("zmutowano czubixa")
+        async with aiohttp.ClientSession() as session:
+            await session.get("http://192.168.100.67:8080/apps/discord/mute")
+
+        await ctx.reply("ok")
 
     @commands.command()
     @commands.is_owner
     async def unmute(self, ctx):
-        self.socket.sendto(b"\x00\x00", self.address)
-        await ctx.reply("odmutowano czubixa")
+        async with aiohttp.ClientSession() as session:
+            await session.get("http://192.168.100.67:8080/apps/discord/unmute")
+
+        await ctx.reply("ok")
 
     @commands.command()
     @commands.is_owner
-    async def deafen(self, ctx):
-        self.socket.sendto(b"\x00\x01", self.address)
-        await ctx.reply("zmutowano czubixa")
+    async def deaf(self, ctx):
+        async with aiohttp.ClientSession() as session:
+            await session.get("http://192.168.100.67:8080/apps/discord/deaf")
+
+        await ctx.reply("ok")
 
     @commands.command()
     @commands.is_owner
-    async def undeafen(self, ctx):
-        self.socket.sendto(b"\x00\x00", self.address)
-        await ctx.reply("odmutowano czubixa")
+    async def undeaf(self, ctx):
+        async with aiohttp.ClientSession() as session:
+            await session.get("http://192.168.100.6:8080/apps/discord/undeaf")
+
+        await ctx.reply("ok")
 
 def setup(bot):
     bot.load_cog(SmartHome(bot))

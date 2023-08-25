@@ -60,17 +60,51 @@ class TrackInfo:
     is_stream: bool
     title: str
     source_name: str
+    position: int = None
     uri: str = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "TrackInfo":
+        data["is_seekable"] = data.pop("isSeekable"),
+        data["artist"] = data.pop("author"),
+        data["is_stream"] = data.pop("isStream"),
+        data["source_name"] = data.pop("sourceName"),
+
+        return cls(**data)
 
 @dataclass
 class Track:
     encoded: str
     info: TrackInfo
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "Track":
+        data["info"] = TrackInfo.from_dict(data["info"])
+        del data["track"]
+
+        return cls(**data)
+
+@dataclass
+class VoiceStateEvent:
+    token: str
+    guild_id: str
+    endpoint: str
+
+    def to_dict(self) -> dict:
+        return {
+            "token": self.token,
+            "guildId": self.guild_id,
+            "endpoint": self.endpoint
+        }
+
 @dataclass
 class VoiceState:
-    token: str
-    endpoint: str
-    session_id: str
-    connected: bool
-    ping: int
+    session_id: str = None
+    event: VoiceStateEvent = None
+
+    def __post_init__(self) -> None:
+        if self.event:
+            self.event = VoiceStateEvent(**self.event)
+
+    def clear(self) -> None:
+        self.__init__()

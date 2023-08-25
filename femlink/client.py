@@ -15,22 +15,30 @@ limitations under the License.
 """
 
 import asyncio, aiohttp, json
-from .models import *
 from enum import Enum
 from typing import List
+from .models import *
 
 class Opcodes(Enum):
-    PLAYER_UPDATE = "playerUpdate"
-    VOICE_UPDATE = "voiceUpdate"
-    STATS = "stats"
     READY = "ready"
-    EVENT = "event"
     PLAY = "play"
     STOP = "stop"
     PAUSE = "pause"
     SEEK = "seek"
     VOLUME = "volume"
     FILTERS = "filters"
+    DESTROY = "destroy"
+    VOICE_UPDATE = "voiceUpdate"
+    PLAYER_UPDATE = "playerUpdate"
+    STATS = "stats"
+    EVENT = "event"
+
+class Events(Enum):
+    TRACK_START = "TrackStartEvent"
+    TRACK_END = "TrackEndEvent"
+    TRACK_EXCEPTION = "TrackExceptionEvent"
+    TRACK_STUCK = "TrackStuckEvent"
+    WEBSOCKET_CLOSED = "WebSocketClosedEvent"
 
 class Player:
     def __init__(self, client: "Client", guild_id: str):
@@ -70,6 +78,13 @@ class Player:
         return self.client.send(Opcodes.PAUSE, guildId=self.guild_id, pause=self.paused)
 
     def seek(self, position: int):
+        if position < 0:
+            raise ValueError("Position must be greater than 0")
+        elif position > self.track.length:
+            raise ValueError("Position must be less than track length")
+
+        self.position = position
+
         return self.client.send(Opcodes.SEEK, guildId=self.guild_id, position=position)
 
     def set_volume(self, volume: int):
@@ -93,13 +108,14 @@ class Client:
         await instance.__init__(*args)
         return instance
 
-    async def __init__(self, user_id: str, host: str, port: int, password: str):
+    async def __init__(self, user_id: str, host: str, port: int, password: str, _ssl: bool = False):
         self.user_id = user_id
         self.host = host
         self.port = port
         self.password = password
+        self._ssl = _ssl
         self.session_id = None
-        self._voice_state = {}
+        self._voice_state: VoiceState = VoiceState()
         self.players: List[Player] = []
 
         self.loop = asyncio.get_event_loop()
@@ -111,11 +127,11 @@ class Client:
             "Client-Name": "cenzura/1.0"
         }
 
-        self.ws = await self.session.ws_connect("ws://%s:%d/v3/websocket" % (host, port), headers=self.headers)
+        self.ws = await self.session.ws_connect("%s://%s:%d/v3/websocket" % ("wss" if self._ssl else "ws", host, port), headers=self.headers)
 
         self.receiver_task = self.loop.create_task(self.data_receiver())
 
-    def send(self, op: Opcodes, **kwargs):
+    def send(self, op: Opcodes, **kwargs) -> None:
         return self.ws.send_json({"op": op.value, **kwargs})
 
     def get_player(self, guild_id: str) -> Player:
@@ -130,19 +146,21 @@ class Client:
 
             if message.type is aiohttp.WSMsgType.text:
                 data = json.loads(message.data)
-                opcode = Opcodes(data["op"])
 
-                if opcode is Opcodes.READY:
+                op = Opcodes(data["op"])
+
+                if op == Opcodes.READY:
                     self.session_id = data["sessionId"]
 
-                elif opcode is Opcodes.PLAYER_UPDATE:
+                elif op == Opcodes.PLAYER_UPDATE:
                     player = self.get_player(data["guildId"])
                     player.position = data["state"]["position"]
 
-                elif opcode is Opcodes.EVENT:
+                elif op == Opcodes.EVENT:
                     player = self.get_player(data["guildId"])
+                    event = Events(data["type"])
 
-                    if data["type"] in ("TrackEndEvent", "TrackExceptionEvent"):
+                    if event in (Events.TRACK_END, Events.TRACK_EXCEPTION):
                         if player.loop is True:
                             await player.play(player.track)
                             continue
@@ -151,7 +169,7 @@ class Client:
                             player.track = None
                             await player.skip()
 
-                    elif data["type"] == "TrackStuckEvent":
+                    elif event == Events.TRACK_STUCK:
                         await player.play(player.track)
                         await player.seek(player.position)
 
@@ -159,34 +177,35 @@ class Client:
 
         self.receiver_task = self.loop.create_task(self.data_receiver())
 
-    async def voice_server_update(self, data):
-        self._voice_state.update({"event": data})
+    async def voice_server_update(self, data: dict) -> None:
+        self._voice_state.event = VoiceStateEvent(**data)
 
         self.players.append(Player(self, data["guild_id"]))
 
         await self.voice_update()
 
-    async def voice_state_update(self, data):
+    async def voice_state_update(self, data: dict) -> None:
         if data["user_id"] != self.user_id:
             return
 
         if data["channel_id"] is None:
             self._voice_state.clear()
-            return self.players.remove(self.get_player(data["guild_id"]))
-
-        if data["session_id"] == self._voice_state.get("sessionId"):
+            del self.players[self.get_player(data["guild_id"])]
             return
 
-        self._voice_state.update({"sessionId": data["session_id"]})
+        if data["session_id"] == self._voice_state.session_id:
+            return
+
+        self._voice_state.session_id = data["session_id"]
 
         await self.voice_update()
 
-    async def voice_update(self):
-        if "sessionId" in self._voice_state and "event" in self._voice_state:
-            await self.send(Opcodes.VOICE_UPDATE, guildId=self._voice_state["event"]["guild_id"], sessionId=self._voice_state["sessionId"], event=self._voice_state["event"])
+    async def voice_update(self) -> None:
+        if self._voice_state.event is not None:
+            await self.send(Opcodes.VOICE_UPDATE, guildId=self._voice_state.event.guild_id, sessionId=self._voice_state.session_id, event=self._voice_state.event.to_dict())
 
     async def get_tracks(self, identifier: str) -> List[Track]:
-        async with self.session.get("http://%s:%d/v3/loadtracks?identifier=%s" % (self.host, self.port, identifier), headers=self.headers) as response:
+        async with self.session.get("%s://%s:%d/v3/loadtracks?identifier=%s" % ("https" if self._ssl else "http", self.host, self.port, identifier), headers=self.headers) as response:
             data = await response.json()
             tracks = []
 
