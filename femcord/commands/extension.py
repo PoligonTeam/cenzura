@@ -99,7 +99,7 @@ class Group(Command):
 
 class Listener:
     def __init__(self, callback: Callable) -> None:
-        self.callback: Callable  = callback
+        self.callback: Callable = callback
         self.cog: Union[Cog, None] = None
         self.__name__ = callback.__name__
 

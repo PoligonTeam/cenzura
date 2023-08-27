@@ -476,7 +476,7 @@ class Music(commands.Cog):
                     if "error" in data:
                         return await ctx.reply("Nie znaleziono użytkownika LastFM")
 
-                    account_age = (datetime.datetime.now() -  datetime.timedelta(hours=2)) - datetime.datetime.fromtimestamp(int(data["user"]["registered"]["unixtime"]))
+                    account_age = (datetime.datetime.now() - datetime.timedelta(hours=2)) - datetime.datetime.fromtimestamp(int(data["user"]["registered"]["unixtime"]))
                     scrobbles = int(data["user"]["playcount"])
 
                     if not scrobbles:

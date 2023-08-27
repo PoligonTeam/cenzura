@@ -65,7 +65,7 @@ class Gateway:
         self.intents: Intents = client.intents
         self.token: str = client.token
         self.bot: bool = client.bot
-        self.ws: "WebSocket" =  None
+        self.ws: "WebSocket" = None
         self.heartbeat: Heartbeat = None
         self.latency: int = None
         self.last_latencies: List[int] = []

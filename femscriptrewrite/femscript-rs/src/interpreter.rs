@@ -238,7 +238,7 @@ pub fn execute_ast(ast: Vec<AST>, scope: &mut Scope, context: Option<Token>, dep
                                                 return Token::new_error(TokenType::Error, format!("{}", error.value(py)));
                                             }
 
-                                            Token::new_none() // TODO: konwersja na rust
+                                            to_token(py, py_result.unwrap())
                                         });
                                     } else {
                                         return Token::new_error(TokenType::TypeError, format!("{} is not defined", context.value));

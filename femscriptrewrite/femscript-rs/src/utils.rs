@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use crate::{lexer, parser};
+use crate::{lexer::{Token, TokenType}, parser::{AST, ASTType}};
 use std::str::FromStr;
 use pyo3::{prelude::*, types::PyDict, types::PyList};
 
-pub fn convert_token(py: Python, token: lexer::Token) -> &PyDict {
+pub fn convert_token(py: Python, token: Token) -> &PyDict {
     let py_token = PyDict::new(py);
     let mut list: Vec<&PyDict> = Vec::new();
 
@@ -38,15 +38,15 @@ pub fn convert_token(py: Python, token: lexer::Token) -> &PyDict {
     py_token
 }
 
-pub fn convert_to_token(py: Python, token: &PyDict) -> lexer::Token {
-    let mut list: Vec<lexer::Token> = Vec::new();
+pub fn convert_to_token(py: Python, token: &PyDict) -> Token {
+    let mut list: Vec<Token> = Vec::new();
 
     for token in token.get_item("list").unwrap().extract::<Vec<&PyDict>>().unwrap() {
         list.push(convert_to_token(py, token));
     }
 
-    lexer::Token {
-        _type: lexer::TokenType::from_str(token.get_item("type").unwrap().extract::<String>().unwrap().as_str()).unwrap(),
+    Token {
+        _type: TokenType::from_str(token.get_item("type").unwrap().extract::<String>().unwrap().as_str()).unwrap(),
         value: token.get_item("value").unwrap().extract::<String>().unwrap(),
         number: token.get_item("number").unwrap().extract::<f64>().unwrap(),
         list,
@@ -58,7 +58,7 @@ pub fn convert_to_token(py: Python, token: &PyDict) -> lexer::Token {
     }
 }
 
-pub fn convert_ast(py: Python, ast: Vec<parser::AST>) -> Vec<&PyDict> {
+pub fn convert_ast(py: Python, ast: Vec<AST>) -> Vec<&PyDict> {
     let mut py_ast = Vec::new();
 
     for node in ast {
@@ -74,12 +74,12 @@ pub fn convert_ast(py: Python, ast: Vec<parser::AST>) -> Vec<&PyDict> {
     py_ast
 }
 
-pub fn convert_to_ast(py: Python, ast: Vec<&PyDict>) -> Vec<parser::AST> {
+pub fn convert_to_ast(py: Python, ast: Vec<&PyDict>) -> Vec<AST> {
     let mut rust_ast = Vec::new();
 
     for node in ast {
-        rust_ast.push(parser::AST {
-            _type: parser::ASTType::from_str(node.get_item("type").unwrap().extract::<String>().unwrap().as_str()).unwrap(),
+        rust_ast.push(AST {
+            _type: ASTType::from_str(node.get_item("type").unwrap().extract::<String>().unwrap().as_str()).unwrap(),
             token: convert_to_token(py, node.get_item("token").unwrap().extract::<&PyDict>().unwrap()),
             children: convert_to_ast(py, node.get_item("children").unwrap().extract::<Vec<&PyDict>>().unwrap())
         });
@@ -88,12 +88,12 @@ pub fn convert_to_ast(py: Python, ast: Vec<&PyDict>) -> Vec<parser::AST> {
     rust_ast
 }
 
-pub fn to_pyobject(py: Python, token: lexer::Token) -> Py<PyAny> {
+pub fn to_pyobject(py: Python, token: Token) -> Py<PyAny> {
     match token._type {
-        lexer::TokenType::Str => token.value.into_py(py),
-        lexer::TokenType::Int => if token.number.fract() == 0.0 { (token.number as u64).into_py(py) } else { token.number.into_py(py) },
-        lexer::TokenType::Bool => if token.number == 1.0 { true } else { false }.into_py(py),
-        lexer::TokenType::List => {
+        TokenType::Str => token.value.into_py(py),
+        TokenType::Int => if token.number.fract() == 0.0 { (token.number as u64).into_py(py) } else { token.number.into_py(py) },
+        TokenType::Bool => if token.number == 1.0 { true } else { false }.into_py(py),
+        TokenType::List => {
             let mut list = Vec::new();
 
             for item in token.list {
@@ -102,12 +102,26 @@ pub fn to_pyobject(py: Python, token: lexer::Token) -> Py<PyAny> {
 
             list.into_py(py)
         },
-        lexer::TokenType::None => Python::None(py),
-        lexer::TokenType::PyObject => token.pyobject.unwrap(),
+        TokenType::None => Python::None(py),
+        TokenType::PyObject => token.pyobject.unwrap(),
         _ => unreachable!()
     }
 }
 
-// pub fn to_token(py: Python, pyobject: Py<PyAny>) -> lexer::Token {
+pub fn to_token(py: Python, pyobject: Py<PyAny>) -> Token {
+    if pyobject.is_none(py) {
+        return Token::new_none();
+    }
 
-// }
+    if let Ok(value) = pyobject.extract::<String>(py) {
+        Token::new_string(value)
+    } else if let Ok(value) = pyobject.extract::<bool>(py) {
+        Token::new_bool(if value == true { "true" } else { "false" }.to_string())
+    } else if let Ok(number) = pyobject.extract::<f64>(py) {
+        Token::new_int(number)
+    } else if let Ok(list) = pyobject.extract::<Vec<Py<PyAny>>>(py) {
+        Token::new_list(list.into_iter().map(|item| to_token(py, item)).collect())
+    } else {
+        Token::new_pyobject(pyobject)
+    }
+}

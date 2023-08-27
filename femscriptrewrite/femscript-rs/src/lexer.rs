@@ -180,6 +180,26 @@ impl Token {
             pyobject: None
         }
     }
+
+    pub fn new_list(list: Vec<Token>) -> Self {
+        Self {
+            _type: TokenType::List,
+            value: String::new(),
+            number: 0.0,
+            list,
+            pyobject: None
+        }
+    }
+
+    pub fn new_pyobject(pyobject: Py<PyAny>) -> Self {
+        Self {
+            _type: TokenType::PyObject,
+            value: String::new(),
+            number: 0.0,
+            list: Vec::new(),
+            pyobject: Some(pyobject)
+        }
+    }
 }
 
 pub fn generate_tokens(code: &str) -> Vec<Token> {

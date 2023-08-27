@@ -110,7 +110,7 @@ class ApiClient:
             if isinstance(e, aiohttp.ClientConnectorError):
                 raise ApiError(self.error_map["api_down"], url)
             elif isinstance(e, aiohttp.ClientPayloadError):
-                raise ApiError(self.error_map["invalid_payload∑"], url)
+                raise ApiError(self.error_map["invalid_payload"], url)
 
             raise ApiError(self.error_map["unexpected_status"], url)
 
