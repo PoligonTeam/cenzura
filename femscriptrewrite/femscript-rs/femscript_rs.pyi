@@ -5,6 +5,7 @@ class Token(TypedDict):
     value: str
     number: float
     list: List[Token]
+    scope: Optional[List[Variable]]
     pyobject: Optional[object]
 
 class AST(TypedDict):
@@ -15,7 +16,6 @@ class AST(TypedDict):
 class Variable(TypedDict):
     name: str
     value: Token
-    variables: List[Variable]
 
 class Function(TypedDict):
     name: str
@@ -27,5 +27,5 @@ def generate_tokens(code: str) -> List[Token]:
 def generate_ast(tokens: List[Token]) -> List[AST]:
     pass
 
-def execute_ast(ast: List[AST], variables: List[Variable], functions: List[Function]) -> None:
+def execute_ast(ast: List[AST], variables: List[Variable], functions: List[Function], debug: bool) -> Token:
     pass

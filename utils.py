@@ -16,13 +16,34 @@ limitations under the License.
 
 import femcord
 from femcord import types
-from femscript import Dict, List
 from aiohttp import ClientSession, ClientTimeout
 from models import Artists, Guilds, LastFM, Lyrics
 from config import LASTFM_API_URL, LASTFM_API_KEY
 from lastfm import Client, Track, exceptions
 from lyrics import GeniusClient, MusixmatchClient, TrackNotFound, LyricsNotFound, Lyrics as LyricsTrack
 import asyncio, config, random, json
+
+class fg:
+    black = "\u001b[30m"
+    red = "\u001b[31m"
+    green = "\u001b[32m"
+    yellow = "\u001b[33m"
+    blue = "\u001b[34m"
+    magenta = "\u001b[35m"
+    cyan = "\u001b[36m"
+    white = "\u001b[37m"
+    reset = "\u001b[0m"
+
+class bg:
+    black = "\u001b[40m"
+    red = "\u001b[41m"
+    green = "\u001b[42m"
+    yellow = "\u001b[43m"
+    blue = "\u001b[44m"
+    magenta = "\u001b[45m"
+    cyan = "\u001b[46m"
+    white = "\u001b[47m"
+    reset = "\u001b[0m"
 
 CHARS = (("\u200b", ("0", "1", "2", "3")), ("\u200c", ("4", "5", "6", "7")), ("\u200d", ("8", "9", "A", "B")), ("\u200e", ("C", "D", "E", "F")))
 SEPARATOR = "\u200f"
@@ -119,13 +140,13 @@ async def get_track_lyrics(artist: str, title: str, session: ClientSession):
 
 def convert(**items):
     objects = {
-        types.Guild: lambda guild: Dict(
+        types.Guild: lambda guild: dict(
             id = guild.id,
             name = guild.name,
             description = guild.description or False,
             icon_url = guild.icon_url or False,
             banner_url = guild.banner_url or False,
-            owner = Dict(
+            owner = dict(
                 id = guild.owner.user.id,
                 username = guild.owner.user.username,
                 avatar_url = guild.owner.user.avatar_url or False,
@@ -137,14 +158,14 @@ def convert(**items):
             emojis = len(guild.emojis),
             stickers = len(guild.stickers)
         ),
-        types.Channel: lambda channel: Dict(
+        types.Channel: lambda channel: dict(
             id = channel.id,
             name = channel.name,
             topic = channel.topic or False,
             nsfw = channel.nsfw,
             position = channel.position
         ),
-        types.Role: lambda role: Dict(
+        types.Role: lambda role: dict(
             id = role.id,
             name = role.name,
             color = role.color,
@@ -152,58 +173,50 @@ def convert(**items):
             mentionable = role.mentionable,
             position = role.position
         ),
-        types.User: lambda user: Dict(
+        types.User: lambda user: dict(
             id = user.id,
             username = user.username,
             avatar_url = user.avatar_url,
             bot = user.bot or False
         ),
-        Track: lambda track: Dict(
-            artist = Dict(
+        Track: lambda track: dict(
+            artist = dict(
                 name = track.artist.name,
                 url = track.artist.url,
-                image = List(
-                    *(
-                        Dict(
-                            url = image.url,
-                            size = image.size
-                        ) for image in track.artist.image
-                    )
-                ),
+                image = [
+                    dict(
+                        url = image.url,
+                        size = image.size
+                    ) for image in track.artist.image
+                ],
                 streamable = track.artist.streamable,
                 on_tour = track.artist.on_tour or False,
-                stats = Dict(
+                stats = dict(
                     listeners = track.artist.stats.listeners,
                     playcount = track.artist.stats.playcount,
                     userplaycount = track.artist.stats.userplaycount
                 ),
-                similar = List(
-                    *(
-                        Dict(
-                            name = similar.name,
-                            url = similar.url,
-                            image = List(
-                                *(
-                                    Dict(
-                                        url = image.url,
-                                        size = image.size
-                                    ) for image in similar.image
-                                )
-                            )
-                        ) for similar in track.artist.similar
+                similar = [
+                    dict(
+                        name = similar.name,
+                        url = similar.url,
+                        image = [
+                            dict(
+                                url = image.url,
+                                size = image.size
+                            ) for image in similar.image
+                        ]
+                    ) for similar in track.artist.similar
+                ],
+                tags = [
+                    dict(
+                        name = tag.name,
+                        url = tag.url
                     )
-                ),
-                tags = List(
-                    *(
-                        Dict(
-                            name = tag.name,
-                            url = tag.url
-                        )
-                        for tag in track.artist.tags
-                    )
-                ),
-                bio = Dict(
-                    links = Dict(
+                    for tag in track.artist.tags
+                ],
+                bio = dict(
+                    links = dict(
                         name = track.artist.bio.links.name,
                         rel = track.artist.bio.links.rel,
                         url = track.artist.bio.links.url
@@ -213,47 +226,40 @@ def convert(**items):
                     content = track.artist.bio.content
                 )
             ),
-            image = List(
-                *(
-                    Dict(
+            image = [
+                dict(
+                    url = image.url,
+                    size = image.size
+                ) for image in track.image
+            ] if track.image else [],
+            album = dict(
+                name = track.album.name or False,
+                mbid = track.album.mbid or False,
+                image = [
+                    dict(
                         url = image.url,
                         size = image.size
                     ) for image in track.image
-                )
-            ) if track.image else List(),
-            album = Dict(
-                name = track.album.name or False,
-                mbid = track.album.mbid or False,
-                image = List(
-                    *(
-                        Dict(
-                            url = image.url,
-                            size = image.size
-                        ) for image in track.image
-                    )
-                ) if track.image else List(),
+                ] if track.image else [],
                 position = track.album.position or False
             ) if track.album else False,
             title = track.title,
             url = track.url,
-            date = Dict(
+            date = dict(
                 uts = track.date.uts,
                 text = track.date.text,
                 date = track.date.date
-
             ) if track.date else False,
             listeners = track.listeners,
             playcount = track.playcount,
             scrobbles = track.scrobbles,
-            tags = List(
-                *(
-                    Dict(
-                        name = tag.name,
-                        url = tag.url
-                    )
-                    for tag in track.tags
+            tags = [
+                dict(
+                    name = tag.name,
+                    url = tag.url
                 )
-            )
+                for tag in track.tags
+            ]
         )
     }
 
@@ -314,25 +320,20 @@ async def request(method: str, url: str, *, headers: dict = None, cookies: dict 
 
             if length is not None and length > 10 * 1024 * 1024:
                 return {
-                    "status": response.status,
+                    "status": -1,
                     "text": "Content too large",
                     "json": {}
                 }
 
             content = await response.read()
 
-            data = Dict()
+            data = {}
 
             if response.content_type == "application/json":
                 try:
                     data = json.loads(content)
                 except json.JSONDecodeError:
                     data = {}
-
-                if isinstance(json, dict):
-                    data = Dict(**json)
-                elif isinstance(json, list):
-                    data = List(*json)
 
             return {
                 "status": response.status,
@@ -369,6 +370,7 @@ modules = {
         }
     }
 }
+
 builtins = {
     "Embed": femcord.Embed,
     "execute_webhook": execute_webhook,
@@ -471,7 +473,7 @@ async def get_modules(bot, guild, *, ctx = None, user = None, message_errors = F
         **modules,
         "database": {
             "builtins": {
-                "get_all": lambda: Dict(**database),
+                "get_all": lambda: dict(**database),
                 "get": lambda key: database.get(key, False),
                 "update": db_update,
                 "delete": db_delete

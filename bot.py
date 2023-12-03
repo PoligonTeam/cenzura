@@ -18,9 +18,9 @@ import femcord
 from femcord import commands, types
 from femcord.http import Route
 from femcord.permissions import Permissions
-from femscript import run
+from femscript import Femscript, var
 from tortoise import Tortoise
-from utils import modules, builtins
+from utils import request
 from lokiclient import LokiClient
 from models import Guilds
 from scheduler import Scheduler
@@ -264,31 +264,32 @@ class Bot(commands.Bot):
 
             self.presences = []
 
+            femscript = Femscript(code, variables = [
+                var("guilds", str(len(self.gateway.guilds))),
+                var("users", str(len(self.gateway.users))),
+                var("StatusTypes", variables = [
+                    var(status_type.name, status_type) for status_type in femcord.StatusTypes
+                ]),
+                var("ActivityTypes", variables = [
+                    var(status_type.name, status_type) for status_type in femcord.ActivityTypes
+                ])
+            ])
+
+            @femscript.wrap_function()
             def set_update_interval(interval: Union[str, int]):
                 self.presence_update_interval = interval
 
+            @femscript.wrap_function()
             def set_random_presence(value: bool):
                 self.random_presence = value
 
-            def add_presence(name: str = None, *, status_type: femcord.StatusTypes = femcord.StatusTypes.ONLINE, activity_type: femcord.ActivityTypes = femcord.ActivityTypes.PLAYING, state: str = None):
-                self.presences.append(presence := femcord.Presence(status_type, activities=[femcord.Activity(name, activity_type)]))
-                return presence
+            @femscript.wrap_function()
+            def add_presence(*, name: str = None, status_type: femcord.StatusTypes = femcord.StatusTypes.ONLINE, activity_type: femcord.ActivityTypes = femcord.ActivityTypes.PLAYING):
+                self.presences.append(femcord.Presence(status_type, activities=[femcord.Activity(name, activity_type)]))
 
-            await run(
-                code,
-                modules = modules,
-                builtins = {
-                    **builtins,
-                    "set_update_interval": set_update_interval,
-                    "set_random_presence": set_random_presence,
-                    "add_presence": add_presence
-                },
-                variables = {
-                    "gateway": self.gateway,
-                    "StatusTypes": femcord.StatusTypes,
-                    "ActivityTypes": femcord.ActivityTypes
-                }
-            )
+            femscript.wrap_function(request)
+
+            await femscript.execute(debug=True)
 
         if not (schedules := self.scheduler.get_schedules("update_presence")):
             return await self.scheduler.create_schedule(self.update_presence, self.presence_update_interval, name="update_presence")()

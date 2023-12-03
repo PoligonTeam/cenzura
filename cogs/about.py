@@ -18,7 +18,6 @@ import femcord
 from femcord import commands
 from femcord.http import Route
 from datetime import datetime
-import psutil, time
 
 class About(commands.Cog):
     def __init__(self, bot):

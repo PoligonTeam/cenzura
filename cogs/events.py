@@ -19,9 +19,9 @@ from femcord import commands
 from femcord.commands import Context
 from femcord.types import Guild, Member, User, Message
 from femcord.http import Route
-from femscript import run
+from femcord.commands.context import Context
+from femscript import run, Femscript, var
 from typing import TYPE_CHECKING
-from lokiclient import LokiClient
 from utils import *
 from models import Guilds
 

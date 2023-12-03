@@ -93,7 +93,7 @@ class SmartHome(commands.Cog):
     @commands.is_owner
     async def undeaf(self, ctx):
         async with aiohttp.ClientSession() as session:
-            await session.get("http://192.168.100.6:8080/apps/discord/undeaf")
+            await session.get("http://192.168.100.67:8080/apps/discord/undeaf")
 
         await ctx.reply("ok")
 

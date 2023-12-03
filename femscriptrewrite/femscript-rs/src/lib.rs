@@ -17,8 +17,7 @@ limitations under the License.
 #![warn(clippy::pedantic)]
 
 use crate::utils::*;
-use std::collections::HashMap;
-use pyo3::{prelude::*, types::PyDict, types::PyList};
+use pyo3::{prelude::*, types::{PyDict, PyBool}};
 
 mod lexer;
 mod parser;
@@ -52,88 +51,32 @@ fn generate_ast<'a>(py: Python<'a>, tokens: Vec<&PyDict>) -> PyResult<Vec<&'a Py
     Ok(convert_ast(py, ast))
 }
 
-static mut FUNCTIONS: Option<HashMap<String, PyObject>> = None;
-
 #[pyfunction]
-fn execute_ast<'a>(py: Python<'a>, ast: Vec<&PyDict>, variables: Vec<&PyDict>, functions: Vec<&PyDict>) -> PyResult<&'a PyDict> {
+fn execute_ast<'a>(py: Python<'a>, ast: Vec<&PyDict>, variables: Vec<&PyDict>, functions: Vec<&PyDict>, debug: &PyBool) -> PyResult<&'a PyAny> {
     let rust_ast = convert_to_ast(py, ast);
 
+    let mut scope = utils::get_scope(py, variables);
     let mut builtins = builtins::get_builtins();
-
-    fn get_scope(py: Python, variables: Vec<&PyDict>) -> interpreter::Scope {
-        let mut scope = interpreter::Scope::new();
-
-        for variable in variables {
-            let name = variable.get_item("name").unwrap().extract::<String>().unwrap();
-            let value = convert_to_token(py, variable.get_item("value").unwrap().extract::<&PyDict>().unwrap());
-
-            scope.push_variable(&name, value, if let Some(child_variables) = variable.get_item("variables") {
-                Some(get_scope(py, child_variables.extract::<Vec<&PyDict>>().unwrap()))
-            } else {
-                None
-            });
-        }
-
-        scope
-    }
-
-    let mut scope = get_scope(py, variables);
 
     scope.functions.append(&mut builtins);
 
-    unsafe {
-        FUNCTIONS = Some(HashMap::new());
+    if debug.is_true() {
+        scope.functions.push(interpreter::Function::new_builtin("print"));
+        scope.functions.push(interpreter::Function::new_builtin("debug"));
     }
 
     for function in functions {
         let name = function.get_item("name").unwrap().extract::<String>().unwrap();
         let func = function.get_item("func").unwrap().extract::<PyObject>().unwrap();
 
-        unsafe {
-            let mut funcs = FUNCTIONS.as_ref().unwrap().to_owned();
-            funcs.insert(name.to_owned(), func);
-            FUNCTIONS = Some(funcs);
-        }
-
-        fn wrapper(name: String, args: Vec<lexer::Token>, _scope: interpreter::Scope) -> lexer::Token {
-            Python::with_gil(|py| {
-                let py_args = PyList::new(py, args.iter().map(|arg| convert_token(py, arg.clone())).collect::<Vec<&PyDict>>());
-                let py_scope = PyDict::new(py);
-
-                for variable in _scope.variables {
-                    py_scope.set_item(variable.name, convert_token(py, variable.value)).unwrap();
-                }
-
-                unsafe {
-                    let funcs = FUNCTIONS.as_ref().unwrap();
-
-                    if let Some(func) = funcs.get(&name) {
-                        let result = func.call1(py, (name, py_args, py_scope));
-
-                        match result {
-                            Ok(result) => match result.extract::<&PyDict>(py) {
-                                Ok(result) => convert_to_token(py, result),
-                                Err(error) => lexer::Token::new_error(lexer::TokenType::Error, format!("{}", error.value(py)))
-                            }
-                            Err(error) => lexer::Token::new_error(lexer::TokenType::Error, format!("{}", error.value(py)))
-                        }
-                    } else {
-                        lexer::Token::new_error(lexer::TokenType::Undefined, format!("{} is not defined", name))
-                    }
-                }
-            })
-        }
-
-        scope.push_function(&name, wrapper);
+        scope.push_pyfunc(&name, func);
     }
 
-    let result = interpreter::execute_ast(rust_ast, &mut scope, None, 0);
+    pyo3_asyncio::tokio::future_into_py(py, async move {
+        let result = interpreter::execute_ast(rust_ast, &mut scope, None, 0).await;
 
-    unsafe {
-        FUNCTIONS = None;
-    }
-
-    Ok(convert_token(py, result))
+        Ok(Python::with_gil(|py| convert_token(py, result).as_ref().to_object(py).clone()))
+    })
 }
 
 #[pymodule]

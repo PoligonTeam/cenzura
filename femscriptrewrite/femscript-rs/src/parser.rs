@@ -96,8 +96,12 @@ fn get_tokens_in_block<'a, 'b>(tokens: &'a mut Peekable<Iter<&'b Token>>, count:
     while let Some(token) = tokens.next() {
         if token._type == TokenType::LeftBrace {
             *count += 1;
+            tokens_in_block.push(token)
         } else if token._type == TokenType::RightBrace {
             *count -= 1;
+            if *count != 0 {
+                tokens_in_block.push(token)
+            }
         } else {
             tokens_in_block.push(token);
         }
@@ -114,38 +118,15 @@ fn get_tokens_in_block<'a, 'b>(tokens: &'a mut Peekable<Iter<&'b Token>>, count:
     Ok(tokens_in_block)
 }
 
+
 fn get_ast_in_list<'a, 'b>(tokens: &'a mut Peekable<Iter<&'b Token>>, from: TokenType, to: TokenType) -> Result<Vec<AST>> {
     let mut ast_in_list: Vec<AST> = Vec::new();
 
     while let Some(token) = tokens.next() {
         if token._type == from {
-            let ast = get_ast_in_list(tokens, from.clone(), to.clone());
-
-            ast_in_list.push(match ast {
-                Ok(ast) => AST {
-                    _type: ASTType::Token,
-                    token: Token::new(TokenType::List),
-                    children: ast
-                },
-                Err(error) => AST {
-                    _type: ASTType::Error,
-                    token: Token::new_error(TokenType::SyntaxError, error.to_string()),
-                    children: Vec::new()
-                }
-            });
-        } else if token._type == TokenType::Comma || token._type == TokenType:: RightParen || token._type == to {
-            return Ok(ast_in_list);
-        } else {
             ast_in_list.push(AST {
-                _type: match token._type {
-                    TokenType::Error |
-                    TokenType::Undefined |
-                    TokenType::SyntaxError |
-                    TokenType::TypeError => ASTType::Error,
-                    TokenType::Not => ASTType::Expression,
-                    _ => ASTType::Token
-                },
-                token: token.to_owned().to_owned(),
+                _type: ASTType::Token,
+                token: Token::new(TokenType::List),
                 children: match get_ast_in_list(tokens, from.to_owned(), to.to_owned()) {
                     Ok(ast) => ast,
                     Err(error) => vec![AST {
@@ -155,10 +136,51 @@ fn get_ast_in_list<'a, 'b>(tokens: &'a mut Peekable<Iter<&'b Token>>, from: Toke
                     }]
                 }
             });
+            continue
+        } else if token._type == to {
+            return Ok(ast_in_list)
+        } else if token._type == TokenType::Comma {
+            continue
         }
+
+        let mut element_tokens: Vec<&Token> = Vec::new();
+
+        element_tokens.push(token);
+
+        while let Some(token) = tokens.next() {
+            if token._type == from {
+                ast_in_list.push(AST {
+                    _type: ASTType::Token,
+                    token: element_tokens.get(element_tokens.len() - 1).unwrap().to_owned().to_owned(),
+                    children: vec![AST {
+                        _type: ASTType::Token,
+                        token: Token::new(TokenType::List),
+                        children: match get_ast_in_list(tokens, from.to_owned(), to.to_owned()) {
+                            Ok(ast) => ast,
+                            Err(error) => vec![AST {
+                                _type: ASTType::Error,
+                                token: Token::new_error(TokenType::SyntaxError, error.to_string()),
+                                children: Vec::new()
+                            }]
+                        }
+                    }]
+                });
+
+                element_tokens.remove(element_tokens.len() - 1);
+            } else if token._type == to {
+                ast_in_list.append(&mut generate_ast(element_tokens));
+                return Ok(ast_in_list)
+            } else if token._type == TokenType::Comma {
+                break
+            } else {
+                element_tokens.push(token);
+            }
+        }
+
+        ast_in_list.append(&mut generate_ast(element_tokens))
     }
 
-    Ok(ast_in_list)
+    bail!("Unclosed list")
 }
 
 pub fn generate_ast(tokens: Vec<&Token>) -> Vec<AST> {
@@ -249,6 +271,16 @@ pub fn generate_ast(tokens: Vec<&Token>) -> Vec<AST> {
                 });
             },
             TokenType::Dot => {
+                if let Some(token) = tokens.peek() {
+                    if token._type == TokenType::Dot {
+                        return vec![AST {
+                            _type: ASTType::Error,
+                            token: Token::new_error(TokenType::SyntaxError, "invalid syntax".to_string()),
+                            children: Vec::new()
+                        }]
+                    }
+                };
+
                 ast.push(match get_tokens_in_expr(&mut tokens, TokenType::Semicolon, None) {
                     Ok(tokens) => AST {
                         _type: ASTType::Token,

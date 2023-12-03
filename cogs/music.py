@@ -16,7 +16,7 @@ limitations under the License.
 
 import femcord
 from femcord import commands, types, HTTPException
-from femscript import run
+from femscript import run, Femscript, var
 from utils import *
 from aiohttp import ClientSession
 from models import LastFM
@@ -80,8 +80,8 @@ class Music(commands.Cog):
         return hashlib.md5(string.encode("utf-8")).hexdigest()
 
     def progress_bar(self, progress: int, length: int) -> str:
-        get_time = lambda position, duration: f"{(position % 3600) // 60}:{position % 60:02d}/{(duration % 3600) // 60}:{duration % 60:02d}"
-        return "[" + "=" * int(progress / length * 20) + "-" * (20 - int(progress / length * 20)) + "] " + get_time(progress, length)
+        return "[" + "=" * int(progress / length * 20) + "-" * (20 - int(progress / length * 20)) + "] " + \
+               f"{(progress % 3600) // 60}:{progress % 60:02d}/{(length % 3600) // 60}:{length % 60:02d}"
 
     @commands.Listener
     async def on_ready(self) -> None:
@@ -239,7 +239,7 @@ class Music(commands.Cog):
 
     @commands.command(description="Pokazuje informacje o odtwarzanym utworze", aliases=["np"])
     async def nowplaying(self, ctx: commands.Context) -> None:
-        player: femlink.Player = self.client.get_player(ctx.guild.id)
+        player = self.client.get_player(ctx.guild.id)
 
         if player is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
@@ -296,12 +296,12 @@ class Music(commands.Cog):
                 try:
                     session = await client.get_session(token)
                 except (exceptions.UnauthorizedToken, exceptions.InvalidApiKey, exceptions.InvalidSignature):
-                    if attempt == 8:
+                    if attempt == 2:
                         return await message.edit("Logowanie się nie powiodło... link się przedawnił lub coś poszło nie tak")
 
                     continue
 
-                user: LastFM = self.lastfm_users.get(ctx.author.id)
+                user = self.lastfm_users.get(ctx.author.id)
 
                 if user is None:
                     user = LastFM(user_id=ctx.author.id, username=session["name"], token=session["key"], script=self.templates["embedmini"])
@@ -397,7 +397,7 @@ class Music(commands.Cog):
 
             await ctx.reply(result)
 
-    @commands.command(description="Statystyki konta LastFM", usage="[użytkownik]", aliases=["fmstats", "fm"])
+    @commands.command(description="lastfm - now playing", usage="[user]", aliases=["fmstats", "fm"])
     async def lastfm(self, ctx: commands.Context, *, user: types.User = None):
         user = user or ctx.author
 
@@ -405,51 +405,120 @@ class Music(commands.Cog):
 
         if lastfm is None:
             if ctx.author is user:
-                return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+                return await ctx.reply("You don't have a linked lastfm account, use `login` to link them")
 
-            return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
+            return await ctx.reply("This user doesn't have a linked lastfm accont")
 
         async with femcord.Typing(ctx.message):
-            femscript_modules = await get_modules(self.bot, ctx.guild, ctx=ctx, user=user, message_errors=True)
+            async with Client(LASTFM_API_KEY) as client:
+                try:
+                    tracks = await client.recent_tracks(lastfm.username)
+                except exceptions.NotFound:
+                    return await ctx.reply(f"Account {lastfm.username} doesn't exist")
 
-            if not femscript_modules:
-                return
+                if not tracks.tracks:
+                    return await ctx.reply(f"{tracks.username} doesn't have any scrobbles")
 
-            result = await run(
-                lastfm.script,
-                modules = femscript_modules,
-                builtins = builtins,
-                variables = convert(user=user)
-            )
+                data = {
+                    "tracks": [],
+                    "user": {
+                        "username": tracks.username,
+                        "scrobbles": tracks.scrobbles
+                    },
+                    "nowplaying": False
+                }
 
-            if isinstance(result, femcord.Embed):
-                return await ctx.reply(embed=result)
+                if len(tracks.tracks) == 3:
+                    data["nowplaying"] = True
 
-            await ctx.reply(result)
+                async def append_track(index: int, track: Track) -> None:
+                    track_info = await client.track_info(track.artist.name, track.title, lastfm.username)
+                    artist_info = await client.artist_info(track.artist.name, lastfm.username)
 
-    @commands.command(description="Ustawianie skryptu dla komendy lastfm", usage="(skrypt)", aliases=["fms", "fmset"])
+                    track_data = Track(
+                        artist = artist_info,
+                        image = track.image,
+                        album = track.album,
+                        title = track.title,
+                        url = track.url,
+                        duration = track.duration,
+                        streamable = track.streamable,
+                        listeners = track_info.listeners,
+                        playcount = track_info.playcount,
+                        scrobbles = track_info.scrobbles or "0",
+                        tags = track_info.tags,
+                        date = track.date
+                    )
+
+                    data["tracks"].append((index, track_data))
+
+                for index, track in enumerate(tracks.tracks[:2]):
+                    self.bot.loop.create_task(append_track(index, track))
+
+                count = 0
+
+                while len(data["tracks"]) < 2:
+                    await asyncio.sleep(0.1)
+
+                    count += 1
+
+                    if count > 100:
+                        return await ctx.reply("Timed out")
+
+                data["tracks"].sort(key=lambda track: track[0])
+                data["tracks"] = [track[1] for track in data["tracks"]]
+
+                converted_data = convert(user=user, tracks=data["tracks"])
+
+                variables = [
+                    {
+                        "name": "user",
+                        "value": Femscript.to_fs(converted_data["user"])
+                    },
+                    {
+                        "name": "lastfm",
+                        "value": Femscript.to_fs({
+                            "user": data["user"],
+                            "nowplaying": data["nowplaying"],
+                            "tracks": converted_data["tracks"]
+                        })
+                    }
+                ]
+
+                femscript = Femscript(lastfm.script, variables=variables)
+
+                femscript.wrap_function(request)
+                femscript.wrap_function(femcord.Embed)
+
+                result = await femscript.execute(debug=ctx.author.id in self.bot.owners)
+
+                if isinstance(result, femcord.Embed):
+                    return await ctx.reply(embed=result)
+
+                await ctx.reply(str(result))
+
+    @commands.command(description="Custom script for lastfm", usage="(script)", aliases=["fms", "fmset"])
     async def fmscript(self, ctx: commands.Context, *, script):
         lastfm_user = self.lastfm_users.get(ctx.author.id)
 
         if lastfm_user is None:
-            return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+            return await ctx.reply("You don't have a linked lastfm account, use `login` to link them")
 
-        if script == "get_code()":
+        if re.match(r"get_code(\(\))?;?", script):
             return await self.bot.paginator(ctx.reply, ctx, lastfm_user.script, prefix="```py\n", suffix="```")
 
         script = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
                  f"# GUILD: {ctx.guild.id}\n" \
                  f"# CHANNEL: {ctx.channel.id}\n" \
                  f"# AUTHOR: {ctx.author.id}\n\n" \
-                 "import lastfm\n\n" \
                + script
 
         lastfm_user.script = script
 
         await lastfm_user.save()
-        await ctx.reply("Skrypt został ustawiony")
+        await ctx.reply("Script has been saved")
 
-    @commands.command(description="Wybieranie szablonu dla komendy lastfm", usage="(szablon)", aliases=["fmmode"], other={"embed": femcord.Embed(description="\nSzablony: `embedfull`, `embedsmall`, `embedmini`, `textfull`, `textmini`")})
+    @commands.command(description="Wybieranie szablonu dla komendy lastfm", usage="(szablon)", aliases=["fmmode"], other={"embed": femcord.Embed(description="\nSzablony: `embedfull`, `embedsmall`, `embedmini`")})
     async def fmtemplate(self, ctx: commands.Context, template):
         if not template in self.templates:
             return await ctx.reply("Nie ma takiego szablonu")
@@ -476,7 +545,7 @@ class Music(commands.Cog):
                     if "error" in data:
                         return await ctx.reply("Nie znaleziono użytkownika LastFM")
 
-                    account_age = (datetime.datetime.now() - datetime.timedelta(hours=2)) - datetime.datetime.fromtimestamp(int(data["user"]["registered"]["unixtime"]))
+                    account_age = (datetime.datetime.now() - datetime.timedelta(hours=1)) - datetime.datetime.fromtimestamp(int(data["user"]["registered"]["unixtime"]))
                     scrobbles = int(data["user"]["playcount"])
 
                     if not scrobbles:

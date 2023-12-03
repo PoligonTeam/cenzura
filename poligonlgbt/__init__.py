@@ -28,7 +28,7 @@ class Image:
     time: datetime
 
     def __str__(self) -> str:
-        return Poligon.URL + self.name
+        return Poligon.URL + "/" + self.name
 
 class Poligon:
     URL = "https://poligon.lgbt"

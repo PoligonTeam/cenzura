@@ -32,6 +32,7 @@ class User:
     avatar_url: str
     created_at: datetime
     global_name: str = None
+    display_name: str = None
     public_flags: Sequence[PublicFlags] = None
     bot: bool = None
     system: bool = None

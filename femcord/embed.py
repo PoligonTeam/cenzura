@@ -20,15 +20,15 @@ from typing import TypeVar, Optional, Union
 Embed = TypeVar("Embed")
 
 class Embed:
-    def __init__(self, *, title: Optional[str] = None, url: Optional[str] = None, description: Optional[str] = None, color: Optional[int] = None, timestamp: Optional[Union[datetime, int]] = None):
+    def __init__(self, *, title: Optional[str] = None, url: Optional[str] = None, description: Optional[str] = None, color: Optional[int] = None, timestamp: Optional[Union[datetime, float, int]] = None):
         if title is not None:
-            self.title: str = title
+            self.title = title
         if url is not None:
-            self.url: str = url
+            self.url = url
         if description is not None:
-            self.description: str = description
+            self.description = description
         if color is not None:
-            self.color: str = color
+            self.color = color
         if timestamp is not None:
             self.set_timestamp(timestamp)
 
@@ -66,10 +66,10 @@ class Embed:
 
         return self
 
-    def set_timestamp(self, timestamp: int) -> Embed:
-        if isinstance(timestamp, int):
+    def set_timestamp(self, timestamp: Union[float, int]) -> Embed:
+        if isinstance(timestamp, (float, int)):
             timestamp = datetime.fromtimestamp(timestamp)
-        self.timestamp = (timestamp - timedelta(hours=2)).isoformat()
+        self.timestamp = (timestamp - timedelta(hours=1)).isoformat()
 
         return self
 

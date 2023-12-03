@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use crate::{lexer::{Token, TokenType}, parser::{AST, ASTType}};
+use crate::{lexer::{Token, TokenType}, parser::{AST, ASTType}, interpreter::Scope};
 use std::str::FromStr;
-use pyo3::{prelude::*, types::PyDict, types::PyList};
+use pyo3::{prelude::*, types::{PyList, PyDict}};
 
 pub fn convert_token(py: Python, token: Token) -> &PyDict {
     let py_token = PyDict::new(py);
@@ -30,6 +30,10 @@ pub fn convert_token(py: Python, token: Token) -> &PyDict {
     py_token.set_item("value", token.value).unwrap();
     py_token.set_item("number", token.number).unwrap();
     py_token.set_item("list", PyList::new(py, list)).unwrap();
+
+    if let Some(scope) = token.scope {
+        py_token.set_item("scope", walk_scope(py, scope)).unwrap();
+    }
 
     if let Some(pyobject) = token.pyobject {
         py_token.set_item("pyobject", pyobject).unwrap();
@@ -50,6 +54,15 @@ pub fn convert_to_token(py: Python, token: &PyDict) -> Token {
         value: token.get_item("value").unwrap().extract::<String>().unwrap(),
         number: token.get_item("number").unwrap().extract::<f64>().unwrap(),
         list,
+        scope: if let Some(scope) = token.get_item("scope") {
+            if let Ok(scope) = scope.extract::<Vec<&PyDict>>() {
+                Some(get_scope(py, scope))
+            } else {
+                None
+            }
+        } else {
+            None
+        },
         pyobject: if let Some(pyobject) = token.get_item("pyobject") {
             Some(pyobject.into())
         } else {
@@ -103,6 +116,7 @@ pub fn to_pyobject(py: Python, token: Token) -> Py<PyAny> {
             list.into_py(py)
         },
         TokenType::None => Python::None(py),
+        TokenType::Scope => scope_to_pydict(py, token.scope.unwrap()).to_object(py),
         TokenType::PyObject => token.pyobject.unwrap(),
         _ => unreachable!()
     }
@@ -124,4 +138,37 @@ pub fn to_token(py: Python, pyobject: Py<PyAny>) -> Token {
     } else {
         Token::new_pyobject(pyobject)
     }
+}
+
+pub fn get_scope(py: Python, variables: Vec<&PyDict>) -> Scope {
+    let mut scope = Scope::new();
+
+    for variable in variables {
+        let name = variable.get_item("name").unwrap().extract::<String>().unwrap();
+        let value = convert_to_token(py, variable.get_item("value").unwrap().extract::<&PyDict>().unwrap());
+
+        scope.push_variable(&name, value);
+    }
+
+    scope
+}
+
+pub fn walk_scope<'a>(py: Python<'a>, scope: Scope) -> &'a PyDict {
+    let py_scope = PyDict::new(py);
+
+    for variable in scope.variables {
+        py_scope.set_item(variable.name, convert_token(py, variable.value)).unwrap();
+    }
+
+    py_scope
+}
+
+pub fn scope_to_pydict(py: Python, scope: Scope) -> &PyDict {
+    let py_scope = PyDict::new(py);
+
+    for variable in scope.variables {
+        py_scope.set_item(variable.name, to_pyobject(py, variable.value)).unwrap();
+    }
+
+    py_scope
 }

@@ -45,6 +45,9 @@ class Attachment:
     waveform: str = None
     duration_secs: float = None
     flags: object = None
+    placeholder_version: object = None
+    placeholder: object = None
+    content_scan_version: object = None
 
 @modified_dataclass
 class MessageReference:

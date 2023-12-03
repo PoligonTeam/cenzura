@@ -146,7 +146,9 @@ async def guild_members_chunk(gateway: "Gateway", chunk):
     return chunk,
 
 async def presence_update(gateway: "Gateway", presence):
-    # return None,
+    if len(gateway.requested_guilds) != len(gateway.guilds):
+        return None,
+
     guild = gateway.get_guild(presence["guild_id"])
     member = await guild.get_member(presence["user"]["id"])
 

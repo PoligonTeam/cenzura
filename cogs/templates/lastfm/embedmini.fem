@@ -1,19 +1,9 @@
-import lastfm
+track = lastfm.tracks.0;
+scrobbles = lastfm.user.scrobbles;
 
-scrobbles = lastfm_user.scrobbles
+return Embed {
+    borrow(track, scrobbles);
 
-track = tracks.0
-track_title = track.title
-track_url = track.url
-track_scrobbles = track.scrobbles
-
-artist = track.artist
-track_artist = artist.name
-artist_url = artist.url
-artist_stats = artist.stats
-artist_scrobbles = artist_stats.userplaycount
-
-text = " [" + track_title + "](" + track_url + ") " + track_scrobbles + "x
-by " + "[" + track_artist + "]" + "(" + artist_url + ")" + " " + artist_scrobbles + "x (" + scrobbles + "♪)"
-_color = hex("2f3136")
-return Embed(description: text, color: _color)
+    description = format("[{}]({}) {}x by [{}]({}) {}x ({}♪)", &track.title, &track.url, &track.scrobbles, &track.artist.name, &track.artist.url, &track.artist.stats.userplaycount, &scrobbles);
+    color = hex("2f3136");
+};

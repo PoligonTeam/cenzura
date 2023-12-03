@@ -19,6 +19,7 @@ use std::str::Chars;
 use std::fmt::Display;
 use std::str::FromStr;
 use pyo3::{prelude::Py, types::PyAny};
+use crate::interpreter::Scope;
 
 #[allow(dead_code)]
 #[derive(Clone, PartialEq, Debug)]
@@ -44,7 +45,7 @@ pub enum TokenType {
     List, Scope,
     PyObject,
 
-    Error, Undefined, RecursionError, SyntaxError, TypeError
+    Error, Undefined, RecursionError, SyntaxError, TypeError, IndexError, Unsupported
 }
 
 #[allow(dead_code)]
@@ -64,6 +65,8 @@ impl FromStr for TokenType {
         }
 
         match_string!(
+            Unknown,
+
             LeftParen, RightParen,
             LeftBracket, RightBracket,
             LeftBrace, RightBrace,
@@ -72,14 +75,18 @@ impl FromStr for TokenType {
             Equal, PlusEqual, MinusEqual, MultiplyEqual, DivideEqual, ModuloEqual,
             EqualTo, NotEqual, Not, Greater, Less, GreaterEqual, LessEqual,
             Comment,
+
             If, Else,
             And, Or,
             Func, Import,
             Return,
+
             Var, Str, Int,
             Bool, None,
             List, Scope,
-            PyObject
+            PyObject,
+
+            Error, Undefined, RecursionError, SyntaxError, TypeError, IndexError, Unsupported
         )
     }
 }
@@ -90,6 +97,7 @@ pub struct Token {
     pub value: String,
     pub number: f64,
     pub list: Vec<Token>,
+    pub scope: Option<Scope>,
     pub pyobject: Option<Py<PyAny>>
 }
 
@@ -113,6 +121,7 @@ impl Token {
             value: String::new(),
             number: 0.0,
             list: Vec::new(),
+            scope: None,
             pyobject: None
         }
     }
@@ -123,6 +132,7 @@ impl Token {
             value: format!("{:?}: {}", error_type, error_text),
             number: 0.0,
             list: Vec::new(),
+            scope: None,
             pyobject: None
         }
     }
@@ -133,6 +143,7 @@ impl Token {
             value: String::new(),
             number: 0.0,
             list: Vec::new(),
+            scope: None,
             pyobject: None
         }
     }
@@ -143,6 +154,7 @@ impl Token {
             value,
             number: 0.0,
             list: Vec::new(),
+            scope: None,
             pyobject: None
         }
     }
@@ -153,6 +165,7 @@ impl Token {
             value,
             number: 0.0,
             list: Vec::new(),
+            scope: None,
             pyobject: None
         }
     }
@@ -163,6 +176,7 @@ impl Token {
             value: String::new(),
             number,
             list: Vec::new(),
+            scope: None,
             pyobject: None
         }
     }
@@ -177,6 +191,7 @@ impl Token {
                 _ => unreachable!()
             },
             list: Vec::new(),
+            scope: None,
             pyobject: None
         }
     }
@@ -187,6 +202,18 @@ impl Token {
             value: String::new(),
             number: 0.0,
             list,
+            scope: None,
+            pyobject: None
+        }
+    }
+
+    pub fn new_scope(scope: Scope) -> Self {
+        Self {
+            _type: TokenType::Scope,
+            value: String::new(),
+            number: 0.0,
+            list: Vec::new(),
+            scope: Some(scope),
             pyobject: None
         }
     }
@@ -197,6 +224,7 @@ impl Token {
             value: String::new(),
             number: 0.0,
             list: Vec::new(),
+            scope: None,
             pyobject: Some(pyobject)
         }
     }
@@ -219,6 +247,8 @@ pub fn generate_tokens(code: &str) -> Vec<Token> {
         }
     }
 
+    let mut is_previous_num = false;
+
     while let Some(c) = code.next() {
         let token = match c {
             '(' => Token::new(TokenType::LeftParen),
@@ -234,7 +264,7 @@ pub fn generate_tokens(code: &str) -> Vec<Token> {
             '+' => check_next(&mut code, TokenType::Plus, TokenType::PlusEqual, '='),
             '-' => {
                 if let Some(&c) = code.peek() {
-                    if c.is_numeric() {
+                    if c.is_numeric() && !is_previous_num {
                         let mut num = String::new();
                         let mut float = false;
 
@@ -269,9 +299,11 @@ pub fn generate_tokens(code: &str) -> Vec<Token> {
 
                         Token::new_int(num.parse::<f64>().unwrap() * -1.0)
                     } else {
+                        is_previous_num = false;
                         check_next(&mut code, TokenType::Minus, TokenType::MinusEqual, '=')
                     }
                 } else {
+                    is_previous_num = false;
                     check_next(&mut code, TokenType::Minus, TokenType::MinusEqual, '=')
                 }
             },
@@ -292,6 +324,8 @@ pub fn generate_tokens(code: &str) -> Vec<Token> {
                 Token::new(TokenType::Comment)
             },
             '0'..='9' => {
+                is_previous_num = true;
+
                 let mut num = String::new();
                 let mut float = false;
                 num.push(c);
@@ -389,6 +423,10 @@ pub fn generate_tokens(code: &str) -> Vec<Token> {
                 }
 
                 Token::new_string(string)
+            },
+            '&' => {
+                tokens.push(Token::new_var("&".to_string()));
+                Token::new(TokenType::Dot)
             },
             ' ' | '\n' | '\t' => continue,
             _ => Token::new_error(TokenType::Error, format!("{} is not a valid character", c))

@@ -265,7 +265,7 @@ class Bot(Client):
             command_object = self.get_command(command, guild_id=context.guild.id)
 
         while command_object and arguments and command_object.type is CommandTypes.GROUP:
-            command_object = command_object.get_subcommand(arguments[0]) # type: ignore # TODO: Fix this
+            command_object = command_object.get_subcommand(arguments[0])
             arguments = arguments[1:]
 
         if command_object is None:

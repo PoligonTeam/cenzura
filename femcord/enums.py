@@ -294,6 +294,7 @@ class PremiumTypes(Enum):
     NONE = 0
     NITRO_CLASSIC = 1
     NITRO = 2
+    NITRO_BASIC = 3
 
 class PremiumTier(Enum):
     NONE = 0
@@ -315,6 +316,7 @@ class ActivityTypes(Enum):
     WATCHING = 3
     CUSTOM = 4
     COMPETING = 5
+    HANGSTATUS = 6
 
 class ActivityFlags(Enum):
     INSTANCE = 1 << 0

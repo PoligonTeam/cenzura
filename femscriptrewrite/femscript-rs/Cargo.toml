@@ -11,4 +11,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 anyhow = "1.0.71"
+async-recursion = "1.0.5"
 pyo3 = { version = "0.18.3", features = ["extension-module"] }
+pyo3-asyncio = { version = "0.18.0", features = ["tokio-runtime"] }
+rand = "0.8.5"

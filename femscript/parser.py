@@ -16,7 +16,7 @@ limitations under the License.
 
 from .lexer import Lexer, Tokens, Keywords, Types, Token
 from types import CoroutineType
-import random, datetime, re, string, json
+import random, datetime, sys, gc, re, string, json
 
 class List(list):
     def __init__(self, *args):
@@ -78,11 +78,15 @@ def _len(obj):
 
     return len(obj)
 
+class WeedMemoryError(Exception):
+    pass
+
 class Parser:
     def __init__(self, lexer: Lexer, *, modules = {}, builtins = {}, variables = {}):
         self.lexer = lexer
         self.tokens = self.lexer.make_tokens()
         self.position = 0
+        self.memory = 0
         self.modules = {
             **modules,
             "random": {
@@ -136,13 +140,23 @@ class Parser:
 
     def convert(self, position, var = True):
         if var and self.tokens[position].type is Types.VAR:
-            return self.variables[self.tokens[position].value]
+            value = self.variables[self.tokens[position].value]
         elif self.tokens[position].type is Types.BOOL:
-            return self.tokens[position].value == "true"
+            value = self.tokens[position].value == "true"
         elif self.tokens[position].type is Types.INT:
-            return int(self.tokens[position].value)
+            if not 9999999 >= (value := int(self.tokens[position].value)) >= -9999999:
+                raise OverflowError()
         elif var is False or self.tokens[position].type in (Types.STR, Types.LIST, Types.DICT, Types.UNKNOWN):
-            return self.tokens[position].value
+            value = self.tokens[position].value
+
+        if (size := sys.getsizeof(value)) > 1024 * 1024:
+            del self.tokens[position].value
+            gc.collect()
+            raise MemoryError()
+        elif size == 420:
+            raise WeedMemoryError("420 bytes (hehehehaw sound effect)")
+
+        return value
 
     def set(self, result, position = None, position2 = None):
         position = position or self.position
@@ -178,10 +192,18 @@ class Parser:
         }
 
         while True:
+            if self.memory > 2 * 1024 * 1024 * 1024:
+                raise MemoryError()
+
             if self.position >= len(self.tokens):
                 break
 
             current_token = self.tokens[self.position]
+
+            if isinstance(current_token, Token) and current_token.type is Types.INT:
+                if not 9999999 >= int(current_token.value) >= -9999999:
+                    raise OverflowError()
+                self.memory += sys.getsizeof(current_token.value)
 
             if current_token is Tokens.ASSIGN:
                 if isinstance(self.tokens[self.position + 1], Token) and self.tokens[self.position + 1].type is Types.VAR:

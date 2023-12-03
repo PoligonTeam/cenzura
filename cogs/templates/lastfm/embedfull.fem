@@ -1,51 +1,52 @@
-import lastfm
+curr_track = lastfm.tracks.0;
+prev_track = lastfm.tracks.1;
 
-username = user.username
+embed = Embed {
+    borrow(lastfm, curr_track);
 
-lastfm_username = lastfm_user.username
-scrobbles = lastfm_user.scrobbles
+    color = hex("b22487");
 
-current_track = tracks.0
-previous_track = tracks.1
+    if { !&lastfm.nowplaying } {
+        timestamp = &curr_track.date.uts;
+    }
+};
 
-current_title = current_track.title
-current_track_url = current_track.url
-current_track_scrobbles = current_track.scrobbles
-current_track_images = current_track.image
-current_track_image = current_track_images.3
-current_artist = current_track.artist
-current_artist_name = current_artist.name
-current_album = current_track.album
-current_album_name = current_album.name
+embed.set_author {
+    borrow(lastfm, user);
 
-previous_title = previous_track.title
-previous_track_url = previous_track.url
-previous_artist = previous_track.artist
-previous_artist_name = previous_artist.name
-previous_album = previous_track.album
-previous_album_name = previous_album.name
+    name = &user.username;
+    url = format("https://www.last.fm/user/{}", &lastfm.user.username);
+    icon_url = &user.avatar_url;
+};
 
-embed_color = hex("b22487")
-author_name = "Ostatnie utwory dla " + username + ":"
-author_url = "https://www.last.fm/user/" + lastfm_username
-current_value = "[" + current_title + "](" + current_track_url + ")
-Przez **" + current_artist_name + "** | _" + current_album_name + "_"
-previous_value = "[" + previous_title + "](" + previous_track_url + ")
-Przez **" + previous_artist_name + "** | _" + previous_album_name + "_"
-footer_text = lastfm_username + " posiada " + current_track_scrobbles + " scrobbli na tym utworze | Łącznie posiada " + scrobbles + " scrobbli"
+embed.set_thumbnail {
+    borrow(curr_track);
 
-embed = Embed(color: embed_color)
+    url = &curr_track.image.3.url;
+};
 
-nowplaying == false {
-    footer_text = footer_text + " | Ostatni scrobble"
-    embed_timestamp = current_track.date
-    embed = Embed(color: embed_color, timestamp: embed_timestamp.uts)
-}
+embed.add_field {
+    borrow(curr_track);
 
-Embed.set_author(embed, name: author_name, url: author_url, icon_url: user.avatar_url)
-Embed.set_thumbnail(embed, url: current_track_image.url)
-Embed.add_field(embed, name: "Obecnie:", value: current_value)
-Embed.add_field(embed, name: "Poprzednie:", value: previous_value)
-Embed.set_footer(embed, text: footer_text)
+    name = "Current:";
+    value = format("[{}]({}) by **{}** | _{}_", &curr_track.title, &curr_track.url, &curr_track.artist.name, &curr_track.album.name);
+};
 
-return embed
+embed.add_field {
+    borrow(prev_track);
+
+    name = "Previous:";
+    value = format("[{}]({}) by **{}** | _{}_", &prev_track.title, &prev_track.url, &prev_track.artist.name, &prev_track.album.name);
+};
+
+embed.set_footer {
+    borrow(lastfm, curr_track);
+
+    if { &lastfm.nowplaying } {
+        text = format("{} track scrobbles • {} total scrobbles", &curr_track.scrobbles, &lastfm.user.scrobbles);
+    } else {
+        text = format("{} track scrobbles • {} total scrobbles • last scrobble", &curr_track.scrobbles, &lastfm.user.scrobbles);
+    }
+};
+
+return embed;

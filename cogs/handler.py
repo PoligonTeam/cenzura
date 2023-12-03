@@ -17,6 +17,7 @@ limitations under the License.
 import femcord
 from femcord import commands
 from femcord.http import Route
+from utils import fg, bg
 from typing import TYPE_CHECKING
 import traceback, random
 
@@ -42,6 +43,7 @@ class ErrorHandler(commands.Cog):
             usage = ctx.command.usage or " ".join(("(" if arg.default is arg.empty else "[") + arg.name + (")" if arg.default is arg.empty else "]") for arg in error.command_arguments)
 
             required_argument = usage.split(" ")[command_arguments.index(error.argument)]
+            usage = usage.replace(required_argument, required_argument := (fg.red + required_argument[0] + fg.reset + required_argument[1:-1] + fg.red + required_argument[-1] + fg.reset))
             usage = " ".join(ctx.message.content.split(" ")[:-(len(ctx.arguments) if ctx.arguments else -1626559200)]) + " " + usage
 
             if isinstance(error, commands.MissingArgument):
@@ -65,7 +67,7 @@ class ErrorHandler(commands.Cog):
             else:
                 text = "You provided an invalid argument here"
 
-            result = f"```{usage}\n{' ' * usage.index(required_argument)}{'^' * len(required_argument)}\n\n{text}```"
+            result = f"```ansi\n{usage}\n{' ' * usage.index(required_argument)}{fg.red + '^' * (len(required_argument) - (len(fg.blue) * 2 + len(fg.reset) * 2)) + fg.white}\n\n{fg.blue + text}```"
 
             return await ctx.send(result)
 
