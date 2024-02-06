@@ -1,6 +1,7 @@
 uvloop
 aiohttp
 beautifulsoup4
+python-dateutil
 lxml
 Pillow
 playwright

@@ -89,7 +89,7 @@ class Fun(commands.Cog):
 
         percent = get_int(user, user2)
 
-        await ctx.reply(f"**{user.username}** + **{user2.username}** = **{user.username[:len(user.username) // 2].lower()}{user2.username[len(user2.username) // 2:].lower()}**\nTheir love is equal **{percent}%**!", files=[("ship.png", image.getvalue())])
+        await ctx.reply(f"**{user.username}** + **{user2.username}** = **{user.username[:len(user.username) // 2].lower()}{user2.username[len(user2.username) // 2:].lower()}**\nThey love each other for **{percent}%**!", files=[("ship.png", image.getvalue())])
 
     @commands.command(description="dog", aliases=["ars", "6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"])
     async def dog(self, ctx: commands.Context):

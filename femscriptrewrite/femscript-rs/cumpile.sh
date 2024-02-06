@@ -1,2 +1,2 @@
-python3 -m maturin build
-pip3 install --force-reinstall target/wheels/*.whl
+python3.12 -m maturin build -i python3.12
+pip3.12 install --force-reinstall target/wheels/*.whl

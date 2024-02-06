@@ -74,8 +74,11 @@ class Other(commands.Cog):
                 except Exception:
                     pass
 
-    @commands.command(description="pisaju skrypt", usage="(kod)", aliases=["fs", "fscript", "cs", "cscript"])
+    @commands.command(description="pisaju skrypt", usage="(code)", aliases=["fs", "fscript", "cs", "cscript"])
     async def femscript(self, ctx: commands.Context, *, code):
+        guild = Guilds.get(guild_id=ctx.guild.id)
+        database = (await guild).database
+
         fake_token = var("token", "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ")
 
         variables = [
@@ -94,27 +97,41 @@ class Other(commands.Cog):
                     fake_token
                 ])
             ])
+        ] + [
+            {
+                "name": key,
+                "value": Femscript.to_fs(value)
+            }
+            for key, value in database.items()
         ]
 
         femscript = Femscript(code, variables=variables)
 
-        logs = []
+        if ctx.member.permissions.has(femcord.enums.Permissions.MANAGE_GUILD):
+            @femscript.wrap_function()
+            def get_all() -> Dict[str, object]:
+                return database
 
-        @femscript.wrap_function()
-        def log(text):
-            logs.append(text)
+            @femscript.wrap_function()
+            def update[T](key: str, value: T) -> T:
+                database[key] = value
+                return value
+            
+            @femscript.wrap_function()
+            def remove(key: str) -> object:
+                return database.pop(key)
 
         femscript.wrap_function(request)
         femscript.wrap_function(femcord.Embed)
 
         result = await femscript.execute(debug=ctx.author.id in self.bot.owners)
 
+        await guild.update(database=database)
+
         if isinstance(result, femcord.Embed):
             return await ctx.reply(embed=result)
 
         result = str(result)
-
-        result = "\n".join([f"{index}. {log}" for index, log in enumerate(logs, 1)]) + "\n\n" + result
 
         prefix_suffix = "```"
 
@@ -211,8 +228,10 @@ class Other(commands.Cog):
         return command_data.pop("operation"), command_data
             
     def create_custom_command(self, guild_id: str, command_data: CommandData, code: str) -> commands.Command:
-        async def func(ctx, args = None) -> object:
+        async def func(ctx: commands.Context, args: list = None) -> object:
             async with femcord.Typing(ctx.message):
+                guild = Guilds.get(guild_id=ctx.guild.id)
+
                 if args is not None:
                     args = args[0]
                     values = list(command_data["arguments"].values())
@@ -247,23 +266,39 @@ class Other(commands.Cog):
                     args = dict(zip(command_data["arguments"].keys(), args))
 
                 converted = convert(guild=ctx.guild, channel=ctx.channel, author=ctx.author)
+                database = (await guild).database
 
                 variables = [
                     {
                         "name": key,
                         "value": Femscript.to_fs(value)
                     }
-                    for key, value in (converted | (args or {})).items()
+                    for key, value in (converted | (args or {}) | database).items()
                 ]
 
                 femscript = Femscript(code, variables=variables)
 
+                @femscript.wrap_function()
+                def get_all() -> Dict[str, object]:
+                    return database
+
+                @femscript.wrap_function()
+                def update[T](key: str, value: T) -> T:
+                    database[key] = value
+                    return value
+                
+                @femscript.wrap_function()
+                def remove(key: str) -> object:
+                    return database.pop(key)
+
                 femscript.wrap_function(request)
                 femscript.wrap_function(femcord.Embed)
 
-                femscript.wrap_function(void, func_name="command")
+                femscript.wrap_function(lambda *_, **__: None, func_name="command")
 
                 result = await femscript.execute()
+
+                await guild.update(database=database)
 
                 if isinstance(result, femcord.Embed):
                     return await ctx.reply(embed=result)
@@ -321,7 +356,7 @@ class Other(commands.Cog):
         elif operation == CommandOperation.GET_CODE:
             command = self.bot.get_command(command_data["name"], guild_id=ctx.guild.id)
 
-            if not command or not "code" in command.other or not command.guild_id == ctx.guild.id:
+            if not command:
                 raise commands.CommandNotFound()
             
             return await self.bot.paginator(ctx.reply, ctx, command.other["code"], prefix="```py\n", suffix="```")
@@ -329,6 +364,9 @@ class Other(commands.Cog):
             return await self.bot.paginator(ctx.reply, ctx, pages=custom_commands, prefix="```py\n", suffix="```")
         elif operation == CommandOperation.REMOVE_COMMAND:
             command = self.bot.get_command(command_data["name"], guild_id=ctx.guild.id)
+
+            if not command:
+                raise commands.CommandNotFound()
 
             custom_commands.remove(command.other["code"])
             self.bot.remove_command(command)

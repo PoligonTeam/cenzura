@@ -32,7 +32,7 @@ class ErrorHandler(commands.Cog):
     @commands.Listener
     async def on_error(self, ctx: commands.Context, error):
         if isinstance(error, commands.CommandNotFound):
-            return error.args[0][0] in string.ascii_letters and await ctx.reply("Command not found")
+            return await ctx.reply("Command not found")
 
         elif isinstance(error, commands.CommandDisabled):
             return await ctx.reply("This command is disabled")

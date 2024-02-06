@@ -18,7 +18,7 @@ import femcord
 from femcord import types
 from femscript import FemscriptException
 from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError
-from models import Artists, Guilds, LastFM, Lyrics
+from models import Artists, LastFM, Lyrics
 from config import LASTFM_API_URL, LASTFM_API_KEY
 from lastfm import Client, Track, exceptions
 from lyrics import GeniusClient, MusixmatchClient, TrackNotFound, LyricsNotFound, Lyrics as LyricsTrack
@@ -66,10 +66,10 @@ def replace_chars(text):
 def get_random_username():
     gender = random.randint(0, 1)
 
-    with open("NIGGER/words%d.txt" % gender, "r") as f:
+    with open("assets/words%d.txt" % gender, "r") as f:
         word = random.choice(f.read().splitlines())
 
-    with open("NIGGER/names%d.txt" % gender, "r") as f:
+    with open("assets/names%d.txt" % gender, "r") as f:
         name = random.choice(f.read().splitlines()).replace(" ", "_").lower()
 
     return f"{word}_{name}{random.randint(1, 100)}"
@@ -344,157 +344,3 @@ async def request(method: str, url: str, *, headers: dict = None, cookies: dict 
                 }
         except ClientHttpProxyError as exc:
             raise FemscriptException(f"ClientHttpProxyError: {exc.status}")
-
-async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_url = None, content = None, embed: femcord.Embed = None):
-    data = {}
-
-    if username:
-        data["username"] = username
-    if avatar_url:
-        data["avatar_url"] = avatar_url
-    if content:
-        data["content"] = content
-    if embed:
-        data["embeds"] = [embed.__dict__]
-
-    await request("POST", femcord.http.HTTP.URL + "/webhooks/" + webhook_id + "/" + webhook_token, data=data)
-
-def void(*args, **kwargs):
-    return False
-
-modules = {
-    "requests": {
-        "builtins": {
-            "request": request,
-            "get": lambda *args, **kwargs: request("GET", *args, **kwargs),
-            "post": lambda *args, **kwargs: request("POST", *args, **kwargs),
-            "patch": lambda *args, **kwargs: request("PATCH", *args, **kwargs),
-            "put": lambda *args, **kwargs: request("PUT", *args, **kwargs),
-            "delete": lambda *args, **kwargs: request("DELETE", *args, **kwargs)
-        }
-    }
-}
-
-builtins = {
-    "Embed": femcord.Embed,
-    "execute_webhook": execute_webhook,
-    "table": table
-}
-
-async def get_modules(bot, guild, *, ctx = None, user = None, message_errors = False):
-    query = Guilds.filter(guild_id=guild.id)
-    db_guild = await query.first()
-
-    database = db_guild.database
-
-    async def db_update(key, value):
-        database[key] = value
-        await query.update(database=database)
-        return value
-
-    async def db_delete(key):
-        database.pop(key)
-        await query.update(database=database)
-
-    async def lastfm():
-        nonlocal user
-
-        user = user or ctx.author
-        lastfm = await LastFM.filter(user_id=user.id).first()
-
-        if lastfm is None:
-            if message_errors is True:
-                if ctx.author is user:
-                    await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
-
-                await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
-
-            return {}
-
-        async with Client(LASTFM_API_KEY) as client:
-            try:
-                tracks = await client.recent_tracks(lastfm.username)
-            except exceptions.NotFound:
-                await ctx.reply("Takie konto LastFM nie istnieje")
-                return {}
-
-            if not tracks.tracks:
-                await ctx.reply("Nie ma żadnych utworów w historii")
-                return {}
-
-            fs_data = {
-                "tracks": [],
-                "lastfm_user": {
-                    "username": tracks.username,
-                    "scrobbles": tracks.scrobbles
-                },
-                "nowplaying": False
-            }
-
-            if len(tracks.tracks) == 3:
-                fs_data["nowplaying"] = True
-
-            async def append_track(index: int, track: Track) -> None:
-                track_info = await client.track_info(track.artist.name, track.title, lastfm.username)
-                artist_info = await client.artist_info(track.artist.name, lastfm.username)
-
-                fs_track = Track(
-                    artist = artist_info,
-                    image = track.image,
-                    album = track.album,
-                    title = track.title,
-                    url = track.url,
-                    duration = track.duration,
-                    streamable = track.streamable,
-                    listeners = track_info.listeners,
-                    playcount = track_info.playcount,
-                    scrobbles = track_info.scrobbles or "0",
-                    tags = track_info.tags,
-                    date = track.date
-                )
-
-                fs_data["tracks"].append((index, fs_track))
-
-            for index, track in enumerate(tracks.tracks[:2]):
-                bot.loop.create_task(append_track(index, track))
-
-            count = 0
-
-            while len(fs_data["tracks"]) < 2:
-                await asyncio.sleep(0.1)
-
-                count += 1
-
-                if count > 100:
-                    break
-
-            fs_data["tracks"].sort(key=lambda track: track[0])
-            fs_data["tracks"] = [track[1] for track in fs_data["tracks"]]
-
-            return fs_data
-
-    return {
-        **modules,
-        "database": {
-            "builtins": {
-                "get_all": lambda: dict(**database),
-                "get": lambda key: database.get(key, False),
-                "update": db_update,
-                "delete": db_delete
-            },
-            "variables": database
-        },
-        "lastfm": {
-            "variables": (
-                {
-                    **convert(tracks=(lfm := await lastfm()).get("tracks", [])),
-                    "lastfm_user": lfm.get("lastfm_user"),
-                    "nowplaying": lfm.get("nowplaying")
-                }
-                if ctx is not None else
-                {
-
-                }
-            )
-        }
-    }
