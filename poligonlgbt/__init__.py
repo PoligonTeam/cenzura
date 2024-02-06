@@ -47,18 +47,18 @@ class Poligon:
 
         self.images = []
 
-        async with self._me("/files") as response:
-            data = await response.json()
+        # async with self._me("/files") as response:
+        #     data = await response.json()
 
-            for image in data:
-                self.images.append(Image(
-                    name = image["name"],
-                    size = image["size"],
-                    time = datetime.fromtimestamp(image["time"])
-                ))
+        #     for image in data:
+        #         self.images.append(Image(
+        #             name = image["name"],
+        #             size = image["size"],
+        #             time = datetime.fromtimestamp(image["time"])
+        #         ))
 
     def _me(self, url: str) -> aiohttp.client._RequestContextManager:
-        return self.session.get(self.API_URL + "/@me" + url, headers={"authorization": self.api_key})
+        return self.session.get(self.API_URL + "/me" + url, headers={"authorization": self.api_key})
 
     def _upload(self, content: bytes, *, filename: str = None) -> aiohttp.client._RequestContextManager:
         filename = filename or "unknown." + get_extension(content)

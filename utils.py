@@ -16,7 +16,8 @@ limitations under the License.
 
 import femcord
 from femcord import types
-from aiohttp import ClientSession, ClientTimeout
+from femscript import FemscriptException
+from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError
 from models import Artists, Guilds, LastFM, Lyrics
 from config import LASTFM_API_URL, LASTFM_API_KEY
 from lastfm import Client, Track, exceptions
@@ -315,31 +316,34 @@ async def request(method: str, url: str, *, headers: dict = None, cookies: dict 
         proxy_address = config.PROXIES[proxy]
 
     async with ClientSession(timeout=ClientTimeout(10)) as session:
-        async with session.request(method, url, headers=headers, cookies=cookies, json=data, proxy=config.PROXY_TEMPLATE.format(proxy_address)) as response:
-            length = response.content_length
+        try:
+            async with session.request(method, url, headers=headers, cookies=cookies, json=data, proxy=config.PROXY_TEMPLATE.format(proxy_address)) as response:
+                length = response.content_length
 
-            if length is not None and length > 10 * 1024 * 1024:
+                if length is not None and length > 10 * 1024 * 1024:
+                    return {
+                        "status": -1,
+                        "text": "Content too large",
+                        "json": {}
+                    }
+
+                content = await response.read()
+
+                data = {}
+
+                if response.content_type == "application/json":
+                    try:
+                        data = json.loads(content)
+                    except json.JSONDecodeError:
+                        data = {}
+
                 return {
-                    "status": -1,
-                    "text": "Content too large",
-                    "json": {}
+                    "status": response.status,
+                    "text": content.decode(response.get_encoding()),
+                    "json": data
                 }
-
-            content = await response.read()
-
-            data = {}
-
-            if response.content_type == "application/json":
-                try:
-                    data = json.loads(content)
-                except json.JSONDecodeError:
-                    data = {}
-
-            return {
-                "status": response.status,
-                "text": content.decode(response.get_encoding()),
-                "json": data
-            }
+        except ClientHttpProxyError as exc:
+            raise FemscriptException(f"ClientHttpProxyError: {exc.status}")
 
 async def execute_webhook(webhook_id, webhook_token, *, username = None, avatar_url = None, content = None, embed: femcord.Embed = None):
     data = {}

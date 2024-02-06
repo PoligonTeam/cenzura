@@ -169,6 +169,8 @@ class MessageTypes(Enum):
     STAGE_SPEAKER = 29
     STAGE_TOPIC = 31
     GUILD_APPLICATION_PREMIUM_SUBSCRIPTION = 32
+    CHUJWIECO = 38
+    CHUJWIECO2 = 39
 
 class ComponentTypes(Enum):
     ACTION_ROW = 1

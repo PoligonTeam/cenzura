@@ -20,12 +20,20 @@ from femscript import Lexer, Parser, run, Dict, Femscript, var, FemscriptExcepti
 from utils import *
 from types import CoroutineType
 from models import Guilds
-from typing import List
-import re, datetime
+from typing import List, Dict, Literal, TypedDict
+import config, re, datetime
+
+class CommandData(TypedDict):
+    name: str
+    description: str
+    usage: str
+    aliases: List[str]
+    arguments: Dict[str, Literal["str", "int", "Channel", "Role", "User"]]
+    prefix: str
 
 class CustomCommands(commands.Cog):
-    name = "Komendy serwerowe"
-    description = "Komendy które są dostępne tylko na tym serwerze ([dokumentacja](https://cenzura.poligon.lgbt/docs))"
+    name = "Custom Commands"
+    description = "Commands that are available only on this server"
 
     def __init__(self):
         self.prefixes = []
@@ -38,11 +46,25 @@ class CustomCommands(commands.Cog):
             self.prefixes.append("")
 
 class Other(commands.Cog):
-    name = "Inne"
-
     def __init__(self, bot, custom_commands_cog):
         self.bot: commands.Bot = bot
         self.custom_commands_cog = custom_commands_cog
+
+    @commands.Listener
+    async def on_ready(self):
+        for guild in self.bot.gateway.guilds:
+            db_guild = await Guilds.filter(guild_id=guild.id).first()
+
+            if db_guild is None:
+                db_guild = await Guilds.create(guild_id=guild.id, prefix=config.PREFIX, welcome_message="", leave_message="", autorole="", custom_commands=[], database={}, permissions={}, schedules=[])
+
+            for custom_command in db_guild.custom_commands:
+                try:
+                    self.create_custom_command(guild.id, await self.get_command_data(custom_command), custom_command)
+                except FemscriptException:
+                    pass
+                except Exception:
+                    pass
 
     @commands.command(description="pisaju skrypt", usage="(kod)", aliases=["fs", "fscript", "cs", "cscript"])
     async def femscript(self, ctx: commands.Context, *, code):
@@ -183,14 +205,12 @@ class Other(commands.Cog):
                 fake_message.content = (await self.bot.get_prefix(self.bot, message))[-1] + message.content[len(prefix):]
 
                 return await self.bot.process_commands(fake_message)
-
-    @commands.command(description="Creating a custom command", usage="(code)")
-    @commands.has_permissions("manage_guild")
-    async def cctest(self, ctx: commands.Context, *, code):
+            
+    async def get_command_data(self, code: str) -> CommandData:
         femscript = Femscript(code)
 
         if not (len(femscript.ast) > 0 and femscript.ast[0]["type"] == "Token" and femscript.ast[0]["token"]["value"] == "command"):
-            return await ctx.reply("Your code hasn't initialised the command")
+            raise Exception("Missing initialization")
 
         femscript.ast = femscript.ast[0:1]
 
@@ -229,20 +249,114 @@ class Other(commands.Cog):
             command_data["name"] = name
             command_data["description"] = description
             command_data["usage"] = usage
-            command_data["aliases"] = aliases
-            command_data["arguments"] = arguments
+            command_data["aliases"] = aliases or []
+            command_data["arguments"] = arguments or {}
             command_data["prefix"] = prefix
 
-        result = await femscript.execute(debug=ctx.author.id in self.bot.owners)
+        await femscript.execute()
 
-        if isinstance(result, FemscriptException):
-            return await ctx.reply(result)
+        if command_data["prefix"] is not None:
+            self.custom_commands_cog.append_prefix(command_data["prefix"])
+        
+        return command_data
+            
+    def create_custom_command(self, guild_id: str, command_data: CommandData, code: str) -> commands.Command:
+        async def func(ctx, args = None) -> object:
+            async with femcord.Typing(ctx.message):
+                converted = convert(guild=ctx.guild, channel=ctx.channel, author=ctx.author)
 
-        await ctx.reply(str(command_data))
+                variables = [
+                    {
+                        "name": key,
+                        "value": Femscript.to_fs(value)
+                    }
+                    for key, value in converted.items()
+                ]
+
+                femscript = Femscript(code, variables=variables)
+
+                femscript.wrap_function(request)
+                femscript.wrap_function(femcord.Embed)
+
+                femscript.wrap_function(void, func_name="command")
+
+                result = await femscript.execute()
+
+                if isinstance(result, femcord.Embed):
+                    return await ctx.reply(embed=result)
+                
+                await self.bot.paginator(ctx.reply, ctx, str(result), replace=False)                
+
+        kwargs = {
+            **command_data,
+            "cog": self.custom_commands_cog,
+            "guild_id": guild_id,
+            "other": {
+                "prefix": command_data["prefix"],
+                "display_name": command_data["name"],
+                "code": code
+            }
+        }
+        
+        kwargs["name"] = guild_id + "_" + command_data["name"]
+        kwargs["aliases"].append(command_data["name"])
+        del kwargs["prefix"]
+
+        if command_data["arguments"]:
+            @commands.command(**kwargs)
+            async def command(_, ctx, *args):
+                await func(ctx, args)
+        else:
+            @commands.command(**kwargs)
+            async def command(_, ctx):
+                await func(ctx)
+
+        if command_data["usage"] is not None:
+            command.usage = "(" + command_data["usage"][0] + ")" + (" " if len(command_data["usage"]) > 1 else "") + " ".join("[" + item + "]" for item in command_data["usage"][1:])
+
+        self.custom_commands_cog.commands.append(command)
+        self.bot.commands.append(command)
+
+        return command
 
     @commands.command(description="Creating a custom command", usage="(code)", aliases=["cc", "createcommand"])
     @commands.has_permissions("manage_guild")
     async def customcommand(self, ctx: commands.Context, *, code):
+        guild = Guilds.get(guild_id=ctx.guild.id)
+        custom_commands = (await guild).custom_commands
+
+        try:
+            command_data = await self.get_command_data(code)
+        except FemscriptException as exc:
+            return await ctx.reply(exc)
+        except Exception:
+            return await ctx.reply("Your code hasn't initialised the command")
+
+        command_object = self.bot.get_command(command_data["name"], guild_id=ctx.guild.id)
+
+        for alias in command_data["aliases"]:
+            alias_command = self.bot.get_command(alias, guild_id=ctx.guild.id)
+            if alias_command is not None and not alias_command.name == ctx.guild.id + "_" + command_data["name"]:
+                return await ctx.reply(f"Alias `{alias}` is already used in the bot")
+            
+        text = "Created"
+    
+        if command_object is not None:
+            custom_commands.remove(command_object.other["code"])
+            self.bot.remove_command(command_object)
+
+            text = "Updated"
+
+        command = self.create_custom_command(ctx.guild.id, command_data, code)
+
+        custom_commands.append(code)
+        await guild.update(custom_commands=custom_commands)
+
+        await ctx.reply(text)
+
+    # @commands.command(description="Creating a custom command", usage="(code)", aliases=["cc", "createcommand"])
+    # @commands.has_permissions("manage_guild")
+    async def _(self, ctx: commands.Context, *, code):
         guild = Guilds.get(guild_id=ctx.guild.id)
         custom_commands = (await guild).custom_commands
 

@@ -41,7 +41,7 @@ macro_rules! check_args {
     };
 }
 
-pub async fn print(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
+async fn print(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
     check_args!(name, args);
 
     println!("{}", match args[0]._type {
@@ -82,11 +82,11 @@ async fn get(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
     check_args!(name, args, 2);
 
     if args[0]._type != TokenType::List {
-        return Token::new_error(TokenType::TypeError, "item() takes a list as its first argument".to_string());
+        return Token::new_error(TokenType::TypeError, "get() takes a list as its first argument".to_string());
     }
 
     if args[1]._type != TokenType::Int {
-        return Token::new_error(TokenType::TypeError, "item() takes an integer as its second argument".to_string());
+        return Token::new_error(TokenType::TypeError, "get() takes an integer as its second argument".to_string());
     }
 
     let index = args[1].number as usize;
@@ -130,6 +130,34 @@ async fn contains(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
     }
 
     Token::new_bool("false".to_string())
+}
+
+async fn split(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
+    check_args!(name, args, 2);
+
+    if args[0]._type != TokenType::Str {
+        return Token::new_error(TokenType::TypeError, "split() takes a string as its first argument".to_string());
+    }
+
+    if args[1]._type != TokenType::Str {
+        return Token::new_error(TokenType::TypeError, "split() takes a string as its second argument".to_string());
+    }
+
+    Token::new_list(args[0].value.split(&args[1].value).map(|string| Token::new_string(string.to_string())).collect())
+}
+
+async fn join(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
+    check_args!(name, args, 2);
+
+    if args[0]._type != TokenType::List {
+        return Token::new_error(TokenType::TypeError, "has() takes a list as its first argument".to_string());
+    }
+
+    if args[1]._type != TokenType::Str {
+        return Token::new_error(TokenType::TypeError, "split() takes a string as its second argument".to_string());
+    }
+
+    Token::new_string(args[0].list.to_owned().into_iter().map(|token| token.value).collect::<Vec<String>>().join(&args[1].value))
 }
 
 async fn hex(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
@@ -265,7 +293,7 @@ async fn _str(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
     }
 }
 
-pub async fn _await(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
+async fn _await(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
     check_args!(name, args);
 
     if let None = args[0].pyobject {
@@ -295,18 +323,31 @@ pub async fn _await(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token
     }
 }
 
+async fn error(name: String, args: Vec<Token>, _scope: &mut Scope) -> Token {
+    check_args!(name, args);
+
+    if args[0]._type != TokenType::Str {
+        return Token::new_error(TokenType::TypeError, "Error() takes a string as its first argument".to_string());
+    }
+
+    Token::new_error(TokenType::Error, args[0].value.to_owned())
+}
+
 pub fn get_builtins() -> Vec<Function> {
     vec![
         Function::new_builtin("get"),
         Function::new_builtin("len"),
         Function::new_builtin("contains"),
+        Function::new_builtin("split"),
+        Function::new_builtin("join"),
         Function::new_builtin("hex"),
         Function::new_builtin("rgb"),
         Function::new_builtin("randint"),
         Function::new_builtin("format"),
         Function::new_builtin("type"),
         Function::new_builtin("str"),
-        Function::new_builtin("await")
+        Function::new_builtin("await"),
+        Function::new_builtin("Error")
     ]
 }
 
@@ -330,6 +371,8 @@ pub async fn call_builtin(name: String, args: Vec<Token>, scope: &mut Scope) -> 
     wrap!(get);
     wrap!(len);
     wrap!(contains);
+    wrap!(split);
+    wrap!(join);
     wrap!(hex);
     wrap!(rgb);
     wrap!(randint);
@@ -337,6 +380,7 @@ pub async fn call_builtin(name: String, args: Vec<Token>, scope: &mut Scope) -> 
     wrap!(_type, "type");
     wrap!(_str, "str");
     wrap!(_await, "await");
+    wrap!(error, "Error");
 
     None
 }

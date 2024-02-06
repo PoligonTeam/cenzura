@@ -27,6 +27,7 @@ pub enum ASTType {
     Assign,
     Token,
     Expression,
+    Equation,
     Keyword,
     Error
 }
@@ -52,6 +53,7 @@ impl FromStr for ASTType {
             Assign,
             Token,
             Expression,
+            Equation,
             Keyword,
             Error
         )
@@ -65,7 +67,7 @@ pub struct AST {
     pub children: Vec<AST>
 }
 
-fn get_tokens_in_expr<'a, 'b>(tokens: &'a mut Peekable<Iter<&'b Token>>, to: TokenType, or_to: Option<TokenType>) -> Result<Vec<&'b Token>> {
+pub fn get_tokens_in_expr<'a, 'b>(tokens: &'a mut Peekable<Iter<&'b Token>>, to: TokenType, or_to: Option<TokenType>) -> Result<Vec<&'b Token>> {
     let mut tokens_in_expr: Vec<&Token> = Vec::new();
 
     while let Some(token) = tokens.next() {
@@ -409,6 +411,41 @@ pub fn generate_ast(tokens: Vec<&Token>) -> Vec<AST> {
                     }
                 });
             },
+            // TokenType::Int => {
+            //     let mut children: Vec<AST> = Vec::new();
+
+            //     children.push(AST {
+            //         _type: ASTType::Token,
+            //         token: token.to_owned().to_owned(),
+            //         children: Vec::new()
+            //     });
+
+            //     while let Some(token) = tokens.next() {
+            //         if let TokenType::RightParen | TokenType::Comma | TokenType::Semicolon = token._type {
+            //             break;
+            //         }
+
+            //         if token._type == TokenType::Var {
+            //             if let Some(token) = tokens.peek() {
+            //                 if token._type == TokenType::RightParen {
+            //                     children.append(&mut generate_ast(get_tokens_in_expr(&mut tokens, TokenType::LeftParen, None).unwrap_or(vec![&Token::new_error(TokenType::SyntaxError, "unclosed (".to_string())])));
+            //                 }
+            //             }
+            //         } else {
+            //             children.push(AST {
+            //                 _type: ASTType::Token,
+            //                 token: token.to_owned().to_owned(),
+            //                 children: Vec::new()
+            //             });
+            //         }
+            //     }
+
+            //     ast.push(AST {
+            //         _type: ASTType::Equation,
+            //         token: Token::new(TokenType::Int),
+            //         children
+            //     })
+            // },
             TokenType::Int |
             TokenType::Str |
             TokenType::Bool |

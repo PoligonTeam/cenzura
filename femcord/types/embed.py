@@ -39,6 +39,8 @@ class EmbedThumbnail:
     height: int
     width: int
     proxy_url: str = None
+    placeholder_version: object = None
+    placeholder: object = None
 
 @modified_dataclass
 class EmbedVideo:
@@ -46,6 +48,8 @@ class EmbedVideo:
     height: int
     width: int
     proxy_url: str = None
+    placeholder_version: object = None
+    placeholder: object = None
 
 @modified_dataclass
 class EmbedProvider:
@@ -81,6 +85,7 @@ class Embed:
     author: EmbedAuthor = None
     fields: Sequence[EmbedField] = None
     reference_id: str = None
+    placeholder_version: object = None
 
     @classmethod
     def from_raw(cls, embed):

@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-use std::iter::Peekable;
 use std::str::Chars;
 use std::fmt::Display;
 use std::str::FromStr;
+use std::{iter::Peekable, collections::HashMap};
 use pyo3::{prelude::Py, types::PyAny};
 use crate::interpreter::Scope;
 
 #[allow(dead_code)]
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TokenType {
     Unknown,
 
@@ -230,6 +230,101 @@ impl Token {
     }
 }
 
+fn parse_equation(tokens: Vec<&Token>) -> Vec<Token> {
+    let mut tokens = tokens.into_iter().peekable();
+    let mut parsed_tokens: Vec<Token> = Vec::new();
+    let mut stack: Vec<&Token> = Vec::new();
+
+    let precedence: HashMap<TokenType, i8> = HashMap::from([
+        (TokenType::Plus, 1i8),
+        (TokenType::Minus, 1i8),
+        (TokenType::Multiply, 2i8),
+        (TokenType::Divide, 2i8),
+        (TokenType::Modulo, 2i8)
+    ]);
+
+    while let Some(token) = tokens.next() {
+        if token._type == TokenType::LeftParen {
+            let mut to_parse: Vec<&Token> = Vec::new();
+
+            let mut count = 1;
+
+            while let Some(token) = tokens.next() {
+                match token._type {
+                    TokenType::LeftParen => count += 1,
+                    TokenType::RightParen => count -= 1,
+                    _ => {}
+                }
+
+                if count == 0 {
+                    break;
+                }
+
+                to_parse.push(token);
+            }
+
+            tokens.next();
+
+            parsed_tokens.append(&mut parse_equation(to_parse));
+        } else if precedence.contains_key(&token._type) {
+            if stack.is_empty() {
+                stack.push(token);
+            } else {
+                if precedence.get(&token._type) > precedence.get(&stack[0]._type) {
+                    stack.insert(0, token);
+                } else {
+                    parsed_tokens.push(stack[0].to_owned());
+                    stack.remove(0);
+                    stack.push(token)
+                }
+            }
+        } else if token._type == TokenType::Var {
+            parsed_tokens.push(token.to_owned());
+
+            if let Some(token) = tokens.peek() {
+                if token._type == TokenType::LeftParen {
+                    parsed_tokens.push(token.to_owned().to_owned());
+
+                    let mut to_parse: Vec<&Token> = Vec::new();
+
+                    tokens.next();
+
+                    let mut count = 1;
+                    let mut close: &Token = &Token::new_error(TokenType::SyntaxError, "( is not closed".to_string());
+
+                    while let Some(token) = tokens.next() {
+                        match token._type {
+                            TokenType::LeftParen => count += 1,
+                            TokenType::RightParen => count -= 1,
+                            _ => {}
+                        }
+
+                        if count == 0 {
+                            close = token;
+                            break;
+                        }
+
+                        to_parse.push(token);
+                    }
+
+                    tokens.next();
+
+                    parsed_tokens.append(&mut parse_equation(to_parse));
+                    parsed_tokens.push(close.to_owned());
+                }
+            }
+        } else {
+            parsed_tokens.push(token.to_owned());
+        }
+    }
+
+    for token in stack {
+        parsed_tokens.push(token.to_owned());
+    }
+
+    parsed_tokens
+}
+
 pub fn generate_tokens(code: &str) -> Vec<Token> {
     let mut tokens: Vec<Token> = Vec::new();
     let mut code = code.chars().peekable();
@@ -299,11 +394,9 @@ pub fn generate_tokens(code: &str) -> Vec<Token> {
 
                         Token::new_int(num.parse::<f64>().unwrap() * -1.0)
                     } else {
-                        is_previous_num = false;
                         check_next(&mut code, TokenType::Minus, TokenType::MinusEqual, '=')
                     }
                 } else {
-                    is_previous_num = false;
                     check_next(&mut code, TokenType::Minus, TokenType::MinusEqual, '=')
                 }
             },
@@ -359,7 +452,8 @@ pub fn generate_tokens(code: &str) -> Vec<Token> {
                     num = format!("{}.0", num);
                 }
 
-                Token::new_int(num.parse::<f64>().unwrap())
+                tokens.push(Token::new_int(num.parse::<f64>().unwrap()));
+                continue;
             },
             'A'..='z' => {
                 let mut string = String::new();
@@ -432,8 +526,39 @@ pub fn generate_tokens(code: &str) -> Vec<Token> {
             _ => Token::new_error(TokenType::Error, format!("{} is not a valid character", c))
         };
 
+        is_previous_num = false;
+
         tokens.push(token);
     }
 
     tokens
+
+    // let mut parsed_tokens: Vec<Token> = Vec::new();
+
+    // let mut tokens = tokens.iter().peekable();
+
+    // while let Some(token) = tokens.next() {
+    //     if token._type == TokenType::Int {
+    //         let mut to_parse: Vec<&Token> = Vec::new();
+    //         let mut end: &Token = &Token::new(TokenType::Semicolon);
+
+    //         to_parse.push(&token);
+
+    //         while let Some(token) = tokens.next() {
+    //             if let TokenType::Semicolon | TokenType::Comma = token._type {
+    //                 end = token;
+    //                 break
+    //             }
+                
+    //             to_parse.push(&token);
+    //         }
+
+    //         parsed_tokens.append(&mut parse_equation(to_parse));
+    //         parsed_tokens.push(end.to_owned());
+    //     } else {
+    //         parsed_tokens.push(token.to_owned())
+    //     }
+    // }
+
+    // parsed_tokens
 }

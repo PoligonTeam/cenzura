@@ -16,10 +16,9 @@ limitations under the License.
 
 import femcord
 from femcord import commands
-from femcord.http import Route
-from utils import fg, bg
+from utils import fg
 from typing import TYPE_CHECKING
-import traceback, random
+import traceback, random, string
 
 if TYPE_CHECKING:
     from bot import Bot
@@ -33,7 +32,7 @@ class ErrorHandler(commands.Cog):
     @commands.Listener
     async def on_error(self, ctx: commands.Context, error):
         if isinstance(error, commands.CommandNotFound):
-            return await ctx.reply("Command not found")
+            return error.args[0][0] in string.ascii_letters and await ctx.reply("Command not found")
 
         elif isinstance(error, commands.CommandDisabled):
             return await ctx.reply("This command is disabled")

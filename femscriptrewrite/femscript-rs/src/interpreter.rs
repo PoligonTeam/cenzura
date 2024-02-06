@@ -134,7 +134,13 @@ pub async fn execute_ast(ast: Vec<AST>, scope: &mut Scope, context: Option<Token
                 return node.token;
             },
             ASTType::Block => {
-                if context._type != TokenType::Unknown {
+                if let TokenType::Func | TokenType::If = context._type {
+                    result = execute_ast(node.children, scope, Some(node.token.to_owned()), depth).await;
+
+                    if check_if_error(&result) {
+                        return result;
+                    }
+                } else {
                     let mut borrowed_scope = Scope::new();
                     let mut start = 0;
 
@@ -176,12 +182,6 @@ pub async fn execute_ast(ast: Vec<AST>, scope: &mut Scope, context: Option<Token
                     if check_if_error(&result) {
                         return result;
                     }
-                } else {
-                    result = execute_ast(node.children, scope, Some(node.token.to_owned()), depth).await;
-
-                    if check_if_error(&result) {
-                        return result;
-                    }
                 }
             },
             ASTType::Token => {
@@ -199,7 +199,15 @@ pub async fn execute_ast(ast: Vec<AST>, scope: &mut Scope, context: Option<Token
                         result = if context._type == TokenType::Var && node.token._type == TokenType::Int {
                             result = if let Some(variable) = get_variable(&context.value, scope) {
                                 if variable.value._type == TokenType::List {
-                                    variable.value.list[node.token.number as usize].to_owned()
+                                    let len = variable.value.list.len();
+                                    let mut num = node.token.number as i32;
+                                    if num < 0 {
+                                        num += len as i32;
+                                    }
+                                    if num as usize >= len {
+                                        return Token::new_error(TokenType::IndexError, "list index out of range".to_string());
+                                    }
+                                    variable.value.list[num as usize].to_owned()
                                 } else {
                                     node.token
                                 }
@@ -233,7 +241,7 @@ pub async fn execute_ast(ast: Vec<AST>, scope: &mut Scope, context: Option<Token
                             result = node.token;
                         } else {
                             for child in node.children {
-                                let child_result = execute_ast(vec![child], scope, None, depth).await;
+                                let child_result = execute_ast(vec![child], scope, Some(node.token.to_owned()), depth).await;
 
                                 if check_if_error(&child_result) {
                                     return child_result;
@@ -372,7 +380,7 @@ pub async fn execute_ast(ast: Vec<AST>, scope: &mut Scope, context: Option<Token
                                     });
                                 }
 
-                                result = execute_ast(body.to_owned(), &mut function_scope, None, depth + 1).await;
+                                result = execute_ast(body.to_owned(), &mut function_scope, Some(Token::new(TokenType::Func)), depth + 1).await;
 
                                 if check_if_error(&result) {
                                     return result;
@@ -568,19 +576,61 @@ pub async fn execute_ast(ast: Vec<AST>, scope: &mut Scope, context: Option<Token
 
                 result = _result;
             },
+            ASTType::Equation => {
+                let mut stack: Vec<Token> = Vec::new();
+
+                for children in node.children {
+                    match children.token._type {
+                        TokenType::Plus |
+                        TokenType::Minus |
+                        TokenType::Multiply |
+                        TokenType::Divide |
+                        TokenType::Modulo => {
+                            let stack_len = stack.len();
+                            
+                            let left = stack[stack_len - 2].to_owned();
+                            let right = stack[stack_len - 1].to_owned();
+
+                            stack.remove(stack_len - 1);
+                            stack.remove(stack_len - 2);
+
+                            stack.push(Token::new_int(match children.token._type {
+                                TokenType::Plus => left.number + right.number,
+                                TokenType::Minus => left.number - right.number,
+                                TokenType::Multiply => left.number * right.number,
+                                TokenType::Divide => left.number / right.number,
+                                TokenType::Modulo => left.number % right.number,
+                                _ => unreachable!()
+                            }))
+                        },
+                        TokenType::Var => {
+                            result = execute_ast(vec![children], scope, None, depth).await;
+                            
+                            if check_if_error(&result) {
+                                return result;
+                            }
+
+                            stack.push(result);
+                        },
+                        _ => stack.push(children.token)
+                    }
+                }
+
+                result = stack[0].to_owned();
+            },
             ASTType::Keyword => {
                 match node.token._type {
                     TokenType::If => {
-                        let condition = execute_ast(node.children[0].children.to_owned(), scope, None, depth).await;
+                        let condition = execute_ast(node.children[0].children.to_owned(), scope, Some(Token::new(TokenType::If)), depth).await;
 
                         if check_if_error(&condition) {
                             return condition;
                         }
 
                         if condition.number == 1.0 {
-                            result = execute_ast(node.children[1].children.to_owned(), scope, None, depth).await;
+                            result = execute_ast(node.children[1].children.to_owned(), scope, Some(Token::new(TokenType::If)), depth).await;
                         } else if node.children.len() == 3 {
-                            result = execute_ast(node.children[2].children.to_owned(), scope, None, depth).await;
+                            result = execute_ast(node.children[2].children.to_owned(), scope, Some(Token::new(TokenType::If)), depth).await;
                         }
 
                         if check_if_error(&result) {

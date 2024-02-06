@@ -113,14 +113,14 @@ class Bot(commands.Bot):
             if db_guild is None:
                 db_guild = await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[], database={}, permissions={}, schedules=[])
 
-            if db_guild.custom_commands:
-                guild.owner = await guild.get_member(guild.owner)
+            # if db_guild.custom_commands:
+            #     guild.owner = await guild.get_member(guild.owner)
 
-            for custom_command in db_guild.custom_commands:
-                channel_id, author_id = metadata_pattern.findall(custom_command)[2:4]
-                fake_ctx = FakeCtx(self.gateway.copy, guild, guild.get_channel(channel_id), await guild.get_member(author_id), self.su_role)
+            # for custom_command in db_guild.custom_commands:
+            #     channel_id, author_id = metadata_pattern.findall(custom_command)[2:4]
+            #     fake_ctx = FakeCtx(self.gateway.copy, guild, guild.get_channel(channel_id), await guild.get_member(author_id), self.su_role)
 
-                await customcommand_command(fake_ctx, code=custom_command)
+            #     await customcommand_command(fake_ctx, code=custom_command)
 
         await self.scheduler.create_schedule(self.update_presences, "10m", name="update_presences")()
 
