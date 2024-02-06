@@ -16,12 +16,20 @@ limitations under the License.
 
 import femcord
 from femcord import commands, types
-from femscript import Lexer, Parser, run, Dict, Femscript, var, FemscriptException
+from femscript import Femscript, var, FemscriptException
 from utils import *
 from types import CoroutineType
 from models import Guilds
-from typing import List, Dict, Literal, TypedDict
-import config, re, datetime
+from typing import List, Dict, Tuple, Literal, TypedDict
+from enum import Enum
+import config, datetime
+
+class CommandOperation(Enum):
+    UPDATE = 0
+    GET_CODE = 1
+    GET_COMMANDS = 2
+    REMOVE_COMMAND = 3
+    MISSING_INIT = 4
 
 class CommandData(TypedDict):
     name: str
@@ -60,7 +68,7 @@ class Other(commands.Cog):
 
             for custom_command in db_guild.custom_commands:
                 try:
-                    self.create_custom_command(guild.id, await self.get_command_data(custom_command), custom_command)
+                    self.create_custom_command(guild.id, (await self.get_command_data(custom_command))[1], custom_command)
                 except FemscriptException:
                     pass
                 except Exception:
@@ -68,79 +76,6 @@ class Other(commands.Cog):
 
     @commands.command(description="pisaju skrypt", usage="(kod)", aliases=["fs", "fscript", "cs", "cscript"])
     async def femscript(self, ctx: commands.Context, *, code):
-        result = await run(
-            code,
-            modules = {
-                **await get_modules(self.bot, ctx.guild, ctx=ctx),
-                **(
-                    {
-                        "database": {}
-                    }
-                    if not ctx.member.permissions.has("manage_guild") else
-                    {
-
-                    }
-                ),
-                **(
-                    {
-                        "owneronly": {
-                            "builtins": {
-                                "call": lambda function, *args, **kwargs: function(*args, **kwargs),
-                                "py_builtins": Dict(**__builtins__),
-                                "send": ctx.send,
-                                "reply": ctx.reply
-                            },
-                            "variables": {
-                                "femcord": femcord,
-                                "_bot": self.bot,
-                                "ctx": ctx
-                            }
-                        }
-                    }
-                    if ctx.author.id in self.bot.owners else
-                    {
-
-                    }
-                )
-            },
-            builtins = builtins,
-            variables = {
-                **convert(
-                    guild = ctx.guild,
-                    channel = ctx.channel,
-                    author = ctx.author
-                ),
-                "bot": {
-                    "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ",
-                    "gateway": {
-                        "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ"
-                    },
-                    "http": {
-                        "token": "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ"
-                    }
-                },
-                "sex": 69,
-                "dupa": True
-            }
-        )
-
-        if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], femcord.Embed):
-            return await ctx.reply(result[0], embed=result[1])
-
-        if isinstance(result, femcord.Embed):
-            return await ctx.reply(embed=result)
-
-        result = str(result)
-
-        prefix_suffix = "```"
-
-        if len(result) < 100:
-            prefix_suffix = ""
-
-        await self.bot.paginator(ctx.reply, ctx, result, prefix=prefix_suffix, suffix=prefix_suffix)
-
-    @commands.command(description="pisaju skrypt w rewrite", usage="(kod)", aliases=["fsr"])
-    async def femscriptrewrite(self, ctx: commands.Context, *, code):
         fake_token = var("token", "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ")
 
         variables = [
@@ -206,15 +141,11 @@ class Other(commands.Cog):
 
                 return await self.bot.process_commands(fake_message)
             
-    async def get_command_data(self, code: str) -> CommandData:
+    async def get_command_data(self, code: str) -> Tuple[CommandOperation, CommandData]:
         femscript = Femscript(code)
 
-        if not (len(femscript.ast) > 0 and femscript.ast[0]["type"] == "Token" and femscript.ast[0]["token"]["value"] == "command"):
-            raise Exception("Missing initialization")
-
-        femscript.ast = femscript.ast[0:1]
-
         command_data = {
+            "operation": CommandOperation.UPDATE,
             "name": None,
             "description": None,
             "usage": None,
@@ -223,8 +154,13 @@ class Other(commands.Cog):
             "prefix": None
         }
 
+        if not (len(femscript.ast) > 0 and femscript.ast[0]["type"] == "Token" and femscript.ast[0]["token"]["value"] in ("command", "remove_command", "get_commands", "get_command_code")):
+            return CommandOperation.MISSING_INIT, command_data
+
+        femscript.ast = femscript.ast[0:1]
+
         @femscript.wrap_function()
-        def command(*, name: str, description: str = None, usage: str = None, aliases: List[str] = None, arguments: Dict[str, str] = None, prefix: str = None):
+        def command(*, name: str, description: str = None, usage: str = None, aliases: List[str] = None, arguments: Dict[str, str] = None, prefix: str = None) -> None:
             if not isinstance(name, str):
                 raise FemscriptException("Name must be a string")
             if description and not isinstance(description, str):
@@ -253,16 +189,63 @@ class Other(commands.Cog):
             command_data["arguments"] = arguments or {}
             command_data["prefix"] = prefix
 
+        @femscript.wrap_function()
+        def get_command_code(name: str) -> None:
+            command_data["operation"] = CommandOperation.GET_CODE
+            command_data["name"] = name
+
+        @femscript.wrap_function()
+        def get_commands() -> None:
+            command_data["operation"] = CommandOperation.GET_COMMANDS
+        
+        @femscript.wrap_function()
+        def remove_command(name: str) -> None:
+            command_data["operation"] = CommandOperation.REMOVE_COMMAND
+            command_data["name"] = name
+
         await femscript.execute()
 
         if command_data["prefix"] is not None:
             self.custom_commands_cog.append_prefix(command_data["prefix"])
-        
-        return command_data
+
+        return command_data.pop("operation"), command_data
             
     def create_custom_command(self, guild_id: str, command_data: CommandData, code: str) -> commands.Command:
         async def func(ctx, args = None) -> object:
             async with femcord.Typing(ctx.message):
+                if args is not None:
+                    args = args[0]
+                    values = list(command_data["arguments"].values())
+
+                    normal_types = {
+                        "str": str,
+                        "int": float
+                    }
+
+                    discord_types = {
+                        "User": lambda item: types.User.from_arg(ctx, item),
+                        "Channel": lambda item: types.Channel.from_arg(ctx, item),
+                        "Role": lambda item: types.Role.from_arg(ctx, item)
+                    }
+
+                    for index, item in enumerate(args):
+                        _type = values[index]
+
+                        if _type == "str" and index + 1 >= len(values):
+                            args = [" ".join(args[index:])]
+                            break
+                        elif _type in normal_types:
+                            args[index] = normal_types[_type](item)
+                        elif _type in discord_types:
+                            result = discord_types[_type](item)
+                            if isinstance(result, CoroutineType):
+                                result = await result
+
+                            args[index] = convert(_=result)["_"]
+                            continue
+
+                    args = dict(zip(command_data["arguments"].keys(), args))
+
                 converted = convert(guild=ctx.guild, channel=ctx.channel, author=ctx.author)
 
                 variables = [
@@ -270,7 +253,7 @@ class Other(commands.Cog):
                         "name": key,
                         "value": Femscript.to_fs(value)
                     }
-                    for key, value in converted.items()
+                    for key, value in (converted | (args or {})).items()
                 ]
 
                 femscript = Femscript(code, variables=variables)
@@ -285,7 +268,10 @@ class Other(commands.Cog):
                 if isinstance(result, femcord.Embed):
                     return await ctx.reply(embed=result)
                 
-                await self.bot.paginator(ctx.reply, ctx, str(result), replace=False)                
+                await self.bot.paginator(ctx.reply, ctx, str(result), replace=False)
+
+        if command_data["usage"] is None and command_data["arguments"]:
+            command_data["usage"] = " ".join(["(" + key + ":" + value + ")" for key, value in command_data["arguments"].items()])  
 
         kwargs = {
             **command_data,
@@ -311,9 +297,6 @@ class Other(commands.Cog):
             async def command(_, ctx):
                 await func(ctx)
 
-        if command_data["usage"] is not None:
-            command.usage = "(" + command_data["usage"][0] + ")" + (" " if len(command_data["usage"]) > 1 else "") + " ".join("[" + item + "]" for item in command_data["usage"][1:])
-
         self.custom_commands_cog.commands.append(command)
         self.bot.commands.append(command)
 
@@ -322,15 +305,37 @@ class Other(commands.Cog):
     @commands.command(description="Creating a custom command", usage="(code)", aliases=["cc", "createcommand"])
     @commands.has_permissions("manage_guild")
     async def customcommand(self, ctx: commands.Context, *, code):
+        code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
+               f"# GUILD: {ctx.guild.id}\n" \
+               f"# CHANNEL: {ctx.channel.id}\n" \
+               f"# AUTHOR: {ctx.author.id}\n\n" \
+             + code
+
         guild = Guilds.get(guild_id=ctx.guild.id)
         custom_commands = (await guild).custom_commands
 
-        try:
-            command_data = await self.get_command_data(code)
-        except FemscriptException as exc:
-            return await ctx.reply(exc)
-        except Exception:
+        operation, command_data = await self.get_command_data(code)
+
+        if operation == CommandOperation.MISSING_INIT:
             return await ctx.reply("Your code hasn't initialised the command")
+        elif operation == CommandOperation.GET_CODE:
+            command = self.bot.get_command(command_data["name"], guild_id=ctx.guild.id)
+
+            if not command or not "code" in command.other or not command.guild_id == ctx.guild.id:
+                raise commands.CommandNotFound()
+            
+            return await self.bot.paginator(ctx.reply, ctx, command.other["code"], prefix="```py\n", suffix="```")
+        elif operation == CommandOperation.GET_COMMANDS:
+            return await self.bot.paginator(ctx.reply, ctx, pages=custom_commands, prefix="```py\n", suffix="```")
+        elif operation == CommandOperation.REMOVE_COMMAND:
+            command = self.bot.get_command(command_data["name"], guild_id=ctx.guild.id)
+
+            custom_commands.remove(command.other["code"])
+            self.bot.remove_command(command)
+
+            await guild.update(custom_commands=custom_commands)
+
+            return await ctx.reply("Removed")
 
         command_object = self.bot.get_command(command_data["name"], guild_id=ctx.guild.id)
 
@@ -353,280 +358,6 @@ class Other(commands.Cog):
         await guild.update(custom_commands=custom_commands)
 
         await ctx.reply(text)
-
-    # @commands.command(description="Creating a custom command", usage="(code)", aliases=["cc", "createcommand"])
-    # @commands.has_permissions("manage_guild")
-    async def _(self, ctx: commands.Context, *, code):
-        guild = Guilds.get(guild_id=ctx.guild.id)
-        custom_commands = (await guild).custom_commands
-
-        command_prefix = None
-        command_name = None
-        command_description = None
-        command_usage = None
-        command_aliases = []
-        command_arguments = {}
-
-        return_text = None
-
-        def set_command_name(name, *, prefix = None):
-            nonlocal command_prefix, command_name, code
-            command_prefix = prefix
-            command_name = name
-
-            if prefix is not None and not prefix in self.custom_commands_cog.prefixes:
-                self.custom_commands_cog.append_prefix(prefix)
-
-            if not re.findall(r"# (DATE|GUILD|CHANNEL|AUTHOR): \d+", code) == ["DATE", "GUILD", "CHANNEL", "AUTHOR"]:
-                code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
-                       f"# GUILD: {ctx.guild.id}\n" \
-                       f"# CHANNEL: {ctx.channel.id}\n" \
-                       f"# AUTHOR: {ctx.author.id}\n\n" \
-                     + code
-
-        def set_command_description(description):
-            nonlocal command_description
-            command_description = description
-
-        def set_command_usage(*usage):
-            nonlocal command_usage
-            command_usage = usage
-
-        def set_command_aliases(*aliases):
-            nonlocal command_aliases
-            command_aliases = list(aliases)
-
-        def set_command_arguments(**arguments):
-            nonlocal command_arguments
-
-            _types = {
-                "str": str,
-                "int": int,
-                "user": types.User,
-                "channel": types.Channel,
-                "role": types.Role
-            }
-
-            for key, value in arguments.items():
-                if value in _types:
-                    command_arguments[key] = _types[value]
-                    if value == "str":
-                        parser.variables[key] = ""
-                    elif value == "int":
-                        parser.variables[key] = 0
-                    elif value == "user":
-                        parser.variables[key] = convert(_=ctx.author)["_"]
-                    elif value == "channel":
-                        parser.variables[key] = convert(_=ctx.channel)["_"]
-                    elif value == "role":
-                        parser.variables[key] = convert(_=ctx.member.roles[0])["_"]
-                    continue
-
-                command_arguments[key] = value
-                parser.variables[key] = value
-
-        async def get_command_code(name):
-            nonlocal return_text
-
-            command = self.bot.get_command(name, guild_id=ctx.guild.id)
-
-            if not command or not "code" in command.other or not command.guild_id == ctx.guild.id:
-                raise commands.CommandNotFound()
-
-            await self.bot.paginator(ctx.reply, ctx, command.other["code"], prefix="```py\n", suffix="```")
-
-            return_text = ""
-
-        async def get_commands():
-            nonlocal return_text
-
-            await self.bot.paginator(ctx.reply, ctx, pages=custom_commands, prefix="```py\n", suffix="```")
-
-            return_text = ""
-
-        def delete_command(name):
-            nonlocal return_text
-
-            command = self.bot.get_command(ctx.guild.id + "_" + name, guild_id=ctx.guild.id)
-
-            custom_commands.remove(command.other["code"])
-            self.bot.remove_command(command)
-
-            return_text = "Komenda została usunięta"
-
-        lexer = Lexer(code)
-        parser = Parser(
-            lexer,
-            modules = {
-                **await get_modules(self.bot, ctx.guild),
-                "requests": {
-                    "builtins": {
-                        "request": lambda *args, **kwargs: {"text": "", "json": {}},
-                        "get": lambda *args, **kwargs: {"text": "", "json": {}},
-                        "post": lambda *args, **kwargs: {"text": "", "json": {}},
-                        "patch": lambda *args, **kwargs: {"text": "", "json": {}},
-                        "put": lambda *args, **kwargs: {"text": "", "json": {}},
-                        "delete": lambda *args, **kwargs: {"text": "", "json": {}}
-                    }
-                }
-            },
-            builtins = {
-                **builtins,
-                "set_command_name": set_command_name,
-                "set_command_description": set_command_description,
-                "set_command_usage": set_command_usage,
-                "set_command_aliases": set_command_aliases,
-                "set_command_arguments": set_command_arguments,
-                "get_command_code": get_command_code,
-                "get_commands": get_commands,
-                "delete_command": delete_command
-            },
-            variables = {
-                **convert(
-                    guild = ctx.guild,
-                    channel = ctx.channel,
-                    author = ctx.author
-                ),
-                "str": "str",
-                "int": "int",
-                "Channel": "channel",
-                "Role": "role",
-                "User": "user"
-            }
-        )
-
-        await parser.parse()
-
-        if return_text is not None:
-            if return_text == "":
-                return
-
-            await guild.update(custom_commands=custom_commands)
-            return await ctx.reply(return_text)
-
-        if command_name is None:
-            return await ctx.reply("Nie ustawiono nazwy komendy")
-
-        command_object = self.bot.get_command(command_name, guild_id=ctx.guild.id)
-
-        for alias in command_aliases:
-            _command = self.bot.get_command(alias, guild_id=ctx.guild.id)
-            if _command is not None and not _command.name == ctx.guild.id + "_" + command_name:
-                return await ctx.reply("Alias `%s` jest już używany w bocie" % alias)
-
-        text = "Stworzono"
-
-        if command_object:
-            if command_prefix is not None and not command_prefix in self.custom_commands_cog.prefixes:
-                self.custom_commands_cog.append_prefix(command_object.other["prefix"])
-
-            custom_commands.remove(command_object.other["code"])
-            self.bot.remove_command(command_object)
-
-            text = "Zaktualizowano"
-
-        command_info = {
-            "name": ctx.guild.id + "_" + command_name,
-            "description": command_description,
-            "usage": command_usage,
-            "aliases": [command_name] + command_aliases,
-            "cog": self.custom_commands_cog,
-            "guild_id": ctx.guild.id,
-            "other": {
-                "prefix": command_prefix,
-                "display_name": command_name,
-                "code": code
-            }
-        }
-
-        async def command_function(ctx, args = None):
-            async with femcord.Typing(ctx.message):
-                if args is not None:
-                    args = args[0]
-                    values = list(command_arguments.values())
-                    _break = False
-
-                    for index, item in enumerate(args):
-                        _type = values[index]
-
-                        if _type is str and index + 1 >= len(values):
-                            item = " ".join(args[index:])
-                            _break = True
-
-                        if _type in (types.User, types.Channel, types.Role):
-                            result = _type.from_arg(ctx, item)
-                            if isinstance(result, CoroutineType):
-                                result = await result
-
-                            args[index] = convert(_=result)["_"]
-                            continue
-
-                        args[index] = _type(item)
-
-                        if _break is True:
-                            break
-
-                    args = dict(zip(command_arguments.keys(), args))
-
-                result = await run(
-                    code,
-                    modules = await get_modules(self.bot, ctx.guild),
-                    builtins = {
-                        **builtins,
-                        "set_command_name": void,
-                        "set_command_description": void,
-                        "set_command_usage": void,
-                        "set_command_aliases": void,
-                        "set_command_arguments": void,
-                        "get_command_code": void,
-                        "get_commands": void,
-                        "delete_command": void
-                    },
-                    variables = {
-                        **convert(
-                            guild = ctx.guild,
-                            channel = ctx.channel,
-                            author = ctx.author
-                        ),
-                        "str": "str",
-                        "int": "int",
-                        "Channel": "channel",
-                        "Role": "role",
-                        "User": "user",
-                        **(
-                            args if args is not None else {}
-                        )
-                    }
-                )
-
-                if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], femcord.Embed):
-                    return await ctx.reply(result[0], embed=result[1])
-
-                if isinstance(result, femcord.Embed):
-                    return await ctx.reply(embed=result)
-
-            await self.bot.paginator(ctx.reply, ctx, result, replace=False)
-
-        if not command_arguments:
-            @commands.command(**command_info)
-            async def command(_, ctx):
-                await command_function(ctx)
-        else:
-            @commands.command(**command_info)
-            async def command(_, ctx, *args):
-                await command_function(ctx, args)
-
-        if command_usage is not None:
-            command.usage = "(" + command_usage[0] + ")" + (" " if len(command_usage) > 1 else "") + " ".join("[" + item + "]" for item in command_usage[1:])
-
-        self.custom_commands_cog.commands.append(command)
-        self.bot.commands.append(command)
-
-        if isinstance(ctx, commands.Context):
-            custom_commands.append(code)
-            await guild.update(custom_commands=custom_commands)
-
-        await ctx.reply(text + " komende")
 
 def setup(bot):
     bot.load_cog(custom_commands_cog := CustomCommands())
