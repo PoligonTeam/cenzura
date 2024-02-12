@@ -82,12 +82,6 @@ class Other(commands.Cog):
         fake_token = var("token", "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ")
 
         variables = [
-            var("author", variables = [
-                var("id", ctx.author.id),
-                var("username", ctx.author.username),
-                var("avatar_url", ctx.author.avatar_url),
-                var("bot", ctx.author.bot)
-            ]),
             var("bot", variables = [
                 fake_token,
                 var("gateway", variables = [
@@ -102,7 +96,7 @@ class Other(commands.Cog):
                 "name": key,
                 "value": Femscript.to_fs(value)
             }
-            for key, value in database.items()
+            for key, value in (convert(author=ctx.author, channel=ctx.channel, guild=ctx.guild) | database).items()
         ]
 
         femscript = Femscript(code, variables=variables)
@@ -121,6 +115,14 @@ class Other(commands.Cog):
             def remove(key: str) -> object:
                 return database.pop(key)
 
+        @femscript.wrap_function()
+        async def get_user(user: str) -> dict:
+            return convert(_=await self.bot.gateway.get_user(user)).get("_")
+        
+        @femscript.wrap_function()
+        def get_channel(channel: str) -> dict:
+            return convert(_=ctx.guild.get_channel(channel)).get("_")
+
         femscript.wrap_function(request)
         femscript.wrap_function(femcord.Embed)
 
@@ -138,7 +140,7 @@ class Other(commands.Cog):
         if len(result) < 100:
             prefix_suffix = ""
 
-        await self.bot.paginator(ctx.reply, ctx, result, prefix=prefix_suffix, suffix=prefix_suffix)
+        await self.bot.paginator(ctx.reply, ctx, result or "(empty result)", prefix=prefix_suffix, suffix=prefix_suffix)
 
     @commands.Listener
     async def on_message_create(self, message):
@@ -291,6 +293,14 @@ class Other(commands.Cog):
                 def remove(key: str) -> object:
                     return database.pop(key)
 
+                @femscript.wrap_function()
+                async def get_user(user: str) -> dict:
+                    return convert(_=await self.bot.gateway.get_user(user)).get("_")
+                
+                @femscript.wrap_function()
+                def get_channel(channel: str) -> dict:
+                    return convert(_=ctx.guild.get_channel(channel)).get("_")
+
                 femscript.wrap_function(request)
                 femscript.wrap_function(femcord.Embed)
 
@@ -303,7 +313,7 @@ class Other(commands.Cog):
                 if isinstance(result, femcord.Embed):
                     return await ctx.reply(embed=result)
                 
-                await self.bot.paginator(ctx.reply, ctx, str(result), replace=False)
+                await self.bot.paginator(ctx.reply, ctx, str(result) or "(empty result)", replace=False)
 
         if command_data["usage"] is None and command_data["arguments"]:
             command_data["usage"] = " ".join(["(" + key + ":" + value + ")" for key, value in command_data["arguments"].items()])  

@@ -23,8 +23,21 @@ async def run(code, *, modules = {}, builtins = {}, variables = {}):
     return await parser.parse()
 
 from femscript_rs import *
-from typing import List, Type, Literal, Optional, Union, TypedDict, Callable
-import asyncio
+from typing import List, Optional, Union, TypedDict, Callable
+import asyncio, math
+
+class Scope(Dict):
+    format_depth = 0
+
+    def __str__(self) -> str:
+        Scope.format_depth += 1
+        space = "    " * Scope.format_depth
+        string = "{\n" + "\n".join(f"{space}{key} = {value!r};" for key, value in self.items()) + f"\n{"    " * (Scope.format_depth - 1)}}}"
+        Scope.format_depth -= 1
+
+        return string
+
+    __repr__ = __str__
 
 types = {
     "Str": str,
@@ -82,10 +95,6 @@ class Femscript:
         self.functions = functions or []
 
     @classmethod
-    def py_type(cls, fs_type: Literal["Str", "Int", "Bool", "None", "List", "Scope"]) -> Type:
-        return types.get(fs_type, type(None))
-
-    @classmethod
     def fs_type(cls, obj: object) -> str:
         return {**{value: key for key, value in types.items()}, int: "Int"}.get(type(obj), "PyObject")
 
@@ -116,11 +125,11 @@ class Femscript:
 
         return {
             "Str": (_str := lambda: token["value"]),
-            "Int": lambda: n if not (n := token["number"]).is_integer() else n // 1,
+            "Int": lambda: n if not (n := token["number"]).is_integer() else math.floor(n),
             "Bool": lambda: bool(token["number"]),
             "List": lambda: [cls.to_py(token) for token in token["list"]],
             "None": lambda: None,
-            "Scope": lambda: {name: cls.to_py(token) for name, token in token.get("scope", {}).items()},
+            "Scope": lambda: Scope(**{name: cls.to_py(token) for name, token in token.get("scope", {}).items()}),
             "PyObject": lambda: token["pyobject"]
         }.get(token["type"], _str)()
 

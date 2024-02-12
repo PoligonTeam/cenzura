@@ -29,7 +29,7 @@ class SmartHome(commands.Cog):
     @commands.group()
     @commands.is_owner
     async def leds(self, ctx):
-        cog = self.bot.get_cog(ctx.command.cog.name)
+        cog = self.bot.get_cog("Help")
         embed = cog.get_help_embed(ctx.command)
 
         await ctx.reply(embed=embed)

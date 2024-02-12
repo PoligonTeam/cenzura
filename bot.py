@@ -104,23 +104,11 @@ class Bot(commands.Bot):
         self.loop.run_until_complete(self.async_init())
 
     async def on_ready(self) -> None:
-        customcommand_command = self.get_command("customcommand")
-        metadata_pattern = re.compile(r"# \w+: (\d+)")
-
         for guild in self.gateway.guilds:
             db_guild = await Guilds.filter(guild_id=guild.id).first()
 
             if db_guild is None:
                 db_guild = await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[], database={}, permissions={}, schedules=[])
-
-            # if db_guild.custom_commands:
-            #     guild.owner = await guild.get_member(guild.owner)
-
-            # for custom_command in db_guild.custom_commands:
-            #     channel_id, author_id = metadata_pattern.findall(custom_command)[2:4]
-            #     fake_ctx = FakeCtx(self.gateway.copy, guild, guild.get_channel(channel_id), await guild.get_member(author_id), self.su_role)
-
-            #     await customcommand_command(fake_ctx, code=custom_command)
 
         await self.scheduler.create_schedule(self.update_presences, "10m", name="update_presences")()
 
@@ -349,11 +337,11 @@ class Bot(commands.Bot):
             content = str(content)
 
             if replace is True:
-                content = content.replace("`", "\`")
+                content = content.replace("`", "\\`")
 
             pages = [prefix + content[i:i+length] + suffix for i in range(0, len(content), length)]
         else:
-            pages = [prefix + (page if replace is False else page.replace("`", "\`")) + suffix for page in pages]
+            pages = [prefix + (page if replace is False else page.replace("`", "\\`")) + suffix for page in pages]
 
         if len(pages) == 1 and buttons is False:
             return await function(pages[page], **kwargs)

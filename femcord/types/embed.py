@@ -32,6 +32,8 @@ class EmbedImage:
     height: int
     width: int
     proxy_url: str = None
+    placeholder_version: object = None
+    placeholder: object = None
 
 @modified_dataclass
 class EmbedThumbnail:

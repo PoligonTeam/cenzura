@@ -144,13 +144,13 @@ def convert(**items):
         types.Guild: lambda guild: dict(
             id = guild.id,
             name = guild.name,
-            description = guild.description or False,
-            icon_url = guild.icon_url or False,
-            banner_url = guild.banner_url or False,
+            description = guild.description,
+            icon_url = guild.icon_url,
+            banner_url = guild.banner_url,
             owner = dict(
                 id = guild.owner.user.id,
                 username = guild.owner.user.username,
-                avatar_url = guild.owner.user.avatar_url or False,
+                avatar_url = guild.owner.user.avatar_url,
                 bot = guild.owner.user.bot
             ),
             members = len(guild.members),
@@ -162,7 +162,7 @@ def convert(**items):
         types.Channel: lambda channel: dict(
             id = channel.id,
             name = channel.name,
-            topic = channel.topic or False,
+            topic = channel.topic,
             nsfw = channel.nsfw,
             position = channel.position
         ),
@@ -178,7 +178,7 @@ def convert(**items):
             id = user.id,
             username = user.username,
             avatar_url = user.avatar_url,
-            bot = user.bot or False
+            bot = user.bot
         ),
         Track: lambda track: dict(
             artist = dict(
@@ -191,7 +191,7 @@ def convert(**items):
                     ) for image in track.artist.image
                 ],
                 streamable = track.artist.streamable,
-                on_tour = track.artist.on_tour or False,
+                on_tour = track.artist.on_tour,
                 stats = dict(
                     listeners = track.artist.stats.listeners,
                     playcount = track.artist.stats.playcount,
@@ -234,23 +234,23 @@ def convert(**items):
                 ) for image in track.image
             ] if track.image else [],
             album = dict(
-                name = track.album.name or False,
-                mbid = track.album.mbid or False,
+                name = track.album.name,
+                mbid = track.album.mbid,
                 image = [
                     dict(
                         url = image.url,
                         size = image.size
                     ) for image in track.image
                 ] if track.image else [],
-                position = track.album.position or False
-            ) if track.album else False,
+                position = track.album.position
+            ) if track.album else None,
             title = track.title,
             url = track.url,
             date = dict(
                 uts = track.date.uts,
                 text = track.date.text,
                 date = track.date.date
-            ) if track.date else False,
+            ) if track.date else None,
             listeners = track.listeners,
             playcount = track.playcount,
             scrobbles = track.scrobbles,

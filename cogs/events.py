@@ -20,7 +20,7 @@ from femcord.commands import Context
 from femcord.types import Guild, Member, User, Message
 from femcord.http import Route
 from femcord.commands.context import Context
-from femscript import run, Femscript, var
+from femscript import Femscript
 from typing import TYPE_CHECKING
 from utils import *
 from models import Guilds
@@ -33,7 +33,7 @@ class Events(commands.Cog):
         self.bot: Bot = bot
 
         @bot.before_call
-        async def after_call(ctx: Context) -> None:
+        async def before_call(ctx: Context) -> None:
             if ctx.error is None:
                 self.bot.loki.add_command_log(ctx)
 
@@ -53,13 +53,7 @@ class Events(commands.Cog):
 
     @commands.Listener
     async def on_guild_member_add(self, guild: Guild, member: Member):
-        if guild.id == "704439884340920441":
-            try:
-                await self.bot.http.request(Route("PATCH", "guilds", guild.id, "members", member.user.id), data={"nick": get_random_username()})
-            except femcord.HTTPException:
-                pass
-
-        if not hasattr(guild, "welcome_message"):
+        if not hasattr(guild, "welcome_message") or not hasattr(guild, "autorole"):
             db_guild = await Guilds.filter(guild_id=guild.id).first()
 
             guild.welcome_message = db_guild.welcome_message
@@ -67,32 +61,39 @@ class Events(commands.Cog):
             guild.autorole = db_guild.autorole
 
         if guild.welcome_message:
-            channel = None
+            variables = [
+                {
+                    "name": key,
+                    "value": Femscript.to_fs(value)
+                }
+                for key, value in convert(user=member.user, guild=guild).items()
+            ]
 
-            def set_channel(channel_id):
-                nonlocal channel
+            femscript = Femscript(guild.welcome_message, variables=variables)
+            
+            @femscript.wrap_function()
+            def set_channel(channel_id: str) -> None:
+                femscript.channel_id = channel_id
 
-                channel = guild.get_channel(channel_id)
+            @femscript.wrap_function()
+            async def set_nick(nick: str) -> None:
+                await member.modify(nick=nick) 
 
-            result = await run(
-                guild.welcome_message,
-                modules = await get_modules(self.bot, guild),
-                builtins = {
-                    **builtins,
-                    "set_channel": set_channel
-                },
-                variables = convert(
-                    guild = guild,
-                    user = member.user
-                )
-            )
+            femscript.wrap_function(get_random_username, func_name="random_nick")
 
-            if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], femcord.Embed):
-                await channel.send(result[0], embed=result[1])
-            elif isinstance(result, femcord.Embed):
-                await channel.send(embed=result)
-            else:
-                await channel.send(result)
+            femscript.wrap_function(request)
+            femscript.wrap_function(femcord.Embed)
+
+            result = await femscript.execute()
+
+            if hasattr(femscript, "channel_id"):
+                channel = guild.get_channel(femscript.channel_id)
+
+                if channel is not None:
+                    if isinstance(result, femcord.Embed):
+                        await channel.send(embed=result)
+                    else:
+                        await channel.send(result)
 
         if guild.autorole:
             await member.add_role(guild.get_role(guild.autorole))
@@ -107,32 +108,33 @@ class Events(commands.Cog):
             guild.autorole = db_guild.autorole
 
         if guild.leave_message:
-            channel = None
+            variables = [
+                {
+                    "name": key,
+                    "value": Femscript.to_fs(value)
+                }
+                for key, value in convert(user=user, guild=guild).items()
+            ]
 
-            def set_channel(channel_id):
-                nonlocal channel
+            femscript = Femscript(guild.leave_message, variables=variables)
+            
+            @femscript.wrap_function()
+            def set_channel(channel_id: str) -> None:
+                femscript.channel_id = channel_id
 
-                channel = guild.get_channel(channel_id)
+            femscript.wrap_function(request)
+            femscript.wrap_function(femcord.Embed)
 
-            result = await run(
-                guild.leave_message,
-                modules = await get_modules(self.bot, guild),
-                builtins = {
-                    **builtins,
-                    "set_channel": set_channel
-                },
-                variables = convert(
-                    guild = guild,
-                    user = user
-                )
-            )
+            result = await femscript.execute()
 
-            if isinstance(result, list) and len(result) == 2 and isinstance(result[0], str) and isinstance(result[1], femcord.Embed):
-                await channel.send(result[0], embed=result[1])
-            elif isinstance(result, femcord.Embed):
-                await channel.send(embed=result)
-            else:
-                await channel.send(result)
+            if hasattr(femscript, "channel_id"):
+                channel = guild.get_channel(femscript.channel_id)
+
+                if channel is not None:
+                    if isinstance(result, femcord.Embed):
+                        await channel.send(embed=result)
+                    else:
+                        await channel.send(result)
 
     @commands.Listener
     async def on_message_create(self, message: Message):

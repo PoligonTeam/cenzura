@@ -109,5 +109,7 @@ class Channel:
             channel["thread_metadata"] = ThreadMetadata.from_raw(channel["thread_metadata"]) if channel["thread_metadata"] else None
         if "member" in channel:
             channel["member"] = ThreadMember.from_raw(channel["member"]) if channel["member"] else None
+        if "nsfw" not in channel or channel["nsfw"] is None:
+            channel["nsfw"] = False
 
         return cls(**channel)

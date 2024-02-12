@@ -123,6 +123,17 @@ def set_functions(client: "Client"):
         return await client.http.ban_member(self.guild_id, self.user.id, reason=reason, delete_message_seconds=delete_message_seconds)
 
     @client.func_for(Member)
+    async def modify(self: Member, *, nick: Optional[str] = None, roles: Optional[List[Role]] = None, mute: Optional[bool] = None, deaf: Optional[bool] = None, channel: Optional[Channel] = None, communication_disabled_until: Optional[datetime.datetime] = None):
+        if roles:
+            roles = [role.id for role in roles]
+        if channel:
+            channel = channel.id
+        if communication_disabled_until:
+            communication_disabled_until = communication_disabled_until.timestamp()
+
+        return await client.http.modify_member(self.guild_id, self.user.id, nick=nick, roles=roles, mute=mute, deaf=deaf, channel_id=channel, communication_disabled_until=communication_disabled_until)
+
+    @client.func_for(Member)
     async def add_role(self: Member, role: Role):
         return await client.http.add_role(self.guild_id, self.user.id, role.id)
 

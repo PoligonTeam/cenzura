@@ -59,7 +59,7 @@ class Dev(commands.Cog):
     @commands.command(description="cenzura is a bot, the bot is cenzura", usage="(code)")
     async def eval(self, ctx: commands.Context, *, code):
         if not ctx.author.id in self.bot.owners:
-            return await self.bot.get_command("femscriptrewrite")(ctx, code=code)
+            return await self.bot.get_command("femscript")(ctx, code=code)
 
         result = await self._eval(code, {
             "femcord": femcord,

@@ -102,9 +102,9 @@ class Admin(commands.Cog):
 
         await ctx.reply(f"Usunięto `{limit}` wiadomości")
 
-    @commands.group(description="Pomoc komendy set", aliases=["ustaw"])
+    @commands.group(description="Set commands")
     async def set(self, ctx: commands.Context):
-        cog = self.bot.get_cog(ctx.command.cog.name)
+        cog = self.bot.get_cog("Help")
         embed = cog.get_help_embed(ctx.command)
 
         await ctx.reply(embed=embed)
@@ -120,7 +120,7 @@ class Admin(commands.Cog):
 
         await ctx.reply("Ustawiono prefix")
 
-    @set.command(description="Ustawia wiadomość powitalną", usage="[kod]", aliases=["welcome", "welcomemsg"])
+    @set.command(description="Welcome message", usage="[code]", aliases=["welcome", "welcomemsg"])
     @commands.has_permissions("manage_guild")
     async def welcomemessage(self, ctx: commands.Context, *, code = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
@@ -130,21 +130,23 @@ class Admin(commands.Cog):
             await query.update(welcome_message="")
             ctx.guild.welcome_message = ""
 
-            return await ctx.reply("Wyłączono wiadomość powitalną")
+            return await ctx.reply("Disabled")
 
         if code == "get_code()":
             return await self.bot.paginator(ctx.reply, ctx, guild_db.welcome_message, prefix="```py\n", suffix="```")
         elif code == "emit()":
-            events = self.bot.get_cog(ctx.command.cog.name)
+            events = self.bot.get_cog("Events")
             return await events.on_guild_member_add(ctx.guild, ctx.member)
 
         if (match := re.match(r"(<#)?(\d+)>? ([\s\S]+)", code)) is not None:
             channel_id = match.group(2)
             message = match.group(3)
 
-            code = f"set_channel(\"{channel_id}\")\n\n" \
-                   f"message = \"{message}\"\n\n" \
-                    "return str.format(message, guild: guild, user: user)"
+            args = re.findall(r"\{([^{}]+)\}", message)
+            message = re.sub(r"\{([^{}]+)\}", r"{}", message)
+
+            code = f"set_channel(\"{channel_id}\");\n" \
+                   f"return format(\"{message}\", {", ".join(args)});"
 
         code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
                f"# GUILD: {ctx.guild.id}\n" \
@@ -155,9 +157,9 @@ class Admin(commands.Cog):
         await query.update(welcome_message=code)
         ctx.guild.welcome_message = code
 
-        await ctx.reply("Ustawiono wiadomość powitalną")
+        await ctx.reply("Updated")
 
-    @set.command(description="Ustawia wiadomość pożegnalną", usage="[kod]", aliases=["leave", "leavemsg"])
+    @set.command(description="Leave message", usage="[code]", aliases=["leave", "leavemsg"])
     @commands.has_permissions("manage_guild")
     async def leavemessage(self, ctx: commands.Context, *, code = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
@@ -167,21 +169,23 @@ class Admin(commands.Cog):
             await query.update(leave_message="")
             ctx.guild.leave_message = ""
 
-            return await ctx.reply("Wyłączono wiadomość pożegnalną")
+            return await ctx.reply("Disabled")
 
         if code == "get_code()":
             return await self.bot.paginator(ctx.reply, ctx, guild_db.leave_message, prefix="```py\n", suffix="```")
         elif code == "emit()":
-            events = self.bot.get_cog(ctx.command.cog.name)
+            events = self.bot.get_cog("Events")
             return await events.on_guild_member_remove(ctx.guild, ctx.author)
 
         if (match := re.match(r"(<#)?(\d+)>? ([\s\S]+)", code)) is not None:
             channel_id = match.group(2)
             message = match.group(3)
 
-            code = f"set_channel(\"{channel_id}\")\n\n" \
-                   f"message = \"{message}\"\n\n" \
-                    "return str.format(message, guild: guild, user: user)"
+            args = re.findall(r"\{([^{}]+)\}", message)
+            message = re.sub(r"\{([^{}]+)\}", r"{}", message)
+
+            code = f"set_channel(\"{channel_id}\");\n" \
+                   f"return format(\"{message}\", {", ".join(args)});"
 
         code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
                f"# GUILD: {ctx.guild.id}\n" \
@@ -192,7 +196,7 @@ class Admin(commands.Cog):
         await query.update(leave_message=code)
         ctx.guild.leave_message = code
 
-        await ctx.reply("Ustawiono wiadomość pożegnalną")
+        await ctx.reply("Updated")
 
     @set.command(description="Ustawia autorole", usage="[rola]")
     @commands.has_permissions("manage_guild", "manage_roles")

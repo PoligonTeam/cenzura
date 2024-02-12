@@ -328,7 +328,7 @@ class Music(commands.Cog):
             except exceptions.NotFound:
                 return await ctx.reply("Nie znaleziono takiego artysty")
 
-            embed = femcord.Embed(title="Informacje o " + artist.name, url=artist.url, description=re.sub(r"<a href=\"(.+)\">(.+)</a>", "[\\2](\\1)", artist.bio.summary), color=self.bot.embed_color, timestamp=datetime.datetime.now())
+            embed = femcord.Embed(title="Informacje o " + artist.name, url=artist.url, description=re.sub(r"<a href=\"(.+)\">(.+)</a>", r"[\2](\1)", artist.bio.summary), color=self.bot.embed_color, timestamp=datetime.datetime.now())
             embed.add_field(name="Liczba słuchaczy", value=artist.stats.listeners, inline=True)
             embed.add_field(name="Liczba odtworzeń", value=artist.stats.playcount, inline=True)
             embed.add_field(name="Liczba twoich odtworzeń", value=artist.stats.userplaycount, inline=True)

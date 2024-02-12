@@ -206,6 +206,24 @@ class HTTP:
 
         return self.request(Route("DELETE", "guilds", guild_id, "bans", member_id), headers=headers)
 
+    def modify_member(self, guild_id: str, member_id: str, *, nick: Optional[str] = None, roles: Optional[List[str]] = None, mute: Optional[bool] = None, deaf: Optional[bool] = None, channel_id: Optional[str] = None, communication_disabled_until: Optional[int] = None):
+        data = {}
+
+        if nick:
+            data["nick"] = nick
+        if roles:
+            data["roles"] = roles
+        if mute:
+            data["mute"] = mute
+        if deaf:
+            data["deaf"] = deaf
+        if channel_id:
+            data["channel_id"] = channel_id
+        if communication_disabled_until:
+            data["communication_disabled_until"] = communication_disabled_until
+
+        return self.request(Route("PATCH", "guilds", guild_id, "members", member_id), data=data)
+
     def add_role(self, guild_id: str, member_id: str, role_id: str):
         return self.request(Route("PUT", "guilds", guild_id, "members", member_id, "roles", role_id))
 
