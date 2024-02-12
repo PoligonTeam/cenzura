@@ -16,7 +16,7 @@ limitations under the License.
 
 import asyncio, socket, struct, base64, hmac, hashlib, json, os, time, logging, config
 from aiohttp import web, abc, ClientSession
-from scheduler import Scheduler
+from scheduler.scheduler import Scheduler
 from enum import Enum
 from typing import Union, List, Tuple, Sequence
 

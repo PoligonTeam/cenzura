@@ -23,7 +23,7 @@ from tortoise import Tortoise
 from utils import request
 from lokiclient import LokiClient
 from models import Guilds
-from scheduler import Scheduler
+from scheduler.scheduler import Scheduler
 from poligonlgbt import Poligon
 from datetime import datetime
 from enum import Enum

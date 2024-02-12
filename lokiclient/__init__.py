@@ -18,7 +18,7 @@ import aiohttp
 from datetime import datetime
 from femcord.commands import Context
 from femcord.types import Guild
-from scheduler import Scheduler
+from scheduler.scheduler import Scheduler
 from typing import List, Optional
 
 class LokiException(Exception):

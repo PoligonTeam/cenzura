@@ -16,7 +16,7 @@ limitations under the License.
 
 import femcord
 from femcord import commands, types, HTTPException
-from femscript import run, Femscript, var
+from femscript import Femscript
 from utils import *
 from aiohttp import ClientSession
 from models import LastFM
@@ -372,30 +372,30 @@ class Music(commands.Cog):
 
             await ctx.reply(embed=embed)
 
-    @commands.command(description="Informacje o użytkowniku LastFM", usage="[użytkownik]", aliases=["fui"])
-    async def fmuserinfo(self, ctx: commands.Context, *, user: types.User = None):
-        user = user or ctx.author
+    # @commands.command(description="Informacje o użytkowniku LastFM", usage="[użytkownik]", aliases=["fui"])
+    # async def fmuserinfo(self, ctx: commands.Context, *, user: types.User = None):
+    #     user = user or ctx.author
 
-        lastfm = self.lastfm_users.get(user.id)
+    #     lastfm = self.lastfm_users.get(user.id)
 
-        if lastfm is None:
-            if ctx.author is user:
-                return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
+    #     if lastfm is None:
+    #         if ctx.author is user:
+    #             return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
 
-            return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
+    #         return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
 
-        async with femcord.Typing(ctx.message):
-            result = await run(
-                lastfm.uiscript,
-                modules = await get_modules(self.bot, ctx.guild, ctx=ctx, user=user),
-                builtins = builtins,
-                variables = convert(user=user)
-            )
+    #     async with femcord.Typing(ctx.message):
+    #         result = await run(
+    #             lastfm.uiscript,
+    #             modules = await get_modules(self.bot, ctx.guild, ctx=ctx, user=user),
+    #             builtins = builtins,
+    #             variables = convert(user=user)
+    #         )
 
-            if isinstance(result, femcord.Embed):
-                return await ctx.reply(embed=result)
+    #         if isinstance(result, femcord.Embed):
+    #             return await ctx.reply(embed=result)
 
-            await ctx.reply(result)
+    #         await ctx.reply(result)
 
     @commands.command(description="lastfm - now playing", usage="[user]", aliases=["fmstats", "fm"])
     async def lastfm(self, ctx: commands.Context, *, user: types.User = None):
