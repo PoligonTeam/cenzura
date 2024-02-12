@@ -1,0 +1,6 @@
+[submodule "femscript"]
+	path = femscript
+	url = https://github.com/czubix/femscript
+[submodule "scheduler"]
+	path = scheduler
+	url = https://github.com/czubix/scheduler
