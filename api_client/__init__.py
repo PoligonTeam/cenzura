@@ -1,5 +1,5 @@
 """
-Copyright 2023 PoligonTeam
+Copyright 2023-2024 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

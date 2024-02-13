@@ -1,5 +1,5 @@
 """
-Copyright 2022 PoligonTeam
+Copyright 2022-2024 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ limitations under the License.
 __title__ = "femcord"
 __author__ = "PoligonTeam"
 __license__ = "Apache License"
-__copyright__ = "Copyright 2022 PoligonTeam"
+__copyright__ = "Copyright 2022-2024 PoligonTeam"
 __version__ = "0.6.9a"
 __pronouns__ = "they/them"
 __hotel__ = "trivago"
