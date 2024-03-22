@@ -66,7 +66,7 @@ class Embed:
 
         return self
 
-    def set_timestamp(self, timestamp: Union[float, int]) -> Embed:
+    def set_timestamp(self, timestamp: Union[datetime, float, int]) -> Embed:
         if isinstance(timestamp, (float, int)):
             timestamp = datetime.fromtimestamp(timestamp)
         self.timestamp = (timestamp - timedelta(hours=1)).isoformat()

@@ -4,21 +4,25 @@ set_update_interval("10s");
 data = await(request("GET", "https://astolfo.poligon.lgbt/api/startit"));
 joke = data.json.joke;
 
-add_presence {
-    borrow(guilds, StatusTypes, ActivityTypes);
+if { guilds != "0" } {
+    add_presence {
+        borrow(guilds, StatusTypes, ActivityTypes);
 
-    name = format("{} serwerów", &guilds);
-    status_type = &StatusTypes.DND;
-    activity_type = &ActivityTypes.WATCHING;
-};
+        name = format("{} guilds", &guilds);
+        status_type = &StatusTypes.DND;
+        activity_type = &ActivityTypes.WATCHING;
+    };
+}
 
-add_presence {
-    borrow(users, StatusTypes, ActivityTypes);
+if { users != "0" } {
+    add_presence {
+        borrow(users, StatusTypes, ActivityTypes);
 
-    name = format("{} użytkowników", &users);
-    status_type = &StatusTypes.DND;
-    activity_type = &ActivityTypes.LISTENING;
-};
+        name = format("{} users", &users);
+        status_type = &StatusTypes.DND;
+        activity_type = &ActivityTypes.LISTENING;
+    };
+}
 
 add_presence {
     borrow(StatusTypes, ActivityTypes);
@@ -47,7 +51,7 @@ add_presence {
 add_presence {
     borrow(StatusTypes, ActivityTypes);
 
-    name = str(randint(1, 100));
+    name = str(randint(1, 100, true));
     status_type = &StatusTypes.DND;
     activity_type = &ActivityTypes.PLAYING;
 };

@@ -502,10 +502,13 @@ class Fun(commands.Cog):
             if data["description"]:
                 embed.description = data["description"]
             if "guild_id" in data:
-                guild_data = await self.bot.http.request(Route("GET", "guilds", data["guild_id"], "widget.json"))
+                try:
+                    guild_data = await self.bot.http.request(Route("GET", "guilds", data["guild_id"], "widget.json"))
 
-                if "code" not in guild_data:
-                    embed.add_field(name="Guild:", value=f"{guild_data['name']} ({guild_data['id']})")
+                    if "code" not in guild_data:
+                        embed.add_field(name="Guild:", value=f"{guild_data['name']} ({guild_data['id']})")
+                except femcord.errors.HTTPException:
+                    pass
             if "terms_of_service_url" in data:
                 embed.add_field(name="ToS:", value=data["terms_of_service_url"])
             if "privacy_policy_url" in data:
@@ -636,7 +639,10 @@ class Fun(commands.Cog):
 
     @commands.group(description="Dictionary", aliases=["definition", "word", "dict", "def"])
     async def dictionary(self, ctx: commands.Context):
-        pass
+        cog = self.bot.get_cog("Help")
+        embed = cog.get_help_embed(ctx.command)
+
+        await ctx.reply(embed=embed)
 
     @dictionary.command(usage="(word)", aliases=["pl"])
     async def polish(self, ctx: commands.Context, *, word):

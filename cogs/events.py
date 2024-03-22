@@ -34,6 +34,8 @@ class Events(commands.Cog):
 
         @bot.before_call
         async def before_call(ctx: Context) -> None:
+            print(f"{ctx.author.username}: {ctx.message.content}")
+
             if ctx.error is None:
                 self.bot.loki.add_command_log(ctx)
 

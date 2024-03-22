@@ -112,7 +112,7 @@ class Music(commands.Cog):
 
         await ctx.reply("Wyszedłem z kanału głosowego")
 
-    @commands.command(description="Odtwarza muzykę", usage="[tytuł]")
+    @commands.command(description="Odtwarza muzykę", usage="(tytuł)")
     async def play(self, ctx: commands.Context, *, query: str) -> None:
         player: femlink.Player = self.client.get_player(ctx.guild.id)
 

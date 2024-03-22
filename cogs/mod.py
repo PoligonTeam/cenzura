@@ -29,10 +29,13 @@ class Admin(commands.Cog):
     @commands.command(description="Wyrzuca użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("kick_members")
     async def kick(self, ctx: commands.Context, member: types.Member, *, reason = "nie podano powodu"):
+        if not ctx.guild.me.permissions.has("kick_members"):
+            return await ctx.reply("Bot nie ma uprawnień (`kick_members`)")
+
         if ctx.member.roles[-1].position <= member.roles[-1].position:
             return await ctx.reply("Nie możesz wyrzucić użytkownika równego lub wyższego od ciebie")
 
-        if not ctx.guild.me.permissions.has("kick_members") or ctx.guild.me.roles[-1].position <= member.roles[-1].position:
+        if ctx.guild.me.roles[-1].position <= member.roles[-1].position:
             return await ctx.reply("Bot nie może wyrzucić tego użytkownika")
 
         await member.kick(reason)
@@ -47,11 +50,14 @@ class Admin(commands.Cog):
     @commands.command(description="Banuje użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("ban_members")
     async def ban(self, ctx: commands.Context, member: Union[types.Member, types.User], *, reason = "nie podano powodu"):
+        if not ctx.guild.me.permissions.has("ban_members"):
+            return await ctx.reply("Bot nie ma uprawnień (`ban_members`)")
+
         if isinstance(member, types.Member):
             if ctx.member.roles[-1].position <= member.roles[-1].position:
                 return await ctx.reply("Nie możesz zbanować użytkownika równego lub wyższego od ciebie")
 
-            if not ctx.guild.me.permissions.has("ban_members") or ctx.guild.me.roles[-1].position <= member.roles[-1].position:
+            if ctx.guild.me.roles[-1].position <= member.roles[-1].position:
                 return await ctx.reply("Bot nie może zbanować tego użytkownika")
 
             await member.ban(reason)

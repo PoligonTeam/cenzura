@@ -207,10 +207,8 @@ class HTTP:
         return self.request(Route("DELETE", "guilds", guild_id, "bans", member_id), headers=headers)
 
     def modify_member(self, guild_id: str, member_id: str, *, nick: Optional[str] = None, roles: Optional[List[str]] = None, mute: Optional[bool] = None, deaf: Optional[bool] = None, channel_id: Optional[str] = None, communication_disabled_until: Optional[int] = None):
-        data = {}
+        data = {"nick": nick}
 
-        if nick:
-            data["nick"] = nick
         if roles:
             data["roles"] = roles
         if mute:

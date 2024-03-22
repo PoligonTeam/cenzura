@@ -105,6 +105,10 @@ class Other(commands.Cog):
             @femscript.wrap_function()
             def get_all() -> Dict[str, object]:
                 return database
+            
+            @femscript.wrap_function()
+            def get(key: str) -> object:
+                return database.get(key)
 
             @femscript.wrap_function()
             def update[T](key: str, value: T) -> T:
@@ -283,6 +287,10 @@ class Other(commands.Cog):
                 @femscript.wrap_function()
                 def get_all() -> Dict[str, object]:
                     return database
+                
+                @femscript.wrap_function()
+                def get_value(key: str) -> object:
+                    return database.get(key)
 
                 @femscript.wrap_function()
                 def update[T](key: str, value: T) -> T:
