@@ -39,22 +39,6 @@ class Opcodes(Enum):
     STATS = 4
     BOT = 5
 
-class FakeCtx:
-    def __init__(self, copy_function: Callable, guild: types.Guild, channel: types.Channel, member: types.Member, su_role: types.Role) -> None:
-        self.guild = guild
-        self.channel = channel
-        self.member = copy_function(member, deep=True)
-        self.author = self.member.user
-
-        self.member.roles.append(su_role)
-        self.member.permissions = su_role.permissions
-
-    async def send(self, *args, **kwargs) -> None:
-        pass
-
-    async def reply(self, *args, **kwargs) -> None:
-        pass
-
 class Bot(commands.Bot):
     def __init__(self, *, start_time: float = time.time()) -> None:
         super().__init__(name="fembot", command_prefix=self.get_prefix, intents=femcord.Intents().all(), owners=config.OWNERS)

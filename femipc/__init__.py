@@ -20,47 +20,44 @@ from enum import Enum
 from typing import Union, Callable
 
 class OpCodes(Enum):
-    EVENT = 0
-    MESSAGE = 1
+    EMIT = 0
+    RESPONSE = 1
 
 class Client:
-    def __init__(self, sock: socket.socket, name: str, path: Path) -> None:
+    def __init__(self, sock: "IPC", name: str, path: Path) -> None:
         self.socket = sock
 
         self.name = name
         self.path = path
 
-    def get_packet[T](self, opcode: OpCodes, event: str, data: bytes) -> bytes:
-        return struct.pack("HHI", opcode.value, len(event), len(data))
+    def get_packet[T](self, opcode: OpCodes, nonce: bytes, event: str, data: bytes) -> bytes:
+        return struct.pack("H16sHI", opcode.value, nonce, len(event), len(data))
 
-    def emit[T](self, event: str, data: T) -> None:
-        data = pickle.dumps(data)
-
-        try:
-            self.socket.sendto(self.get_packet(OpCodes.EVENT, event, data), self.path.as_posix())
-            self.socket.sendto(event.encode() + data, self.path.as_posix())
-        except ConnectionRefusedError:
-            return
-
-    async def send[T, U](self, data: T) -> U:
+    async def emit[T, U](self, event: str, data: T = None, *, wait_for_response: bool = None) -> U:
+        wait_for_response = wait_for_response or True
         data = pickle.dumps(data)
         nonce = uuid.uuid4().bytes
 
         try:
-            self.socket.sendto(self.get_packet(OpCodes.MESSAGE, nonce, data), self.path.as_posix())
-            self.socket.sendto(nonce + data, self.path.as_posix())
+            self.socket.sendto(self.get_packet(OpCodes.EMIT, nonce, event, data), self.path.as_posix())
+            self.socket.sendto(event.encode() + data, self.path.as_posix())
         except ConnectionRefusedError:
             return
 
-        with self.socket:
-            for _ in range(3):
-                received_event, received_data = await self.socket.recv()
+        if wait_for_response is True:
+            for _ in range(300):
+                if nonce in self.socket.responses:
+                    return self.socket.responses.pop(nonce)
+                await asyncio.sleep(0.01)
 
-                if nonce != received_event:
-                    await self.socket.emit(received_event, received_data)
-                    continue
+    def respond[T](self, event: str, nonce: bytes, data: T) -> None:
+        data = pickle.dumps(data)
 
-                return received_data
+        try:
+            self.socket.sendto(self.get_packet(OpCodes.RESPONSE, nonce, event, data), self.path.as_posix())
+            self.socket.sendto(event.encode() + data, self.path.as_posix())
+        except ConnectionRefusedError:
+            return
 
 class IPC(socket.socket):
     PATH = Path("/tmp/femipc")
@@ -70,7 +67,6 @@ class IPC(socket.socket):
         self.setblocking(False)
 
         self.loop = loop or asyncio.get_event_loop()
-        self._lock = False
 
         self.name = name
         self.file = self.PATH / (self.name + ".sock")
@@ -85,14 +81,9 @@ class IPC(socket.socket):
         self.bind(self.file.as_posix())
 
         self.events = {}
+        self.responses = {}
 
         self.receiver_task = self.loop.create_task(self.receiver())
-
-    def __enter__(self) -> None:
-        self._lock = True
-
-    def __exit__(self) -> None:
-        self._lock = False
 
     @property
     def clients(self) -> list[Client]:
@@ -103,35 +94,52 @@ class IPC(socket.socket):
         self._clients.append(client)
         return client
 
+    def get_client(self, *, name: str = None, path: str = None) -> Client:
+        for client in self.clients:
+            if (name and client.name == name) or (path and client.path == Path(path)):
+                return client
+
     def on[T](self, event: str) -> Callable[[T], object]:
         def wrapper[U](func: T) -> U:
             self.events[event] = func
             return func
         return wrapper
 
-    async def emit[T](self, event: str, data: T) -> None:
+    async def emit[T, U](self, event: str, data: T) -> U:
         if event not in self.events:
             raise Exception("event not found")
-        await self.events[event](data)
+        return await self.events[event](data)
 
-    async def recv[T](self) -> tuple[str, T]:
+    async def receive[T](self) -> tuple[str, OpCodes, bytes, str, T]:
         while True:
             try:
-                opcode, event_length, data_length = struct.unpack("HHI", self.recvfrom(8)[0])
+                data, path = self.recvfrom(24)
+                opcode, nonce, event_length, data_length = struct.unpack("H16sHI", data)
                 opcode = OpCodes(opcode)
 
-                received = self.recvfrom(event_length + data_length)[0]
-                received_event = received[:event_length].decode()
-                received_data = pickle.loads(received[event_length:data_length+1])
+                while True:
+                    try:
+                        received = self.recvfrom(event_length + data_length)[0]
+                        received_event = received[:event_length].decode()
+                        received_data = pickle.loads(received[event_length:])
 
-                return received_event, received_data
+                        return path, opcode, nonce, received_event, received_data
+                    except socket.error:
+                        await asyncio.sleep(0)
             except socket.error:
                 await asyncio.sleep(0)
 
     async def receiver(self) -> None:
         while True:
-            if self._lock: continue
-            await self.emit(*await self.recv())
+            path, opcode, nonce, received_event, received_data = await self.receive()
+
+            if opcode == OpCodes.EMIT:
+                result = await self.emit(received_event, received_data)
+                client = self.get_client(path=path)
+                client.respond(received_event, nonce, result)
+            elif opcode == OpCodes.RESPONSE:
+                self.responses[nonce] = received_data
+
             await asyncio.sleep(0)
 
     def close(self) -> None:
