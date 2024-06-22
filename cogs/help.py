@@ -17,8 +17,6 @@ limitations under the License.
 import femcord
 from femcord import commands
 from femcord.permissions import Permissions
-from typing import Union
-import inspect
 
 permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles")
 
@@ -30,8 +28,8 @@ WEBSITE = "https://cenzura.poligon.lgbt"
 class Help(commands.Cog):
     hidden = True
 
-    def __init__(self, bot):
-        self.bot: commands.Bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
         self.interactions = []
 
     def get_help_embed(self, command):
@@ -191,5 +189,5 @@ class Help(commands.Cog):
         message = await ctx.reply(embed=embed, components=components)
         self.interactions.append(("help", ctx.author.id, ctx.channel.id, message.id))
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(Help(bot))

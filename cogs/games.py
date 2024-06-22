@@ -22,8 +22,8 @@ from typing import Union
 import asyncio, random
 
 class Games(commands.Cog):
-    def __init__(self, bot):
-        self.bot: commands.Bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
 
     @commands.command(description="https://korrumzthegame.wtf", usage="[name] [avatar-number_1-20]", aliases=["ktg"])
     async def korrumzthegame(self, ctx: commands.Context, username: Union[int, str] = None, avatar: int = None):
@@ -94,5 +94,5 @@ class Games(commands.Cog):
 
         await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(Games(bot))

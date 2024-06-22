@@ -15,12 +15,17 @@ limitations under the License.
 """
 
 from .errors import *
+
+from . import Context, Cog
+
 from functools import wraps
 
-def check(check_function, *, error=CheckFailure):
-    def decorator(func):
+from typing import Callable
+
+def check(check_function: Callable, *, error=CheckFailure) -> Callable:
+    def decorator(func) -> Callable:
         @wraps(func)
-        def wrapper(self, ctx, *args, **kwargs):
+        def wrapper(self: Cog, ctx: Context, *args, **kwargs) -> bool:
             if not check_function(self, ctx):
                 raise error(f"Check failed for {func.__name__}")
 
@@ -30,21 +35,21 @@ def check(check_function, *, error=CheckFailure):
 
     return decorator
 
-def is_owner(func):
-    def check_function(self, ctx):
+def is_owner(func) -> Callable:
+    def check_function(self: Cog, ctx: Context) -> bool:
         return ctx.author.id in self.bot.owners
 
     return check(check_function, error=NotOwner)(func)
 
-def is_nsfw(func):
-    def check_function(self, ctx):
+def is_nsfw(func) -> Callable:
+    def check_function(_: Cog, ctx: Context) -> bool:
         return ctx.channel.nsfw
 
     return check(check_function, error=NotNsfw)(func)
 
-def has_permissions(*permissions):
-    def decorator(func):
-        def check_function(self, ctx):
+def has_permissions(*permissions) -> Callable:
+    def decorator(func) -> Callable:
+        def check_function(_: Cog, ctx: Context) -> bool:
             for permission in permissions:
                 if ctx.guild.owner.user.id == ctx.author.id:
                     return True

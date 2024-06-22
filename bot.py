@@ -63,6 +63,7 @@ class Bot(commands.Bot):
         self.process = psutil.Process()
 
         self.su_role: types.Role = types.Role(
+            self,
             id = "su",
             name = "su",
             color = 0xffffff,
@@ -257,7 +258,7 @@ class Bot(commands.Bot):
 
             @femscript.wrap_function()
             def add_presence(*, name: str = None, status_type: femcord.StatusTypes = femcord.StatusTypes.ONLINE, activity_type: femcord.ActivityTypes = femcord.ActivityTypes.PLAYING):
-                self.presences.append(femcord.Presence(status_type, activities=[femcord.Activity(name, activity_type)]))
+                self.presences.append(femcord.Presence(self, status_type, activities=[femcord.Activity(self, name, activity_type)]))
 
             femscript.wrap_function(request)
 
@@ -293,6 +294,9 @@ class Bot(commands.Bot):
     async def get_prefix(self, _, message: femcord.types.Message) -> List[str]:
         prefixes = ["<@{}>", "<@!{}>", "<@{}> ", "<@!{}> "]
         prefixes = [prefix.format(self.gateway.bot_user.id) for prefix in prefixes]
+
+        if not message.guild:
+            return prefixes
 
         if hasattr(message.guild, "prefix"):
             return prefixes + [message.guild.prefix or config.PREFIX]
@@ -336,11 +340,11 @@ class Bot(commands.Bot):
         def get_components(disabled: Optional[bool] = False) -> femcord.Components:
             return femcord.Components(
                 femcord.Row(
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="previous", disabled=disabled, emoji=types.Emoji("\N{BLACK LEFT-POINTING TRIANGLE}")),
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="previous", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING TRIANGLE}")),
                     femcord.Button(f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=femcord.ButtonStyles.DANGER),
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="next", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING TRIANGLE}")),
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji("\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="next", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING TRIANGLE}")),
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
                 )
             )
 

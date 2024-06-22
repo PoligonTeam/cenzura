@@ -15,8 +15,11 @@ limitations under the License.
 """
 
 from .enums import ButtonStyles, TextInputStyles
-from .types import Emoji
-from typing import Union, Optional, List
+
+from typing import Union, Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .types import Emoji
 
 class Components:
     def __init__(self, *rows: List["Row"]) -> None:
@@ -34,7 +37,7 @@ class Row:
         self.components.append(item.__dict__)
 
 class Button:
-    def __init__(self, label: Optional[str] = None, *, custom_id: Optional[str] = None, style: Optional[ButtonStyles] = None, url: Optional[str] = None, disabled: Optional[bool] = False, emoji: Optional[Emoji] = None) -> None:
+    def __init__(self, label: Optional[str] = None, *, custom_id: Optional[str] = None, style: Optional[ButtonStyles] = None, url: Optional[str] = None, disabled: Optional[bool] = False, emoji: Optional["Emoji"] = None) -> None:
         self.type: int = 2
         self.label: str = label
         if style:
@@ -63,7 +66,7 @@ class SelectMenu:
         self.options.append(option.__dict__)
 
 class Option:
-    def __init__(self, label: str, value: str, *, description: Optional[str] = None, emoji: Optional[Emoji] = None, default: Optional[bool] = False):
+    def __init__(self, label: str, value: str, *, description: Optional[str] = None, emoji: Optional["Emoji"] = None, default: Optional[bool] = False):
         self.label: str = label
         self.value: str = value
         self.description: str = description

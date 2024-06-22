@@ -17,17 +17,13 @@ limitations under the License.
 import femcord
 from femcord import commands
 from utils import fg
-from typing import TYPE_CHECKING
-import traceback, random, string
-
-if TYPE_CHECKING:
-    from bot import Bot
+import traceback, random
 
 class ErrorHandler(commands.Cog):
     hidden = True
 
-    def __init__(self, bot):
-        self.bot: Bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
 
     @commands.Listener
     async def on_error(self, ctx: commands.Context, error):
@@ -87,5 +83,5 @@ class ErrorHandler(commands.Cog):
 
         await self.bot.paginator(ctx.reply, ctx, formatted_error, prefix="```py\n", suffix="```", page=-1)
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(ErrorHandler(bot))

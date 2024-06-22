@@ -14,51 +14,60 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from dataclasses import modified_dataclass
-from typing import List, Sequence, Union, Optional
-from .emoji import Emoji
+from .dataclass import dataclass
+
 from ..enums import *
+
+from .emoji import Emoji
+
 from datetime import datetime
 
-@modified_dataclass
+from typing import List, Sequence, Union, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..client import Client
+
+@dataclass
 class ActivityTimestamps:
+    __client: "Client"
     start: datetime = None
     end: datetime = None
 
     @classmethod
-    def from_raw(cls, timestamps):
+    async def from_raw(cls, client, timestamps):
         if "start" in timestamps:
             timestamps["start"] = datetime.fromtimestamp(timestamps["start"] / 1000)
         if "end" in timestamps:
             timestamps["end"] = datetime.fromtimestamp(timestamps["end"] / 1000)
 
-        return cls(**timestamps)
+        return cls(client, **timestamps)
 
-@modified_dataclass
+@dataclass
 class ActivityParty:
     id: str = None
     size: List[int] = None
 
-@modified_dataclass
+@dataclass
 class ActivityAssets:
     large_image: str = None
     large_text: str = None
     small_image: str = None
     small_text: str = None
 
-@modified_dataclass
+@dataclass
 class ActivitySecrets:
     join: str = None
     spectate: str = None
     match: str = None
 
-@modified_dataclass
+@dataclass
 class ActivityButton:
     label: str
     url: str
 
-@modified_dataclass
+@dataclass
 class Activity:
+    __client: "Client"
     name: str
     type: ActivityTypes
     created_at: datetime = None
@@ -82,14 +91,14 @@ class Activity:
         return "<Activity name={!r} type={!r} details={!r} state={!r}>".format(self.name, self.type, self.details, self.state)
 
     @classmethod
-    def from_raw(cls, activity):
+    async def from_raw(cls, client, activity):
         activity["type"] = ActivityTypes(activity["type"])
         activity["created_at"] = datetime.fromtimestamp(activity["created_at"] / 1000)
 
         if "timestamps" in activity:
-            activity["timestamps"] = ActivityTimestamps.from_raw(activity["timestamps"])
+            activity["timestamps"] = await ActivityTimestamps.from_raw(client, activity["timestamps"])
         if "emoji" in activity:
-            activity["emoji"] = Emoji.from_raw(activity["emoji"])
+            activity["emoji"] = await Emoji.from_raw(client, activity["emoji"])
         if "party" in activity:
             activity["party"] = ActivityParty(**activity["party"])
         if "assets" in activity:
@@ -102,10 +111,11 @@ class Activity:
             if isinstance(activity["buttons"], dict) is True:
                 activity["buttons"] = [ActivityButton(**button) for button in activity["buttons"]]
 
-        return cls(**activity)
+        return cls(client, **activity)
 
-@modified_dataclass
+@dataclass
 class ClientStatus:
+    __client: "Client"
     desktop: Optional[StatusTypes] = None
     mobile: Optional[StatusTypes] = None
     web: Optional[StatusTypes] = None
@@ -117,14 +127,15 @@ class ClientStatus:
         return "<ClientStatus desktop={!r} mobile={!r} web={!r}>".format(self.desktop, self.mobile, self.web)
 
     @classmethod
-    def from_raw(cls, client_status):
+    async def from_raw(cls, client, client_status):
         for key in client_status:
             client_status[key] = StatusTypes(client_status[key])
 
-        return cls(**client_status)
+        return cls(client, **client_status)
 
-@modified_dataclass
+@dataclass
 class Presence:
+    __client: "Client"
     status: StatusTypes
     activities: Sequence[Activity]
     client_status: ClientStatus = None
@@ -151,18 +162,22 @@ class Presence:
                 if isinstance(value, Enum):
                     activity[key] = value.value
 
+            del activity["_Activity__client"]
+
             activities.append(activity)
 
         presence["activities"] = activities
         presence["since"] = None
         presence["afk"] = False
 
+        del presence["_Presence__client"]
+
         return presence
 
     @classmethod
-    def from_raw(cls, presence):
+    async def from_raw(cls, client, presence):
         presence["status"] = StatusTypes(presence["status"])
-        presence["client_status"] = ClientStatus.from_raw(presence["client_status"])
-        presence["activities"] = [Activity.from_raw(activity) for activity in presence["activities"]]
+        presence["client_status"] = await ClientStatus.from_raw(client, presence["client_status"])
+        presence["activities"] = [await Activity.from_raw(client, activity) for activity in presence["activities"]]
 
-        return cls(**presence)
+        return cls(client, **presence)

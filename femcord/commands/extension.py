@@ -15,10 +15,13 @@ limitations under the License.
 """
 
 from .enums import CommandTypes
-from ..utils import get_index
-from typing import TypeVar, Callable, Union, List, Dict
 
-Context = TypeVar("Context")
+from ..utils import get_index
+
+from typing import Callable, Union, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from . import Context
 
 class Command:
     def __init__(self, **kwargs):
@@ -36,7 +39,7 @@ class Command:
         self.guild_id: Union[str, None] = kwargs.get("guild_id", None)
         self.other: dict = kwargs.get("other", {})
 
-    async def __call__(self, context: Context, *args, **kwargs) -> None:
+    async def __call__(self, context: "Context", *args, **kwargs) -> None:
         if self.cog is not None:
             return await self.callback(self.cog, context, *args, **kwargs)
 
@@ -45,7 +48,6 @@ class Command:
 class Group(Command):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-
         self.subcommands: List[Command] = []
 
     def command(self, **kwargs) -> Callable[..., Command]:

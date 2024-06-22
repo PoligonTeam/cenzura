@@ -14,18 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from dataclasses import modified_dataclass
-from typing import Sequence
+from .dataclass import dataclass
+
 from ..enums import *
 from ..utils import *
 from ..errors import InvalidArgument
+
 from .channel import Channel
+from .message import Message
+
 from datetime import datetime
+
+from typing import List, Optional, Sequence, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..client import Client
+    from ..commands import Context
+    from ..embed import Embed
+    from ..components import Components
 
 CDN_URL = "https://cdn.discordapp.com"
 
-@modified_dataclass
+@dataclass
 class User:
+    __client: "Client"
     id: str
     username: str
     avatar: str
@@ -72,7 +84,7 @@ class User:
         return CDN_URL + "/avatars/%s/%s.%s" % (self.id, self.avatar, extension)
 
     @classmethod
-    def from_raw(cls, user):
+    async def from_raw(cls, client, user):
         avatar_url = CDN_URL + "/avatars/%s/%s.%s" % (user["id"], user["avatar"], "gif" if user["avatar"] and user["avatar"][:2] == "a_" else "png")
 
         if user["avatar"] is None:
@@ -90,4 +102,23 @@ class User:
         if "banner_color" in user and user["banner_color"] is not None:
             user["banner_color"] = int(user["banner_color"][1:], 16)
 
-        return cls(**user)
+        return cls(client, **user)
+
+    @classmethod
+    def from_arg(cls, ctx: "Context", argument) -> "User":
+        result = ID_PATTERN.search(argument)
+
+        if result is not None:
+            argument = result.group()
+
+        return ctx.bot.gateway.get_user(argument)
+
+    async def send(self, content: Optional[str] = None, *, embed: Optional["Embed"] = None, embeds: Optional[Sequence["Embed"]] = None, components: Optional["Components"] = None, files: Optional[List[Union[str, bytes]]] = [], mentions: Optional[list] = [], other: Optional[dict] = {}) -> Message:
+        if self.dm is None:
+            response = await self.__client.http.open_dm(self.id)
+            self.dm = await Channel.from_raw(self.__client, response)
+
+        response = await self.__client.http.send_message(self.dm.id, content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)
+
+        if response is not None:
+            return await Message.from_raw(self.__client, response)

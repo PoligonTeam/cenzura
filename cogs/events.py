@@ -18,19 +18,14 @@ import femcord
 from femcord import commands
 from femcord.commands import Context
 from femcord.types import Guild, Member, User, Message
-from femcord.http import Route
 from femcord.commands.context import Context
 from femscript import Femscript
-from typing import TYPE_CHECKING
 from utils import *
 from models import Guilds
 
-if TYPE_CHECKING:
-    from bot import Bot
-
 class Events(commands.Cog):
-    def __init__(self, bot):
-        self.bot: Bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
 
         @bot.before_call
         async def before_call(ctx: Context) -> None:
@@ -72,14 +67,14 @@ class Events(commands.Cog):
             ]
 
             femscript = Femscript(guild.welcome_message, variables=variables)
-            
+
             @femscript.wrap_function()
             def set_channel(channel_id: str) -> None:
                 femscript.channel_id = channel_id
 
             @femscript.wrap_function()
             async def set_nick(nick: str) -> None:
-                await member.modify(nick=nick) 
+                await member.modify(nick=nick)
 
             femscript.wrap_function(get_random_username, func_name="random_nick")
 
@@ -119,7 +114,7 @@ class Events(commands.Cog):
             ]
 
             femscript = Femscript(guild.leave_message, variables=variables)
-            
+
             @femscript.wrap_function()
             def set_channel(channel_id: str) -> None:
                 femscript.channel_id = channel_id
@@ -140,12 +135,12 @@ class Events(commands.Cog):
 
     @commands.Listener
     async def on_message_create(self, message: Message):
-        if message.author.bot:
+        if message.author.bot or not message.guild:
             return
 
         if message.guild.me and message.guild.me.user in message.mentions and not message.message_reference and len(message.content.split()) == 1:
             if message.content in (await self.bot.get_prefix(self.bot, message))[:4]:
                 return await message.reply(f"Prefix on this server is `{(await self.bot.get_prefix(self.bot, message))[-1]}`")
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(Events(bot))

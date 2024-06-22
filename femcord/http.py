@@ -15,41 +15,47 @@ limitations under the License.
 """
 
 import asyncio
+
 from aiohttp import ClientSession, FormData, ContentTypeError
-from .errors import *
+
 from .embed import Embed
 from .components import Components
+
 from .enums import *
-from typing import Optional, List, Sequence, Union
+from .errors import *
+
 import json, logging
 
+from typing import Optional, List, Sequence, Union, Coroutine
+
 class Route:
-    def __init__(self, method: str, *endpoint: str):
+    def __init__(self, method: str, *endpoint: str) -> None:
         self.method = method
         self.endpoint = "/" + "/".join(endpoint)
 
-    def __eq__(self, route):
+    def __eq__(self, route) -> bool:
         return self.method == route.method and self.endpoint == route.endpoint
 
-    def __ne__(self, route):
+    def __ne__(self, route) -> bool:
         return self.method != route.method and self.endpoint != route.endpoint
 
 class HTTP:
     URL = "https://discord.com/api/v10"
+    CDN_URL = "https://cdn.discordapp.com"
 
-    async def __new__(cls, *args):
+    async def __new__(cls, *args) -> "HTTP":
         instance = super().__new__(cls)
         await instance.__init__(*args)
         return instance
 
-    async def __init__(self, client):
+    async def __init__(self, client) -> None:
         client.http = self
         self.loop = asyncio.get_event_loop()
         self.session: ClientSession = ClientSession(loop=self.loop)
         self.token: str = client.token
         self.bot: bool = client.bot
 
-    async def request(self, route: Route, *, headers: Optional[dict] = {}, data: Optional[dict] = None, params: Optional[dict] = None, files: Optional[list] = None) -> Union[dict, str]:
+    async def request(self, route: Route, *, headers: Optional[dict] = {}, data: Optional[dict] = None, params: Optional[dict] = None, files: Optional[List[Union[str, bytes]]] = None) -> Union[dict, str]:
         headers.update({"authorization": ("Bot " if self.bot is True else "") + self.token, "user-agent": "femcord"})
 
         kwargs = dict(json=data)
@@ -58,7 +64,7 @@ class HTTP:
             kwargs["params"] = params
 
         if files is not None:
-            form: FormData = FormData()
+            form = FormData()
             form.add_field("payload_json", json.dumps(data))
 
             for index, file in enumerate(files):
@@ -89,10 +95,10 @@ class HTTP:
                 await asyncio.sleep(response_data["retry_after"])
                 return await self.request(route, headers=headers, data=data, params=params, files=files)
 
-    def start_typing(self, channel_id: str):
+    def start_typing(self, channel_id: str) -> Coroutine:
         return self.request(Route("POST", "channels", channel_id, "typing"))
 
-    def send_message(self, channel_id: str, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], stickers: Optional[list] = None, other: Optional[dict] = {}):
+    def send_message(self, channel_id: str, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[List[Union[str, bytes]]] = [], mentions: Optional[list] = [], stickers: Optional[list] = None, other: Optional[dict] = {}) -> Coroutine:
         data = {**other, "allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}
 
         if content is not None:
@@ -119,7 +125,7 @@ class HTTP:
 
         return self.request(Route("POST", "channels", channel_id, "messages"), data=data, files=files)
 
-    def edit_message(self, channel_id: str, message_id: str, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], stickers: Optional[list] = None, other: Optional[dict] = {}):
+    def edit_message(self, channel_id: str, message_id: str, content: Optional[str] = None, *, embed: Optional[Embed] = None, embeds: Optional[Sequence[Embed]] = None, components: Optional[Components] = None, files: Optional[List[Union[str, bytes]]] = [], mentions: Optional[list] = [], stickers: Optional[list] = None, other: Optional[dict] = {}) -> Coroutine:
         data = {**other, "allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}
 
         if content is not None:
@@ -146,10 +152,10 @@ class HTTP:
 
         return self.request(Route("PATCH", "channels", channel_id, "messages", message_id), data=data, files=files)
 
-    def delete_message(self, channel_id: str, message_id: str):
+    def delete_message(self, channel_id: str, message_id: str) -> Coroutine:
         return self.request(Route("DELETE", "channels", channel_id, "messages", message_id))
 
-    def interaction_callback(self, interaction_id: str, interaction_token: str, interaction_type: InteractionCallbackTypes, content: Optional[str] = None, *, title: Optional[str] = None, custom_id: str = None, embed: Embed = None, embeds: Sequence[Embed] = None, components: Optional[Components] = None, files: Optional[list] = [], mentions: Optional[list] = [], stickers: Optional[list] = None, other: Optional[dict] = {}):
+    def interaction_callback(self, interaction_id: str, interaction_token: str, interaction_type: InteractionCallbackTypes, content: Optional[str] = None, *, title: Optional[str] = None, custom_id: str = None, embed: Embed = None, embeds: Sequence[Embed] = None, components: Optional[Components] = None, files: Optional[List[Union[str, bytes]]] = [], mentions: Optional[list] = [], stickers: Optional[list] = None, other: Optional[dict] = {}) -> Coroutine:
         data = {"type": interaction_type.value, "data": {**other, "allowed_mentions": {"parse": mentions, "users": [], "replied_user": False}}}
 
         if content is not None:
@@ -182,7 +188,7 @@ class HTTP:
 
         return self.request(Route("POST", "interactions", interaction_id, interaction_token, "callback"), data=data, files=files)
 
-    def kick_member(self, guild_id: str, member_id: str, reason: Optional[str] = None):
+    def kick_member(self, guild_id: str, member_id: str, reason: Optional[str] = None) -> Coroutine:
         headers = {}
 
         if reason is not None:
@@ -190,7 +196,7 @@ class HTTP:
 
         return self.request(Route("DELETE", "guilds", guild_id, "members", member_id), headers=headers)
 
-    def ban_member(self, guild_id: str, member_id: str, reason: Optional[str] = None, delete_message_seconds: Optional[int] = 0):
+    def ban_member(self, guild_id: str, member_id: str, reason: Optional[str] = None, delete_message_seconds: Optional[int] = 0) -> Coroutine:
         headers = {}
 
         if reason is not None:
@@ -198,7 +204,7 @@ class HTTP:
 
         return self.request(Route("PUT", "guilds", guild_id, "bans", member_id), headers=headers, data={"delete_message_seconds": delete_message_seconds})
 
-    def unban_member(self, guild_id: str, member_id: str, reason: Optional[str] = None):
+    def unban_member(self, guild_id: str, member_id: str, reason: Optional[str] = None) -> Coroutine:
         headers = {}
 
         if reason is not None:
@@ -206,7 +212,7 @@ class HTTP:
 
         return self.request(Route("DELETE", "guilds", guild_id, "bans", member_id), headers=headers)
 
-    def modify_member(self, guild_id: str, member_id: str, *, nick: Optional[str] = None, roles: Optional[List[str]] = None, mute: Optional[bool] = None, deaf: Optional[bool] = None, channel_id: Optional[str] = None, communication_disabled_until: Optional[int] = None):
+    def modify_member(self, guild_id: str, member_id: str, *, nick: Optional[str] = None, roles: Optional[List[str]] = None, mute: Optional[bool] = None, deaf: Optional[bool] = None, channel_id: Optional[str] = None, communication_disabled_until: Optional[int] = None) -> Coroutine:
         data = {"nick": nick}
 
         if roles:
@@ -222,13 +228,13 @@ class HTTP:
 
         return self.request(Route("PATCH", "guilds", guild_id, "members", member_id), data=data)
 
-    def add_role(self, guild_id: str, member_id: str, role_id: str):
+    def add_role(self, guild_id: str, member_id: str, role_id: str) -> Coroutine:
         return self.request(Route("PUT", "guilds", guild_id, "members", member_id, "roles", role_id))
 
-    def remove_role(self, guild_id: str, member_id: str, role_id: str):
+    def remove_role(self, guild_id: str, member_id: str, role_id: str) -> Coroutine:
         return self.request(Route("DELETE", "guilds", guild_id, "members", member_id, "roles", role_id))
 
-    def get_messages(self, channel_id: str, *, around: Optional[str] = None, before: Optional[str] = None, after: Optional[str] = None, limit: Optional[str] = None):
+    def get_messages(self, channel_id: str, *, around: Optional[str] = None, before: Optional[str] = None, after: Optional[str] = None, limit: Optional[str] = None) -> Coroutine:
         params = {}
 
         if around is not None:
@@ -242,8 +248,8 @@ class HTTP:
 
         return self.request(Route("GET", "channels", channel_id, "messages"), params=params)
 
-    def purge_channel(self, channel_id: str, messages: str):
+    def purge_channel(self, channel_id: str, messages: str) -> Coroutine:
         return self.request(Route("POST", "channels", channel_id, "messages", "bulk-delete"), data={"messages": messages})
 
-    def open_dm(self, user_id: str):
+    def open_dm(self, user_id: str) -> Coroutine:
         return self.request(Route("POST", "users", "@me", "channels"), data={"recipient_id": user_id})

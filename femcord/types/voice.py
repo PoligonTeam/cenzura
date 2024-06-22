@@ -14,15 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from dataclasses import modified_dataclass
-from typing import TypeVar
-from .channel import Channel
+from .dataclass import dataclass
+
 from datetime import datetime
 
-Guild = TypeVar("Guild")
+from typing import TYPE_CHECKING
 
-@modified_dataclass
+if TYPE_CHECKING:
+    from ..client import Client
+    from .guild import Guild
+    from .channel import Channel
+
+@dataclass
 class VoiceState:
+    __client: "Client"
     session_id: str
     deaf: bool
     mute: bool
@@ -30,8 +35,8 @@ class VoiceState:
     self_mute: bool
     self_video: bool
     suppress: bool
-    guild: Guild = None
-    channel: Channel = None
+    guild: "Guild" = None
+    channel: "Channel" = None
     self_stream: bool = None
     request_timestamp: datetime = None
 
@@ -49,8 +54,8 @@ class VoiceState:
         return "<VoiceState guild={!r} channel={!r} deaf={!r} mute={!r} self_deaf={!r} self_mute={!r} self_stream={!r} self_video={!r} suppress={!r} request_timestamp={!r}>".format(self.guild, self.channel, self.deaf, self.mute, self.self_deaf, self.self_mute, self.self_stream, self.self_video, self.suppress, self.request_timestamp)
 
     @classmethod
-    def from_raw(cls, gateway, voice_state):
+    async def from_raw(cls, client, voice_state):
         if voice_state["request_timestamp"] is not None:
             voice_state["request_timestamp"] = datetime.fromisoformat(voice_state["request_timestamp"])
 
-        return cls(**voice_state)
+        return cls(client, **voice_state)

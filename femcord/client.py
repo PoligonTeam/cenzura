@@ -15,31 +15,33 @@ limitations under the License.
 """
 
 import asyncio
+
 from .gateway import Gateway
 from .http import HTTP
 from .intents import Intents
 from .types import *
-from .typefunctions import set_functions
+
 from datetime import datetime
-from typing import Callable, List, Type
+
+from typing import List, Callable
 
 class Client:
-    def __init__(self, *, intents: Intents = Intents.default(), messages_limit: int = 1000, last_latencies_limit: int = 100):
+    def __init__(self, *, intents: Intents = Intents.default(), messages_limit: int = 1000, last_latencies_limit: int = 100) -> None:
         self.loop = asyncio.get_event_loop()
         self.token: str = None
-        self.intents: Intents = intents
+        self.intents = intents
         self.http: HTTP = None
         self.gateway: Gateway = None
         self.listeners: List[Callable] = []
         self.waiting_for: List[Callable] = []
         self.messages_limit: int = messages_limit
-        self.last_latencies_limit: List[int] = last_latencies_limit
-        self.started_at: datetime = datetime.now()
+        self.last_latencies_limit = last_latencies_limit
+        self.started_at = datetime.now()
 
-    def event(self, function: Callable):
+    def event(self, function: Callable) -> None:
         self.listeners.append(function)
 
-    async def wait_for(self, name: str, function: Callable, key: int, *, timeout: int = None, on_timeout: Callable = None):
+    async def wait_for(self, name: str, function: Callable, key: int, *, timeout: int = None, on_timeout: Callable = None) -> None:
         self.waiting_for.append((name, function, key))
 
         if timeout is not None:
@@ -51,14 +53,12 @@ class Client:
                 if on_timeout is not None:
                     await on_timeout()
 
-    def run(self, token: str, *, bot: bool = True):
+    def run(self, token: str, *, bot: bool = True) -> None:
         self.token: str = token
         self.bot: bool = bot
 
         self.loop.create_task(HTTP(self))
         self.loop.create_task(Gateway(self))
-
-        set_functions(self)
 
         try:
             self.loop.run_forever()
@@ -71,7 +71,3 @@ class Client:
                 self.loop.run_until_complete(on_close)
 
             self.gateway.heartbeat.stop()
-
-    @classmethod
-    def func_for(cls, _type: Type):
-        return lambda function: setattr(_type, function.__name__, function)

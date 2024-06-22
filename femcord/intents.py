@@ -16,7 +16,9 @@ limitations under the License.
 
 from .enums import Intents as IntentsEnum
 from .errors import IntentNotExist
+
 from functools import reduce
+
 from typing import TypeVar, Union
 
 __all__ = ("Intents",)
@@ -24,7 +26,7 @@ __all__ = ("Intents",)
 Intents = TypeVar("Intents")
 
 class Intents:
-    def __init__(self, *intents: Union[IntentsEnum, str]):
+    def __init__(self, *intents: Union[IntentsEnum, str]) -> None:
         for intent in intents:
             self.check(intent)
 

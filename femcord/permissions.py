@@ -16,7 +16,9 @@ limitations under the License.
 
 from .enums import Permissions as PermissionsEnum
 from .errors import PermissionNotExist
+
 from functools import reduce
+
 from typing import TypeVar, Union
 
 __all__ = ("Permissions",)
@@ -24,7 +26,7 @@ __all__ = ("Permissions",)
 Permissions = TypeVar("Permissions")
 
 class Permissions:
-    def __init__(self, *permissions: Union[PermissionsEnum, str]):
+    def __init__(self, *permissions: Union[PermissionsEnum, str]) -> None:
         self.permissions = []
 
         for permission in permissions:
@@ -72,9 +74,9 @@ class Permissions:
         return permission in self.permissions
 
     @classmethod
-    def all(cls):
+    def all(cls) -> Permissions:
         return cls(*PermissionsEnum)
 
     @classmethod
-    def from_int(cls, permissions: int):
+    def from_int(cls, permissions: int) -> Permissions:
         return cls(*(permission for permission in PermissionsEnum if permissions & permission.value == permission.value))

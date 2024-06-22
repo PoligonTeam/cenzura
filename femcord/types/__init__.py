@@ -14,50 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import dataclasses, datetime
-
-def modified_dataclass(cls, **kwargs):
-    if hasattr(cls, "from_raw") is True:
-        cls.original_from_raw = cls.from_raw
-
-        @classmethod
-        def new_from_raw(cls, *args):
-            data_argument = args[0]
-
-            if isinstance(data_argument, cls):
-                return data_argument
-
-            if len(args) > 1:
-                data_argument = args[1]
-
-            used_keys = list(cls.__annotations__.keys())
-            change_keys = getattr(cls, "__CHANGE_KEYS__", ())
-
-            for old_key, new_key in change_keys:
-                used_keys.remove(new_key)
-                used_keys.append(old_key)
-
-            to_remove = []
-
-            for key in data_argument:
-                if not key in used_keys:
-                    to_remove.append(key)
-
-            for key in to_remove:
-                del data_argument[key]
-
-            for old_key, new_key in change_keys:
-                if old_key in data_argument:
-                    data_argument[new_key] = data_argument.pop(old_key)
-
-            return cls.original_from_raw(*args)
-
-        cls.from_raw = new_from_raw
-
-    return dataclasses.dataclass(cls, **kwargs)
-
-dataclasses.modified_dataclass = modified_dataclass
-
 from .channel import PermissionOverwrite, ThreadMetadata, ThreadMember, Channel
 from .embed import EmbedFooter, EmbedImage, EmbedThumbnail, EmbedVideo, EmbedProvider, EmbedAuthor, EmbedField, Embed
 from .emoji import Emoji
@@ -71,7 +27,11 @@ from .sticker import Sticker
 from .user import User
 from .voice import VoiceState
 
+channel.Message = Message
+
 interaction.MessageComponents = MessageComponents
+
+from datetime import datetime
 
 class M:
     def __matmul__(self, item):
@@ -102,7 +62,7 @@ class T:
 
         return self
 
-    def __matmul__(self, item: datetime.datetime):
+    def __matmul__(self, item: datetime):
         text = f"<t:{int(item.timestamp())}:{self.style}>"
         self.style = "f"
 

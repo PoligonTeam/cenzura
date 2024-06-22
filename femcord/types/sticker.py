@@ -14,14 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from dataclasses import modified_dataclass
+from .dataclass import dataclass
+
 from ..enums import *
 from ..utils import *
-from .user import User
-from datetime import date, datetime
 
-@modified_dataclass
+from datetime import datetime
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..client import Client
+    from .user import User
+
+@dataclass
 class Sticker:
+    __client: "Client"
     id: str
     name: str
     description: str
@@ -30,7 +38,7 @@ class Sticker:
     available: bool
     created_at: datetime
     pack_id: str = None
-    user: User = None
+    user: "User" = None
     sort_value: int = None
 
     def __str__(self):
@@ -40,7 +48,7 @@ class Sticker:
         return "<Sticker id={!r} name={!r} description={!r}>".format(self.id, self.name, self.description)
 
     @classmethod
-    def from_raw(cls, sticker):
+    async def from_raw(cls, client, sticker):
         sticker["created_at"] = time_from_snowflake(sticker["id"])
 
-        return cls(**sticker)
+        return cls(client, **sticker)

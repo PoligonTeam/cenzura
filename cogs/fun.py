@@ -30,8 +30,8 @@ from utils import *
 import io, random, urllib.parse, json, re
 
 class Fun(commands.Cog):
-    def __init__(self, bot):
-        self.bot: commands.Bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
         self.garfield_emojis = {"0": "1072691610254585927", "1": "1072691612578234438", "2": "1072691613802954753", "3": "1072691615610712235",
                                 "4": "1072691617829494905", "5": "1072691620245413938", "6": "1072691622573248642", "7": "1072691624158695476",
                                 "8": "1072691627149238282", "9": "1072691628713717760", "a": "930949124151443546", "b": "930949123870429286",
@@ -52,7 +52,6 @@ class Fun(commands.Cog):
         self.status_emojis = {"ONLINE": "977693019279077399", "IDLE": "977693019321028649", "DND": "977693019430076456",
                               "INVISIBLE": "977693019518160916", "OFFLINE": "977693019518160916", "MOBILEONLINE": "1002296215456714953",
                               "MOBILEIDLE": "1002296213913214976", "MOBILEDND": "1002296212503932988"}
-        self.interactions = []
         self.results = {}
         self.urls = {}
 
@@ -391,17 +390,17 @@ class Fun(commands.Cog):
     async def dick(self, ctx: commands.Context, user: types.User = None):
         await self.figlet(ctx, text=f".i. {get_int(user or ctx.author) // 5}")
 
-    @commands.command(description="taobao, aliexpress, and china", usage="(product)", aliases=["aliexpress"])
-    async def taobao(self, ctx: commands.Context, *, product):
-        response = await self.bot.http.session.get("https://pl.aliexpress.com/wholesale?SearchText=" + urllib.parse.quote_plus(product))
-        soup = BeautifulSoup(await response.content.read(), "lxml")
+    # @commands.command(description="taobao, aliexpress, and china", usage="(product)", aliases=["aliexpress"])
+    # async def taobao(self, ctx: commands.Context, *, product):
+    #     response = await self.bot.http.session.get("https://pl.aliexpress.com/wholesale?SearchText=" + urllib.parse.quote_plus(product))
+    #     soup = BeautifulSoup(await response.content.read(), "lxml")
 
-        raw_item_list = soup.find_all("script", {"type": "text/javascript"})[3].string.splitlines()[3].strip("window.runParams = ")[:-1]
-        item_list = json.loads(raw_item_list)["mods"]["itemList"]["content"]
+    #     raw_item_list = soup.find_all("script", {"type": "text/javascript"})[3].string.splitlines()[3].strip("window.runParams = ")[:-1]
+    #     item_list = json.loads(raw_item_list)["mods"]["itemList"]["content"]
 
-        random_product = random.choice(item_list)
+    #     random_product = random.choice(item_list)
 
-        await ctx.reply(f"\"{random_product['title']['displayTitle']}\"\nhttps://aliexpress.com/item/{random_product['productId']}.html\n\n*from aliexpress.com*")
+    #     await ctx.reply(f"\"{random_product['title']['displayTitle']}\"\nhttps://aliexpress.com/item/{random_product['productId']}.html\n\n*from aliexpress.com*")
 
     # @commands.command(description="shopee wyszukiwarka", usage="(produkt)", aliases=["shopenis", "fakeali", "alisexpress"])
     # async def shopee(self, ctx: commands.Context, *, product):
@@ -772,5 +771,5 @@ class Fun(commands.Cog):
     async def nick(self, ctx):
         await ctx.reply(get_random_username())
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(Fun(bot))

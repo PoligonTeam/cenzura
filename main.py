@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import logging, socket, threading, re, sys, io, time, config, argparse
+import logging, socket, threading, re, sys, io, time, config, argparse, os, tarfile
 from datetime import datetime
 from bot import Bot
 
@@ -66,13 +66,13 @@ class StreamHandler(io.StringIO):
         while self.path and self.path[-1] == "/":
             self.path = self.path[:-1]
 
-        self.create_file()
+        self.init_file()
 
-    def create_file(self):
+    def init_file(self):
         self.date = datetime.now()
 
         if self.path:
-            self.file = open(self.path + "/%s.log" % self.date.strftime("%Y-%m-%d"), "a")
+            self.file = open(self.path + "/latest.log", "a")
             self.file.write("\n\n\n\n\nTIMEZONE: %s; DATE: %s; TIMESTAMP: %d; BLACKLIST: %s; COMMAND LINE: \"<python> %s\"\n\n\n\n\n\n" % (str(time.tzname), self.date.strftime("%Y-%m-%d %H:%M:%S"), self.date.timestamp(), str([expression.pattern for expression in self.blacklist]), self.command_line))
 
     def write(self, content):
@@ -81,7 +81,22 @@ class StreamHandler(io.StringIO):
                 return
 
         if not self.date.date() == datetime.now().date():
-            self.create_file()
+            y, m, d = self.date.strftime("%Y %m_%B %d").split()
+
+            if not os.path.exists(self.path + "/%s" % y):
+                os.mkdir(self.path + "/%s" % y)
+            if not os.path.exists(self.path + "/%s/%s" % (y, m)):
+                os.mkdir(self.path + "/%s/%s" % (y, m))
+
+            with tarfile.open(self.path + "/%s/%s/%s" % (y, m, d) + ".tar.gz", "w:gz") as tar:
+                tar.add(self.path + "/latest.log", "%s-%s-%s.log" % (y, m.split("_")[0], d))
+
+            old_file = self.file
+            self.file = None
+            old_file.close()
+            with open(self.path + "/latest.log", "w") as file:
+                file.write("")
+            self.init_file()
 
         if self.path is not None:
             self.file.write(content)

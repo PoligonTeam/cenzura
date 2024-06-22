@@ -309,15 +309,10 @@ def table(names, rows):
 
     return text
 
-async def request(method: str, url: str, *, headers: dict = None, cookies: dict = None, data: dict = None, proxy: bool = False):
-    proxy_address = random.choice(list(config.PROXIES.values()))
-
-    if proxy is True and proxy in config.PROXIES:
-        proxy_address = config.PROXIES[proxy]
-
+async def request(method: str, url: str, *, headers: dict = None, cookies: dict = None, data: dict = None):
     async with ClientSession(timeout=ClientTimeout(10)) as session:
         try:
-            async with session.request(method, url, headers=headers, cookies=cookies, json=data, proxy=config.PROXY_TEMPLATE.format(proxy_address)) as response:
+            async with session.request(method, url, headers=headers, cookies=cookies, json=data, proxy=config.PROXY) as response:
                 length = response.content_length
 
                 if length is not None and length > 10 * 1024 * 1024:

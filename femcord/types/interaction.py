@@ -14,39 +14,44 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from dataclasses import modified_dataclass
+from .dataclass import dataclass
+
 from ..enums import *
 from ..utils import *
-from .guild import Guild
-from .channel import Channel
-from .role import Role
-from .member import Member
-from .user import User
-from typing import TypeVar, Sequence, Union
 
-Message = TypeVar("Message")
-MessageComponents = TypeVar("MessageComponents")
-InteractionDataOption = TypeVar("InteractionDataOption")
+from typing import List, Optional, Sequence, Union, TYPE_CHECKING
 
-@modified_dataclass
+if TYPE_CHECKING:
+    from ..client import Client
+    from ..embed import Embed
+    from ..components import Components
+    from .guild import Guild
+    from .channel import Channel
+    from .message import Message, MessageComponents
+    from .member import Member
+    from .user import User
+
+@dataclass
 class InteractionDataOption:
+    __client: "Client"
     name: str
     type: CommandOptionTypes
     value: Union[str, int, float] = None
-    options: Sequence[InteractionDataOption] = None
+    options: Sequence["InteractionDataOption"] = None
     focused: bool = None
 
     @classmethod
-    def from_raw(cls, dataoption):
+    async def from_raw(cls, client, dataoption):
         dataoption["type"] = CommandOptionTypes(dataoption["type"])
 
         if "options" in dataoption:
-            dataoption["options"] = [cls.from_raw(dataoption) for dataoption in dataoption["options"]]
+            dataoption["options"] = [await cls.from_raw(client, dataoption) for dataoption in dataoption["options"]]
 
-        return cls(**dataoption)
+        return cls(client, **dataoption)
 
-@modified_dataclass
+@dataclass
 class InteractionData:
+    __client: "Client"
     id: str = None
     name: str = None
     type: CommandTypes = None
@@ -54,8 +59,8 @@ class InteractionData:
     custom_id: str = None
     component_type: ComponentTypes = None
     values: list = None
-    target: Union[User, Message] = None
-    components: Sequence[MessageComponents] = None
+    target: Union["User", "Message"] = None
+    components: Sequence["MessageComponents"] = None
 
     __CHANGE_KEYS__ = (
         (
@@ -65,41 +70,42 @@ class InteractionData:
     )
 
     @classmethod
-    async def from_raw(cls, gateway, data):
+    async def from_raw(cls, client, data):
         if "type" in data:
             data["type"] = CommandTypes(data["type"])
         if "options" in data:
-            data["options"] = [InteractionDataOption.from_raw(dataoption) for dataoption in data["options"]]
+            data["options"] = [await InteractionDataOption.from_raw(client, dataoption) for dataoption in data["options"]]
         if "component_type" in data:
             data["component_type"] = ComponentTypes(data["component_type"])
         if "target" in data:
             if data["type"] == CommandTypes.USER:
-                data["target"] = await gateway.get_user(data["target"])
+                data["target"] = await client.gateway.get_user(data["target"])
 
             elif data["type"] == CommandTypes.MESSAGE:
-                index = get_index(gateway.messages, data["target"], key=lambda m: m.id)
+                index = get_index(client.gateway.messages, data["target"], key=lambda m: m.id)
 
                 if index is not None:
-                    data["target"] = gateway.messages[index]
+                    data["target"] = client.gateway.messages[index]
         if "components" in data:
-            data["components"] = [MessageComponents.from_raw(component) for component in data["components"]]
+            data["components"] = [await MessageComponents.from_raw(client, component) for component in data["components"]]
 
-        return cls(**data)
+        return cls(client, **data)
 
-@modified_dataclass
+@dataclass
 class Interaction:
+    __client: "Client"
     id: str
     type: InteractionTypes = None
     application_id: str = None
     token: str = None
     version: int = None
     data: InteractionData = None
-    guild: Guild = None
-    channel: Channel = None
-    member: Member = None
+    guild: "Guild" = None
+    channel: "Channel" = None
+    member: "Member" = None
     name: str = None
-    user: User = None
-    message: Message = None
+    user: "User" = None
+    message: "Message" = None
 
     __CHANGE_KEYS__ = (
         (
@@ -119,23 +125,26 @@ class Interaction:
         return "<Interaction id={!r} type={!r}>".format(self.id, self.type)
 
     @classmethod
-    async def from_raw(cls, gateway, interaction):
+    async def from_raw(cls, client, interaction):
         if "type" in interaction:
             interaction["type"] = InteractionTypes(interaction["type"])
         if "data" in interaction:
-            interaction["data"] = await InteractionData.from_raw(gateway, interaction["data"])
+            interaction["data"] = await InteractionData.from_raw(client, interaction["data"])
         if "guild" in interaction:
-            interaction["guild"] = gateway.get_guild(interaction["guild"])
+            interaction["guild"] = client.gateway.get_guild(interaction["guild"])
         if "channel" in interaction and "guild" in interaction:
             interaction["channel"] = interaction["guild"].get_channel(interaction["channel"])
         if "member" in interaction and "guild" in interaction:
             interaction["member"] = await interaction["guild"].get_member(interaction["member"])
         if "user" in interaction:
-            interaction["user"] = await gateway.get_user(interaction["user"])
+            interaction["user"] = await client.gateway.get_user(interaction["user"])
         if "message" in interaction:
-            index = get_index(gateway.messages, interaction["message"]["id"], key=lambda m: m.id)
+            index = get_index(client.gateway.messages, interaction["message"]["id"], key=lambda m: m.id)
 
             if index is not None:
-                interaction["message"] = gateway.messages[index]
+                interaction["message"] = client.gateway.messages[index]
 
-        return cls(**interaction)
+        return cls(client, **interaction)
+
+    async def callback(self, interaction_type: InteractionCallbackTypes, content: Optional[str] = None, *, title: Optional[str] = None, custom_id: Optional[str] = None, embed: "Embed" = None, embeds: Sequence["Embed"] = None, components: Optional["Components"] = None, files: Optional[List[Union[str, bytes]]] = None, mentions: Optional[list] = [], other: Optional[dict] = {}):
+        return await self.__client.http.interaction_callback(self.id, self.token, interaction_type, content, title=title, custom_id=custom_id, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, other=other)

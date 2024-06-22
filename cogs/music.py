@@ -21,21 +21,18 @@ from utils import *
 from aiohttp import ClientSession
 from models import LastFM
 from config import *
-from typing import Union, TYPE_CHECKING
+from typing import Union
 from azuracast import NowPlaying
 from lastfm import exceptions
 import hashlib, datetime, asyncio, femlink, re, os
-
-if TYPE_CHECKING:
-    from bot import Bot
 
 soundcloud_pattern = re.compile(r"(https?:\/\/)?(www.)?(m\.)?soundcloud\.com/.+/.+")
 
 class Music(commands.Cog):
     name = "Muzyka"
 
-    def __init__(self, bot):
-        self.bot: "Bot" = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
         self.client: femlink.Client = None
         self.templates = {}
         self.milestones = [50, 100, 250, 420, 500, 1000, 1337, 2500, 5000, 10000, 25000, 50000, 100000, 150000, 200000, 250000, 300000, 350000, 400000, 450000, 500000, 600000, 700000, 800000, 900000, 1000000, 2000000, 3000000, 4000000, 5000000]
@@ -763,5 +760,5 @@ class Music(commands.Cog):
 
         await self.bot.paginator(ctx.reply, ctx, lyrics, prefix="```md\n", suffix="```", buttons=True)
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(Music(bot))

@@ -16,15 +16,16 @@ limitations under the License.
 
 import femcord
 from femcord import commands
+from poligonlgbt import get_extension
 from api_client import ApiClient, ApiError
-from aiohttp import ClientSession
+from aiohttp import ClientSession, FormData
 from datetime import datetime
-from dateutil import parser
+from bs4 import BeautifulSoup
 from enum import Enum
-import re, json
+from typing import Tuple
+import random, re, json, string
 
 URL_PATTERN = re.compile(r"((http|https):\/\/)?(www\.)?[-a-z0-9@:%._\+~#=]{1,256}\.[a-z0-9()]{1,69}\b[-a-z0-9()@:%_\+.~#!?&//=]*", re.IGNORECASE)
-# tiktok_pattern = re.compile(r"(?x)https?://(?:(?:www|m)\.(?:tiktok.com)\/(?:v|embed|trending)(?:\/)?(?:\?shareId=)?)(?P<id>[\da-z]+)")
 
 STATUS = [
     "No available data",
@@ -64,8 +65,8 @@ class WebsiteInfo:
 class Tools(commands.Cog):
     name = "Narzędzia"
 
-    def __init__(self, bot):
-        self.bot: commands.Bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
 
     # @commands.Listener
     # async def on_ready(self):
@@ -187,6 +188,57 @@ class Tools(commands.Cog):
 
         await self.bot.wait_for("interaction_create", curl, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
 
+    @commands.command(description="Downloads video via cobalt", aliases=["ytdl", "tiktok", "shorts"])
+    async def cobalt(self, ctx: commands.Context, url: str, audio_only: int = 0):
+        async def get_file(url: str) -> Tuple[str, bytes]:
+            async with session.get(url) as response:
+                content = await response.content.read()
+
+                if len(content) > 20 * 1024 * 1024:
+                    raise Exception("Content too large")
+
+                if response.headers.get("Content-Disposition"):
+                    filename = re.search(r"filename=\"(.+)\"", response.headers["Content-Disposition"]).group(1)
+                else:
+                    filename = "output." + get_extension(content)
+                return filename, content
+
+        async with femcord.Typing(ctx.message):
+            async with ClientSession() as session:
+                async with session.get("https://instances.hyper.lol/instances.json", headers={"User-Agent": self.bot.user_agent}) as response:
+                    data = await response.json()
+                    data = [instance for instance in data if instance["api_online"] and instance["score"] == 100 and instance["protocol"] == "https" and instance["api"] != "api.cobalt.tools"]
+
+                    cobalt = random.choice(data)["api"]
+
+                async with session.post("https://" + cobalt + "/api/json", headers={"Accept": "application/json"}, json={"url": url, "isAudioOnly": bool(audio_only), "filenamePattern": "pretty"}) as response:
+                    data = await response.json()
+
+                    match data["status"]:
+                        case "stream":
+                            return await ctx.reply(files=[await get_file(data["url"])])
+                        case "picker":
+                            files = [await get_file(item["url"]) for item in data["picker"]]
+                            form = FormData()
+                            form.add_field("MAX_FILE_SIZE", "1073741824")
+                            form.add_field("target", "1")
+                            for index, file in enumerate(files):
+                                form.add_field("image[%s]" % index, file[1], filename=file[0])
+                            async with session.post("https://en.bloggif.com/slide?id=" + "".join([random.choice(string.ascii_lowercase + string.digits) for _ in range(32)]), headers={"User-Agent": self.bot.user_agent}, data=form) as response:
+                                content = await response.text()
+                                soup = BeautifulSoup(content)
+                                gif = soup.select_one(".result-image > img").attrs["src"]
+                            await ctx.reply(files=files)
+                            async with femcord.Typing(ctx.message):
+                                _, gif = await get_file("https://en.bloggif.com/" + gif)
+                                await ctx.reply(files=[("output.gif", gif)])
+                            if not data["audio"]:
+                                return
+                            async with femcord.Typing(ctx.message):
+                                return await ctx.reply(files=[await get_file(data["audio"])])
+
+            await ctx.reply("An unexpected error occurred")
+
     # @commands.command(description="Nagrywa filmik ze strony", aliases=["recban", "record"])
     # async def rec(self, ctx: commands.Context, url):
     #     if not ctx.author.id in self.bot.owners:
@@ -216,5 +268,5 @@ class Tools(commands.Cog):
 
     #             await browser.close()
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(Tools(bot))

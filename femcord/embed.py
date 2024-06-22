@@ -15,9 +15,8 @@ limitations under the License.
 """
 
 from datetime import datetime, timedelta
-from typing import TypeVar, Optional, Union
 
-Embed = TypeVar("Embed")
+from typing import Optional, Union
 
 class Embed:
     def __init__(self, *, title: Optional[str] = None, url: Optional[str] = None, description: Optional[str] = None, color: Optional[int] = None, timestamp: Optional[Union[datetime, float, int]] = None):
@@ -32,7 +31,7 @@ class Embed:
         if timestamp is not None:
             self.set_timestamp(timestamp)
 
-    def __add__(self, embed: Embed) -> Embed:
+    def __add__(self, embed: "Embed") -> "Embed":
         new_embed: Embed = Embed()
         new_embed.__dict__ = self.__dict__
 
@@ -51,39 +50,39 @@ class Embed:
 
         return new_embed
 
-    def set_title(self, title: str) -> Embed:
+    def set_title(self, title: str) -> "Embed":
         self.title = title
 
         return self
 
-    def set_description(self, description: str) -> Embed:
+    def set_description(self, description: str) -> "Embed":
         self.description = description
 
         return self
 
-    def set_color(self, color: int) -> Embed:
+    def set_color(self, color: int) -> "Embed":
         self.color = color
 
         return self
 
-    def set_timestamp(self, timestamp: Union[datetime, float, int]) -> Embed:
+    def set_timestamp(self, timestamp: Union[datetime, float, int]) -> "Embed":
         if isinstance(timestamp, (float, int)):
             timestamp = datetime.fromtimestamp(timestamp)
         self.timestamp = (timestamp - timedelta(hours=1)).isoformat()
 
         return self
 
-    def set_image(self, *, url: str) -> Embed:
+    def set_image(self, *, url: str) -> "Embed":
         self.image = {"url": url}
 
         return self
 
-    def set_thumbnail(self, *, url: str) -> Embed:
+    def set_thumbnail(self, *, url: str) -> "Embed":
         self.thumbnail = {"url": url}
 
         return self
 
-    def set_footer(self, *, text: str, icon_url: Optional[str] = None) -> Embed:
+    def set_footer(self, *, text: str, icon_url: Optional[str] = None) -> "Embed":
         self.footer = {"text": text}
 
         if icon_url:
@@ -91,7 +90,7 @@ class Embed:
 
         return self
 
-    def set_author(self, *, name: str, url: Optional[str] = None, icon_url: Optional[str] = None) -> Embed:
+    def set_author(self, *, name: str, url: Optional[str] = None, icon_url: Optional[str] = None) -> "Embed":
         self.author = {"name": name}
 
         if url:
@@ -101,7 +100,7 @@ class Embed:
 
         return self
 
-    def add_field(self, *, name: str, value: str, inline: Optional[bool] = False) -> Embed:
+    def add_field(self, *, name: str, value: str, inline: Optional[bool] = False) -> "Embed":
         if not hasattr(self, "fields"):
             self.fields = []
 
@@ -113,5 +112,5 @@ class Embed:
 
         return self
 
-    def add_blank_field(self, *, inline: Optional[bool] = True) -> Embed:
+    def add_blank_field(self, *, inline: Optional[bool] = True) -> "Embed":
         return self.add_field(name="\u200b", value="\u200b", inline=inline)

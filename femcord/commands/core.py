@@ -15,10 +15,13 @@ limitations under the License.
 """
 
 from .extension import Command, Group
+
 from .enums import CommandTypes
 
-def command(**kwargs):
-    def decorator(func):
+from typing import Callable
+
+def command(**kwargs) -> Callable:
+    def decorator(func) -> Command:
         kwargs["type"] = CommandTypes.COMMAND
         kwargs["callback"] = func
 
@@ -26,8 +29,8 @@ def command(**kwargs):
 
     return decorator
 
-def group(**kwargs):
-    def decorator(func):
+def group(**kwargs) -> Callable:
+    def decorator(func) -> Group:
         kwargs["type"] = CommandTypes.GROUP
         kwargs["callback"] = func
 

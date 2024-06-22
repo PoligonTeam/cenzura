@@ -14,47 +14,59 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from dataclasses import modified_dataclass # type: ignore
-from typing import Optional, List, Dict
+from .dataclass import dataclass
+
+from ..http import Route
 from ..enums import *
 from ..utils import *
 from ..errors import InvalidArgument
+
 from .channel import Channel
+from .user import User
 from .role import Role
 from .emoji import Emoji
 from .sticker import Sticker
 from .member import Member
+
 from datetime import datetime
+
+from typing import Optional, List, Dict, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..client import Client
 
 CDN_URL = "https://cdn.discordapp.com"
 EXTENSIONS = ("png", "jpg", "jpeg", "webp", "gif")
 
-@modified_dataclass
+@dataclass
 class WelcomeScreenChannel:
+    __client: "Client"
     channel: Channel
     description: str
     emoji_id: str
     emoji_name: str
 
     @classmethod
-    def from_raw(cls, channels: List[Channel], channel: Dict):
+    async def from_raw(cls, client, channels: List[Channel], channel: Dict):
         channel["channel"] = [_channel := [_channel for _channel in channels if _channel.id == channel["channel_id"]], _channel if len(_channel) >= 1 else None][1]
 
-        return cls(**channel)
+        return cls(client, **channel)
 
-@modified_dataclass
+@dataclass
 class WelcomeScreen:
+    __client: "Client"
     description: str
     welcome_channels: List[WelcomeScreenChannel]
 
     @classmethod
-    def from_raw(cls, channels: List[Channel], welcomescreen: Dict):
-        welcomescreen["welcome_channels"] = [WelcomeScreenChannel.from_raw(channels, channel) for channel in welcomescreen["welcome_channels"]]
+    async def from_raw(cls, client, channels: List[Channel], welcomescreen: Dict):
+        welcomescreen["welcome_channels"] = [await WelcomeScreenChannel.from_raw(client, channels, channel) for channel in welcomescreen["welcome_channels"]]
 
-        return cls(**welcomescreen)
+        return cls(client, **welcomescreen)
 
-@modified_dataclass
+@dataclass
 class Guild:
+    __client: "Client"
     id: str
     name: str
     icon: str
@@ -131,6 +143,55 @@ class Guild:
     def __repr__(self) -> str:
         return "<Guild id={!r} name={!r} owner={!r}>".format(self.id, self.name, self.owner)
 
+    @classmethod
+    async def from_raw(cls, client, guild: Dict) -> "Guild":
+        icon_url = CDN_URL + "/icons/%s/%s.%s" % (guild["id"], guild["icon"], "gif" if guild["icon"] and guild["icon"][:2] == "a_" else "png")
+        banner_url = CDN_URL + "/banners/%s/%s.%s" % (guild["id"], guild["banner"], "gif" if guild["banner"] and guild["banner"][:2] == "a_" else "png")
+
+        if guild["icon"] is None:
+            icon_url = CDN_URL + "/embed/avatars/%s.png" % (int(guild["id"]) % 5)
+
+        if guild["banner"] is None:
+            banner_url = None
+
+        channels = [await Channel.from_raw(client, channel) for channel in guild["channels"]]
+
+        guild["verification_level"] = VerificationLevel(guild["verification_level"])
+        guild["default_message_notifications"] = DefaultMessageNotification(guild["default_message_notifications"])
+        guild["explicit_content_filter"] = ExplicitContentFilter(guild["explicit_content_filter"])
+        guild["roles"] = sorted([await Role.from_raw(client, role) for role in guild["roles"]], key=lambda role: role.position)
+        guild["emojis"] = [await Emoji.from_raw(client, emoji) for emoji in guild["emojis"]]
+        guild["mfa_level"] = MfaLevel(guild["mfa_level"])
+        guild["joined_at"] = parse_time(guild["joined_at"])
+        guild["members"] = []
+        guild["channels"] = channels
+        guild["threads"] = [await Channel.from_raw(client, thread) for thread in guild["threads"]]
+        guild["nsfw_level"] = NSFWLevel(guild["nsfw_level"])
+        guild["stickers"] = [await Sticker.from_raw(client, sticker) for sticker in guild["stickers"]]
+        guild["created_at"] = time_from_snowflake(guild["id"])
+        guild["icon_url"] = icon_url
+        guild["banner_url"] = banner_url
+
+        if "public_updates_channel" in guild:
+            index = get_index(guild["channels"], guild["public_updates_channel"], key=lambda channel: channel.id)
+            guild["public_updates_channel"] = guild["channels"][index] if index is not None else None
+        if "afk_channel" in guild:
+            index = get_index(guild["channels"], guild["afk_channel"], key=lambda channel: channel.id)
+            guild["afk_channel"] = guild["channels"][index] if index is not None else None
+        if "system_channel" in guild:
+            index = get_index(guild["channels"], guild["system_channel"], key=lambda channel: channel.id)
+            guild["system_channel"] = guild["channels"][index] if index is not None else None
+        if "rules_channel" in guild:
+            index = get_index(guild["channels"], guild["rules_channel"], key=lambda channel: channel.id)
+            guild["rules_channel"] = guild["channels"][index] if index is not None else None
+        if "widget_channel" in guild:
+            index = get_index(guild["channels"], guild["widget_channel"], key=lambda channel: channel.id)
+            guild["widget_channel"] = guild["channels"][index] if index is not None else None
+        if "welcome_screen" in guild:
+            guild["welcome_screen"] = await WelcomeScreen.from_raw(client, channels, guild["welcome_screen"])
+
+        return cls(client, **guild)
+
     def get_channel(self, channel_id_or_name: str) -> Union[Channel, None]:
         if not channel_id_or_name:
             return
@@ -178,51 +239,42 @@ class Guild:
 
         return CDN_URL + "/banners/%s/%s.%s" % (self.id, self.banner, extension)
 
-    @classmethod
-    def from_raw(cls, guild: Dict) -> "Guild":
-        icon_url = CDN_URL + "/icons/%s/%s.%s" % (guild["id"], guild["icon"], "gif" if guild["icon"] and guild["icon"][:2] == "a_" else "png")
-        banner_url = CDN_URL + "/banners/%s/%s.%s" % (guild["id"], guild["banner"], "gif" if guild["banner"] and guild["banner"][:2] == "a_" else "png")
+    async def fetch_member(self, member_id: str) -> Dict[str, str]:
+        return await self.__client.http.request(Route("GET", "guilds", self.id, "members", member_id))
 
-        if guild["icon"] is None:
-            icon_url = CDN_URL + "/embed/avatars/%s.png" % (int(guild["id"]) % 5)
+    async def get_member(self, member: Union[dict, str], user: Optional[Union[User, dict]] = None) -> Member:
+        for cached_member in self.members:
+            if isinstance(member, str):
+                if member.lower() in (cached_member.user.username.lower(), (cached_member.nick or "").lower(), cached_member.user.id):
+                    return cached_member
+            elif isinstance(member, dict):
+                if user is not None:
+                    if isinstance(user, User):
+                        if user.id == cached_member.user.id:
+                            return cached_member
+                    elif isinstance(user, dict):
+                        if user["id"] == cached_member.user.id:
+                            return cached_member
+                elif "user" in member:
+                    if member["user"]["id"] == cached_member.user.id:
+                        return cached_member
 
-        if guild["banner"] is None:
-            banner_url = None
+        if isinstance(member, str):
+            member: Dict = await self.fetch_member(member)
 
-        channels = [Channel.from_raw(channel) for channel in guild["channels"]]
+        if isinstance(user, dict):
+            user = await self.__client.gateway.get_user(user)
 
-        guild["verification_level"] = VerificationLevel(guild["verification_level"])
-        guild["default_message_notifications"] = DefaultMessageNotification(guild["default_message_notifications"])
-        guild["explicit_content_filter"] = ExplicitContentFilter(guild["explicit_content_filter"])
-        guild["roles"] = sorted((Role.from_raw(role) for role in guild["roles"]), key=lambda role: role.position)
-        guild["emojis"] = [Emoji.from_raw(emoji) for emoji in guild["emojis"]]
-        guild["mfa_level"] = MfaLevel(guild["mfa_level"])
-        guild["joined_at"] = parse_time(guild["joined_at"])
-        guild["members"] = []
-        guild["channels"] = channels
-        guild["threads"] = [Channel.from_raw(thread) for thread in guild["threads"]]
-        guild["nsfw_level"] = NSFWLevel(guild["nsfw_level"])
-        guild["stickers"] = [Sticker.from_raw(sticker) for sticker in guild["stickers"]]
-        guild["created_at"] = time_from_snowflake(guild["id"])
-        guild["icon_url"] = icon_url
-        guild["banner_url"] = banner_url
+        if not user and "user" in member:
+            user = await self.__client.gateway.get_user(member["user"])
 
-        if "public_updates_channel" in guild:
-            index = get_index(guild["channels"], guild["public_updates_channel"], key=lambda channel: channel.id)
-            guild["public_updates_channel"] = guild["channels"][index] if index is not None else None
-        if "afk_channel" in guild:
-            index = get_index(guild["channels"], guild["afk_channel"], key=lambda channel: channel.id)
-            guild["afk_channel"] = guild["channels"][index] if index is not None else None
-        if "system_channel" in guild:
-            index = get_index(guild["channels"], guild["system_channel"], key=lambda channel: channel.id)
-            guild["system_channel"] = guild["channels"][index] if index is not None else None
-        if "rules_channel" in guild:
-            index = get_index(guild["channels"], guild["rules_channel"], key=lambda channel: channel.id)
-            guild["rules_channel"] = guild["channels"][index] if index is not None else None
-        if "widget_channel" in guild:
-            index = get_index(guild["channels"], guild["widget_channel"], key=lambda channel: channel.id)
-            guild["widget_channel"] = guild["channels"][index] if index is not None else None
-        if "welcome_screen" in guild:
-            guild["welcome_screen"] = WelcomeScreen.from_raw(channels, guild["welcome_screen"])
+        member = await Member.from_raw(self.__client, self, member, user)
+        self.members.append(member)
 
-        return cls(**guild)
+        return member
+
+    async def ban(self, user: User, reason: Optional[str] = None, delete_message_seconds: Optional[int] = 0) -> Union[dict, str]:
+        return await self.__client.http.ban_member(self.id, user.id, reason=reason, delete_message_seconds=delete_message_seconds)
+
+    async def unban(self, member_id: str, reason: Optional[str] = None) -> Union[dict, str]:
+        return await self.__client.http.unban_member(self.id, member_id, reason=reason)

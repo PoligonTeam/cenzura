@@ -17,17 +17,14 @@ limitations under the License.
 import femcord
 from femcord import commands, types
 from datetime import datetime, timedelta
-from typing import Union, TYPE_CHECKING
+from typing import Union
 import asyncio, time, ast, inspect, models
-
-if TYPE_CHECKING:
-    from bot import Bot
 
 class Dev(commands.Cog):
     hidden = True
 
-    def __init__(self, bot) -> None:
-        self.bot: Bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
 
     def insert_returns(self, body: list) -> None:
         if isinstance(body[-1], ast.Expr):
@@ -223,5 +220,5 @@ class Dev(commands.Cog):
 
         await ctx.reply(f"Executed in `{after - before:.2f}s`")
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(Dev(bot))

@@ -15,10 +15,15 @@ limitations under the License.
 """
 
 from .errors import InvalidArgument
+
 from datetime import datetime
+
+import re
+
 from typing import Callable, Iterable, Union, Any
 
 DISCORD_EPOCH = 1420070400000
+ID_PATTERN = re.compile(r"\d{16,19}")
 
 def parse_time(timestamp: Union[str, datetime]) -> Union[datetime, None]:
     if isinstance(timestamp, str):

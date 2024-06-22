@@ -16,12 +16,11 @@ limitations under the License.
 
 import femcord
 from femcord import commands
-from femcord.http import Route
 from datetime import datetime
 
 class About(commands.Cog):
-    def __init__(self, bot):
-        self.bot: commands.Bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
 
     async def get_ping_text(self):
         data = await self.bot.get_latency_data()
@@ -55,5 +54,5 @@ class About(commands.Cog):
 
         await ctx.reply(embed=femcord.Embed(title="Bot statistics:", description=description, color=self.bot.embed_color))
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(About(bot))

@@ -48,7 +48,7 @@ class Client:
             for _ in range(300):
                 if nonce in self.socket.responses:
                     return self.socket.responses.pop(nonce)
-                await asyncio.sleep(0.01)
+                await asyncio.sleep(0.1)
 
     def respond[T](self, event: str, nonce: bytes, data: T) -> None:
         data = pickle.dumps(data)
@@ -125,9 +125,9 @@ class IPC(socket.socket):
 
                         return path, opcode, nonce, received_event, received_data
                     except socket.error:
-                        await asyncio.sleep(0)
+                        await asyncio.sleep(0.1)
             except socket.error:
-                await asyncio.sleep(0)
+                await asyncio.sleep(0.1)
 
     async def receiver(self) -> None:
         while True:
@@ -140,7 +140,7 @@ class IPC(socket.socket):
             elif opcode == OpCodes.RESPONSE:
                 self.responses[nonce] = received_data
 
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.1)
 
     def close(self) -> None:
         super().close()

@@ -14,19 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from dataclasses import modified_dataclass
-from typing import Sequence
+from .dataclass import dataclass
+
 from ..enums import *
 from ..utils import *
+
 from datetime import datetime
 
-@modified_dataclass
+from typing import Sequence, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..client import Client
+
+@dataclass
 class EmbedFooter:
     text: str
     icon_url: str = None
     proxy_icon_url: str = None
 
-@modified_dataclass
+@dataclass
 class EmbedImage:
     url: str
     height: int
@@ -35,7 +41,7 @@ class EmbedImage:
     placeholder_version: object = None
     placeholder: object = None
 
-@modified_dataclass
+@dataclass
 class EmbedThumbnail:
     url: str
     height: int
@@ -44,7 +50,7 @@ class EmbedThumbnail:
     placeholder_version: object = None
     placeholder: object = None
 
-@modified_dataclass
+@dataclass
 class EmbedVideo:
     url: str
     height: int
@@ -53,26 +59,27 @@ class EmbedVideo:
     placeholder_version: object = None
     placeholder: object = None
 
-@modified_dataclass
+@dataclass
 class EmbedProvider:
     name: str
     url: str = None
 
-@modified_dataclass
+@dataclass
 class EmbedAuthor:
     name: str
     icon_url: str = None
     proxy_icon_url: str = None
     url: str = None
 
-@modified_dataclass
+@dataclass
 class EmbedField:
     name: str
     value: str
     inline: bool
 
-@modified_dataclass
+@dataclass
 class Embed:
+    __client: "Client"
     type: str
     title: str = None
     description: str = None
@@ -90,7 +97,7 @@ class Embed:
     placeholder_version: object = None
 
     @classmethod
-    def from_raw(cls, embed):
+    async def from_raw(cls, client, embed):
         if "timestamp" in embed:
             embed["timestamp"] = parse_time(embed["timestamp"])
         if "footer" in embed:
@@ -108,4 +115,4 @@ class Embed:
         if "fields" in embed:
             embed["fields"] = [EmbedField(**field) for field in embed["fields"]]
 
-        return cls(**embed)
+        return cls(client, **embed)

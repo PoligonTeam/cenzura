@@ -18,27 +18,30 @@ from ..client import Client
 from ..intents import Intents
 from ..errors import InvalidArgument
 from ..utils import get_index
-from .errors import *
+
 from .extension import Cog, Command, Group, Listener
 from .enums import CommandTypes
 from .context import Context
-from .typefunctions import set_functions
-from types import CoroutineType
+
+from .errors import *
+
 from dataclasses import is_dataclass
-from typing import Callable, Union, Optional, Iterable, List, Any
-from types import ModuleType
+from types import CoroutineType, ModuleType
+
 import importlib.util, inspect, traceback, sys
+
+from typing import Callable, Union, Optional, Iterable, List, Any
 
 class Bot(Client):
     def __init__(self, *, name: Union[str, None] = None, command_prefix: Union[Callable, str], intents: Intents = Intents.all(), messages_limit: int = 1000, owners: Iterable[str] = []) -> None:
         super().__init__(intents = intents, messages_limit = messages_limit)
 
         self.name = name
-        self.owners: Iterable[str] = list(owners)
-        self.original_prefix = self.command_prefix = command_prefix # TODO change prefix
+        self.owners = list(owners)
+        self.original_prefix = self.command_prefix = command_prefix
 
         if not callable(self.command_prefix):
-            async def command_prefix(self, message):
+            async def command_prefix(self, _):
                 return self.original_prefix
 
             self.command_prefix: Callable = command_prefix
@@ -49,8 +52,6 @@ class Bot(Client):
 
         self.before_call_functions: List[Callable] = []
         self.after_call_functions: List[Callable] = []
-
-        set_functions(self)
 
         @self.event
         async def on_message_create(message) -> None:

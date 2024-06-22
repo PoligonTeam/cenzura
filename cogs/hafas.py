@@ -5,7 +5,7 @@ from hafas import HafasClient, Station, NotFound
 from utils import table
 
 class Hafas(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
     async def get_board(self, ctx, name, type, amount):
@@ -87,5 +87,5 @@ class Hafas(commands.Cog):
 
             await ctx.reply(embeds=embeds)
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(Hafas(bot))

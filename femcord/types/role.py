@@ -14,14 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from dataclasses import modified_dataclass
+from .dataclass import dataclass
+
 from ..enums import *
 from ..utils import *
 from ..permissions import Permissions
+
 from datetime import datetime
 
-@modified_dataclass
+from typing import Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..client import Client
+    from ..commands import Context
+
+@dataclass
 class Role:
+    __client: "Client"
     id: str
     name: str
     color: int
@@ -41,8 +50,17 @@ class Role:
         return "<Role id={!r} name={!r} color={!r} position={!r}>".format(self.id, self.name, self.color, self.position)
 
     @classmethod
-    def from_raw(cls, role):
+    async def from_raw(cls, client, role):
         role["permissions"] = Permissions.from_int(int(role["permissions"]))
         role["created_at"] = time_from_snowflake(role["id"])
 
-        return cls(**role)
+        return cls(client, **role)
+
+    @classmethod
+    def from_arg(cls, ctx: "Context", argument) -> Union["Role", None]:
+        result = ID_PATTERN.search(argument)
+
+        if result is not None:
+            argument = result.group()
+
+        return ctx.guild.get_role(argument)

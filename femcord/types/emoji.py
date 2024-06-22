@@ -14,13 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from dataclasses import modified_dataclass
+from .dataclass import dataclass
+
 from ..enums import *
 from ..utils import *
+
 from datetime import datetime
 
-@modified_dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..client import Client
+
+@dataclass
 class Emoji:
+    __client: "Client"
     name: str
     id: str = None
     created_at: datetime = None
@@ -36,8 +44,8 @@ class Emoji:
         return "<Emoji id={!r} name={!r} animated={!r}>".format(self.id, self.name, self.animated)
 
     @classmethod
-    def from_raw(cls, emoji):
+    async def from_raw(cls, client, emoji):
         if emoji.get("id", None) is not None:
             emoji["created_at"] = time_from_snowflake(emoji["id"])
 
-        return cls(**emoji)
+        return cls(client, **emoji)

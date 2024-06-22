@@ -21,8 +21,8 @@ import socket, aiohttp
 class SmartHome(commands.Cog):
     hidden = True
 
-    def __init__(self, bot):
-        self.bot: commands.Bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.address = "192.168.100.4", 8080
 
@@ -97,5 +97,5 @@ class SmartHome(commands.Cog):
 
         await ctx.reply("ok")
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(SmartHome(bot))

@@ -54,8 +54,8 @@ class CustomCommands(commands.Cog):
             self.prefixes.append("")
 
 class Other(commands.Cog):
-    def __init__(self, bot, custom_commands_cog):
-        self.bot: commands.Bot = bot
+    def __init__(self, bot: commands.Bot, custom_commands_cog: commands.Cog) -> None:
+        self.bot = bot
         self.custom_commands_cog = custom_commands_cog
 
     @commands.Listener
@@ -105,7 +105,7 @@ class Other(commands.Cog):
             @femscript.wrap_function()
             def get_all() -> Dict[str, object]:
                 return database
-            
+
             @femscript.wrap_function()
             def get(key: str) -> object:
                 return database.get(key)
@@ -114,7 +114,7 @@ class Other(commands.Cog):
             def update[T](key: str, value: T) -> T:
                 database[key] = value
                 return value
-            
+
             @femscript.wrap_function()
             def remove(key: str) -> object:
                 return database.pop(key)
@@ -122,7 +122,7 @@ class Other(commands.Cog):
         @femscript.wrap_function()
         async def get_user(user: str) -> dict:
             return convert(_=await self.bot.gateway.get_user(user)).get("_")
-        
+
         @femscript.wrap_function()
         def get_channel(channel: str) -> dict:
             return convert(_=ctx.guild.get_channel(channel)).get("_")
@@ -148,7 +148,7 @@ class Other(commands.Cog):
 
     @commands.Listener
     async def on_message_create(self, message):
-        if message.author.bot:
+        if message.author.bot or not message.guild:
             return
 
         for prefix in self.custom_commands_cog.prefixes:
@@ -163,7 +163,7 @@ class Other(commands.Cog):
                 fake_message.content = (await self.bot.get_prefix(self.bot, message))[-1] + message.content[len(prefix):]
 
                 return await self.bot.process_commands(fake_message)
-            
+
     async def get_command_data(self, code: str) -> Tuple[CommandOperation, CommandData]:
         femscript = Femscript(code)
 
@@ -220,7 +220,7 @@ class Other(commands.Cog):
         @femscript.wrap_function()
         def get_commands() -> None:
             command_data["operation"] = CommandOperation.GET_COMMANDS
-        
+
         @femscript.wrap_function()
         def remove_command(name: str) -> None:
             command_data["operation"] = CommandOperation.REMOVE_COMMAND
@@ -232,7 +232,7 @@ class Other(commands.Cog):
             self.custom_commands_cog.append_prefix(command_data["prefix"])
 
         return command_data.pop("operation"), command_data
-            
+
     def create_custom_command(self, guild_id: str, command_data: CommandData, code: str) -> commands.Command:
         async def func(ctx: commands.Context, args: list = None) -> object:
             async with femcord.Typing(ctx.message):
@@ -287,7 +287,7 @@ class Other(commands.Cog):
                 @femscript.wrap_function()
                 def get_all() -> Dict[str, object]:
                     return database
-                
+
                 @femscript.wrap_function()
                 def get_value(key: str) -> object:
                     return database.get(key)
@@ -296,7 +296,7 @@ class Other(commands.Cog):
                 def update[T](key: str, value: T) -> T:
                     database[key] = value
                     return value
-                
+
                 @femscript.wrap_function()
                 def remove(key: str) -> object:
                     return database.pop(key)
@@ -304,7 +304,7 @@ class Other(commands.Cog):
                 @femscript.wrap_function()
                 async def get_user(user: str) -> dict:
                     return convert(_=await self.bot.gateway.get_user(user)).get("_")
-                
+
                 @femscript.wrap_function()
                 def get_channel(channel: str) -> dict:
                     return convert(_=ctx.guild.get_channel(channel)).get("_")
@@ -320,11 +320,11 @@ class Other(commands.Cog):
 
                 if isinstance(result, femcord.Embed):
                     return await ctx.reply(embed=result)
-                
+
                 await self.bot.paginator(ctx.reply, ctx, str(result) or "(empty result)", replace=False)
 
         if command_data["usage"] is None and command_data["arguments"]:
-            command_data["usage"] = " ".join(["(" + key + ":" + value + ")" for key, value in command_data["arguments"].items()])  
+            command_data["usage"] = " ".join(["(" + key + ":" + value + ")" for key, value in command_data["arguments"].items()])
 
         kwargs = {
             **command_data,
@@ -336,7 +336,7 @@ class Other(commands.Cog):
                 "code": code
             }
         }
-        
+
         kwargs["name"] = guild_id + "_" + command_data["name"]
         kwargs["aliases"].append(command_data["name"])
         del kwargs["prefix"]
@@ -376,7 +376,7 @@ class Other(commands.Cog):
 
             if not command:
                 raise commands.CommandNotFound()
-            
+
             return await self.bot.paginator(ctx.reply, ctx, command.other["code"], prefix="```py\n", suffix="```")
         elif operation == CommandOperation.GET_COMMANDS:
             return await self.bot.paginator(ctx.reply, ctx, pages=custom_commands, prefix="```py\n", suffix="```")
@@ -399,9 +399,9 @@ class Other(commands.Cog):
             alias_command = self.bot.get_command(alias, guild_id=ctx.guild.id)
             if alias_command is not None and not alias_command.name == ctx.guild.id + "_" + command_data["name"]:
                 return await ctx.reply(f"Alias `{alias}` is already used in the bot")
-            
+
         text = "Created"
-    
+
         if command_object is not None:
             custom_commands.remove(command_object.other["code"])
             self.bot.remove_command(command_object)
@@ -415,6 +415,6 @@ class Other(commands.Cog):
 
         await ctx.reply(text)
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(custom_commands_cog := CustomCommands())
     bot.load_cog(Other(bot, custom_commands_cog))

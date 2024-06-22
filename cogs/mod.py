@@ -23,8 +23,8 @@ import datetime, re
 class Admin(commands.Cog):
     name = "Moderacyjne"
 
-    def __init__(self, bot):
-        self.bot: commands.Bot = bot
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
 
     @commands.command(description="Wyrzuca użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("kick_members")
@@ -223,5 +223,5 @@ class Admin(commands.Cog):
 
         await ctx.reply("Ustawiono autorole")
 
-def setup(bot):
+def setup(bot: commands.Bot) -> None:
     bot.load_cog(Admin(bot))
