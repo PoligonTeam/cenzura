@@ -60,8 +60,8 @@ class Heartbeat:
     def __init__(self, gateway: "Gateway", heartbeat_interval: float) -> None:
         self.loop = asyncio.get_event_loop()
         self.gateway: Gateway = gateway
-        self.heartbeat_interval: float = heartbeat_interval
-        self.heartbeat_task: Callable = None
+        self.heartbeat_interval = heartbeat_interval
+        self.heartbeat_task: asyncio.Task = None
         self.time: float = None
 
     def send(self) -> Coroutine:
@@ -113,11 +113,10 @@ class Gateway:
         self.bot_user: User = None
 
         self.guilds: List[Guild] = []
+        self.requested: List[str] = []
         self.unavailable_guilds: List[dict] = []
-        self.requested_guilds: List[str] = []
         self.users: List[User] = []
-        self.request_members: List[str] = []
-        self.member_chunks: List[dict] = []
+        self.user_ids: List[str] = []
 
         self.messages_limit = client.messages_limit
         self.messages: List[Message] = []
@@ -149,10 +148,9 @@ class Gateway:
 
     def reset(self) -> None:
         self.guilds = []
+        self.requested = []
         self.unavailable_guilds = []
-        self.requested_guilds = []
         self.users = []
-        self.request_members = []
 
     async def identify(self) -> None:
         self.reset()
@@ -163,7 +161,8 @@ class Gateway:
                 "os": sys.platform,
                 "browser": "femcord",
                 "device": "femcord"
-            }
+            },
+            "large_threshold": 250
         }
 
         if self.bot is True:
@@ -396,55 +395,63 @@ class Gateway:
 
         return thread,
 
-    @handler.event
-    async def guild_create(self, guild):
-        guild = await Guild.from_raw(self.__client, guild)
-        self.guilds.append(guild)
+    async def add_members(self, guild: Guild, members: List[dict], presences: List[dict] = None) -> None:
+        self.user_ids = (user.id for user in self.users)
 
-        if len(self.unavailable_guilds) <= len(self.guilds):
-            self.unavailable_guilds = []
+        for member in members:
+            if member["user"]["id"] in self.user_ids:
+                for user in self.users:
+                    if user.id == member["user"]["id"]:
+                        break
+            else:
+                user = await User.from_raw(self.__client, member["user"])
+                self.users.append(user)
 
-            if not self.guilds[0].id in self.requested_guilds:
-                await self.ws.send(Opcodes.REQUEST_GUILD_MEMBERS, {"guild_id": self.guilds[0].id, "query": "", "limit": 0, "presences": self.intents.has(IntentsEnum.GUILD_PRESENCES)})
+            await asyncio.sleep(0)
 
-            self.request_members += [guild.id for guild in self.guilds[1:]]
-
-            return guild,
-
-        if not guild.id in self.requested_guilds and self.dispatched_ready and not self.request_members:
-            await self.ws.send(Opcodes.REQUEST_GUILD_MEMBERS, {"guild_id": guild.id, "query": "", "limit": 0, "presences": self.intents.has(IntentsEnum.GUILD_PRESENCES)})
-
-        return guild,
-
-    @handler.event
-    async def guild_members_chunk(self, chunk):
-        guild = self.get_guild(chunk["guild_id"])
-
-        for member in chunk["members"]:
-            member = await guild.get_member(member)
+            member = await Member.from_raw(self.__client, guild, member, user)
 
             if member.user.id == guild.owner:
                 guild.owner = member
             elif member.user.id == self.bot_user.id:
                 guild.me = member
 
-            if self.intents.has(IntentsEnum.GUILD_PRESENCES) is True:
-                for presence in chunk["presences"]:
-                    if "user" in presence and presence["user"]["id"] == member.user.id:
-                        member.presence = await Presence.from_raw(self.__client, presence)
+            guild.members.append(member)
+
+            if presences:
+                if self.intents.has(IntentsEnum.GUILD_PRESENCES) is True:
+                    for presence in presences:
+                        if "user" in presence and presence["user"]["id"] == member.user.id:
+                            member.presence = await Presence.from_raw(self.__client, presence)
+                        await asyncio.sleep(0)
+
+    @handler.event
+    async def guild_create(self, guild):
+        members = guild["members"]
+        guild = await Guild.from_raw(self.__client, guild)
+        self.guilds.append(guild)
+
+        if guild.member_count != len(members):
+            await self.ws.send(Opcodes.REQUEST_GUILD_MEMBERS, {"guild_id": guild.id, "query": "", "limit": 0, "presences": self.intents.has(IntentsEnum.GUILD_PRESENCES)})
+        else:
+            self.requested.append(guild.id)
+            self.loop.create_task(self.add_members(guild, members))
+
+        return guild,
+
+    @handler.event
+    async def guild_members_chunk(self, chunk):
+        self.loop.create_task(self.add_members(self.get_guild(chunk["guild_id"]), chunk["members"], chunk["presences"]))
 
         if chunk["chunk_index"] + 1 == chunk["chunk_count"]:
-            self.requested_guilds.append(chunk["guild_id"])
-
-            if self.request_members and not self.request_members[0] in self.requested_guilds:
-                await self.ws.send(Opcodes.REQUEST_GUILD_MEMBERS, {"guild_id": self.request_members.pop(0), "query": "", "limit": 0, "presences": self.intents.has(IntentsEnum.GUILD_PRESENCES)})
+            self.requested.append(chunk["guild_id"])
 
         return chunk,
 
     @handler.event
     async def presence_update(self, presence):
-        if len(self.requested_guilds) != len(self.guilds):
-            return None,
+        if sorted([guild.id for guild in self.guilds]) != sorted(self.requested):
+            return
 
         guild = self.get_guild(presence["guild_id"])
         member = await guild.get_member(presence["user"]["id"])

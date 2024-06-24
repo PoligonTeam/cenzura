@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 class WebSocket:
     URL = "wss://gateway.discord.gg/?v=9&encoding=json&compress=zlib-stream"
 
-    async def __new__(cls, *args) -> None:
+    async def __new__(cls, *args) -> "WebSocket":
         instance = super().__new__(cls)
         await instance.__init__(*args)
         return instance

@@ -48,7 +48,7 @@ class Music(commands.Cog):
             await asyncio.sleep(1)
             await self.connect("704439884340920441", "853657308152070144", mute=True, deaf=True)
 
-            player: femlink.Player = self.client.get_player("704439884340920441")
+            player = self.client.get_player("704439884340920441")
 
             while player is None:
                 player = self.client.get_player("704439884340920441")
@@ -111,7 +111,7 @@ class Music(commands.Cog):
 
     @commands.command(description="Odtwarza muzykę", usage="(tytuł)")
     async def play(self, ctx: commands.Context, *, query: str) -> None:
-        player: femlink.Player = self.client.get_player(ctx.guild.id)
+        player = self.client.get_player(ctx.guild.id)
 
         if player is None:
             if ctx.member.voice_state.channel is None:
@@ -295,7 +295,6 @@ class Music(commands.Cog):
                 except (exceptions.UnauthorizedToken, exceptions.InvalidApiKey, exceptions.InvalidSignature):
                     if attempt == 2:
                         return await message.edit("Logowanie się nie powiodło... link się przedawnił lub coś poszło nie tak")
-
                     continue
 
                 user = self.lastfm_users.get(ctx.author.id)

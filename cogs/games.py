@@ -39,19 +39,19 @@ class Games(commands.Cog):
 
         components = femcord.Components(
             femcord.Row(
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left up", emoji=Emoji("\N{NORTH WEST ARROW}")),
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="up", emoji=Emoji("\N{UPWARDS BLACK ARROW}")),
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right up", emoji=Emoji("\N{NORTH EAST ARROW}"))
+                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left up", emoji=Emoji(ctx.bot, "\N{NORTH WEST ARROW}")),
+                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="up", emoji=Emoji(ctx.bot, "\N{UPWARDS BLACK ARROW}")),
+                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right up", emoji=Emoji(ctx.bot, "\N{NORTH EAST ARROW}"))
             ),
             femcord.Row(
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left", emoji=Emoji("\N{LEFTWARDS BLACK ARROW}")),
-                femcord.Button(style=femcord.ButtonStyles.DANGER, custom_id="close", emoji=Emoji("\N{BLACK SQUARE FOR STOP}")),
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right", emoji=Emoji("\N{BLACK RIGHTWARDS ARROW}"))
+                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left", emoji=Emoji(ctx.bot, "\N{LEFTWARDS BLACK ARROW}")),
+                femcord.Button(style=femcord.ButtonStyles.DANGER, custom_id="close", emoji=Emoji(ctx.bot, "\N{BLACK SQUARE FOR STOP}")),
+                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right", emoji=Emoji(ctx.bot, "\N{BLACK RIGHTWARDS ARROW}"))
             ),
             femcord.Row(
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left down", emoji=Emoji("\N{SOUTH WEST ARROW}")),
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="down", emoji=Emoji("\N{DOWNWARDS BLACK ARROW}")),
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right down", emoji=Emoji("\N{SOUTH EAST ARROW}"))
+                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left down", emoji=Emoji(ctx.bot, "\N{SOUTH WEST ARROW}")),
+                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="down", emoji=Emoji(ctx.bot, "\N{DOWNWARDS BLACK ARROW}")),
+                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right down", emoji=Emoji(ctx.bot, "\N{SOUTH EAST ARROW}"))
             )
         )
 
@@ -65,7 +65,7 @@ class Games(commands.Cog):
         embed = femcord.Embed(title="Pull requests:", color=self.bot.embed_color)
         embed.set_thumbnail(url=f"https://korrumzthegame.wtf/images/player{renderer.client.image_number}.png")
         embed.set_image(url=f"attachment://image.png")
-        embed.set_footer(text="korrumzthegame.wtf")
+        embed.set_footer(text="ktg.poligon.lgbt")
 
         def update_embed():
             embed.description = "\n".join(f"{player.username if not renderer.client.username == player.username else '**' + player.username + '**'} {player.pull_requests}" for player in sorted(renderer.client.players + [renderer.client], reverse=True, key=lambda player: player.pull_requests))

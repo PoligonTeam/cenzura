@@ -43,7 +43,7 @@ class Context:
         self.error: Exception = None
 
         self.send = self.channel.send
-        self.reply = self.channel.reply
+        self.reply = self.message.reply
 
     def __str__(self) -> None:
         return "<Context guild={!r} channel={!r} message={!r} command={!r} arguments={!r}>".format(self.guild, self.channel, self.message, self.command, self.arguments)

@@ -84,5 +84,3 @@ class Lyrics(Model):
     title = TextField()
     source = TextField()
     lyrics = TextField()
-
-# class NewLyrics(Model):

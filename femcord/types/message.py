@@ -26,7 +26,7 @@ from .interaction import Interaction
 
 from datetime import datetime
 
-from typing import List, Optional, Sequence, TYPE_CHECKING
+from typing import List, Optional, Sequence, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..client import Client
@@ -52,10 +52,10 @@ class Attachment:
     content_type: str = None
     waveform: str = None
     duration_secs: float = None
-    flags: object = None
-    placeholder_version: object = None
-    placeholder: object = None
-    content_scan_version: object = None
+    flags: Any = None
+    placeholder_version: Any = None
+    placeholder: Any = None
+    content_scan_version: Any = None
 
 @dataclass
 class MessageReference:
@@ -238,7 +238,7 @@ class Message:
 
         return cls(client, **message)
 
-    async def reply(self, content: Optional[str] = None, *, embed: Optional["UserEmbed"] = None, embeds: Optional[Sequence["UserEmbed"]] = [], components: Optional["Components"] = None, files: Optional[List[Union[str, bytes]]] = None, mentions: Optional[list] = [], stickers: Optional[List["Sticker"]] = None, other: Optional[dict] = {}) -> "Message":
+    async def reply(self, content: Optional[str] = None, *, embed: Optional["UserEmbed"] = None, embeds: Optional[Sequence["UserEmbed"]] = None, components: Optional["Components"] = None, files: Optional[List[Union[str, bytes]]] = None, mentions: Optional[list] = [], stickers: Optional[List["Sticker"]] = None, other: Optional[dict] = {}) -> "Message":
         other["message_reference"] = {"guild_id": self.guild.id, "channel_id": self.channel.id, "message_id": self.id}
         return await self.channel.send(content, embed=embed, embeds=embeds, components=components, files=files, mentions=mentions, stickers=stickers, other=other)
 

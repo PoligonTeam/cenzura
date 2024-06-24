@@ -260,7 +260,7 @@ class Guild:
                         return cached_member
 
         if isinstance(member, str):
-            member: Dict = await self.fetch_member(member)
+            member = await self.fetch_member(member)
 
         if isinstance(user, dict):
             user = await self.__client.gateway.get_user(user)

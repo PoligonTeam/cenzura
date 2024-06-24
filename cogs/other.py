@@ -20,7 +20,7 @@ from femscript import Femscript, var, FemscriptException
 from utils import *
 from types import CoroutineType
 from models import Guilds
-from typing import List, Dict, Tuple, Literal, TypedDict
+from typing import List, Dict, Tuple, Literal, TypedDict, Any
 from enum import Enum
 import config, datetime
 
@@ -107,7 +107,7 @@ class Other(commands.Cog):
                 return database
 
             @femscript.wrap_function()
-            def get(key: str) -> object:
+            def get(key: str) -> Any:
                 return database.get(key)
 
             @femscript.wrap_function()
@@ -116,7 +116,7 @@ class Other(commands.Cog):
                 return value
 
             @femscript.wrap_function()
-            def remove(key: str) -> object:
+            def remove(key: str) -> Any:
                 return database.pop(key)
 
         @femscript.wrap_function()
@@ -234,7 +234,7 @@ class Other(commands.Cog):
         return command_data.pop("operation"), command_data
 
     def create_custom_command(self, guild_id: str, command_data: CommandData, code: str) -> commands.Command:
-        async def func(ctx: commands.Context, args: list = None) -> object:
+        async def func(ctx: commands.Context, args: list = None) -> Any:
             async with femcord.Typing(ctx.message):
                 guild = Guilds.get(guild_id=ctx.guild.id)
 
@@ -289,7 +289,7 @@ class Other(commands.Cog):
                     return database
 
                 @femscript.wrap_function()
-                def get_value(key: str) -> object:
+                def get_value(key: str) -> Any:
                     return database.get(key)
 
                 @femscript.wrap_function()
@@ -298,7 +298,7 @@ class Other(commands.Cog):
                     return value
 
                 @femscript.wrap_function()
-                def remove(key: str) -> object:
+                def remove(key: str) -> Any:
                     return database.pop(key)
 
                 @femscript.wrap_function()

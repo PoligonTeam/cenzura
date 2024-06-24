@@ -21,7 +21,7 @@ from ..utils import *
 
 from datetime import datetime
 
-from typing import Sequence, TYPE_CHECKING
+from typing import Sequence, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..client import Client
@@ -38,8 +38,8 @@ class EmbedImage:
     height: int
     width: int
     proxy_url: str = None
-    placeholder_version: object = None
-    placeholder: object = None
+    placeholder_version: Any = None
+    placeholder: Any = None
 
 @dataclass
 class EmbedThumbnail:
@@ -47,8 +47,8 @@ class EmbedThumbnail:
     height: int
     width: int
     proxy_url: str = None
-    placeholder_version: object = None
-    placeholder: object = None
+    placeholder_version: Any = None
+    placeholder: Any = None
 
 @dataclass
 class EmbedVideo:
@@ -56,8 +56,8 @@ class EmbedVideo:
     height: int
     width: int
     proxy_url: str = None
-    placeholder_version: object = None
-    placeholder: object = None
+    placeholder_version: Any = None
+    placeholder: Any = None
 
 @dataclass
 class EmbedProvider:
@@ -94,7 +94,7 @@ class Embed:
     author: EmbedAuthor = None
     fields: Sequence[EmbedField] = None
     reference_id: str = None
-    placeholder_version: object = None
+    placeholder_version: Any = None
 
     @classmethod
     async def from_raw(cls, client, embed):

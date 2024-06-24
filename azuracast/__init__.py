@@ -15,7 +15,8 @@ limitations under the License.
 """
 
 from dataclasses import dataclass
-from typing import List, Union
+
+from typing import List, Union, Any
 
 @dataclass
 class Listeners:
@@ -78,8 +79,8 @@ class Station:
     hls_enabled: bool
     hls_url: str
     hls_listeners: int
-    hls_is_default: object
-    timezone: object
+    hls_is_default: Any
+    timezone: Any
 
     @classmethod
     def from_dict(cls, data: dict) -> "Station":

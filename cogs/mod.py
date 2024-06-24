@@ -43,7 +43,7 @@ class Admin(commands.Cog):
         await ctx.reply(f"Wyrzucono `{member.user}` z powodu `{reason}`")
 
         try:
-            await member.user.send(f"Zostałes wyrzucony z serwera `{ctx.guild.name}` przez `{ctx.author}` z powodu `{reason}`")
+            await member.user.send(f"Zostałeś wyrzucony z serwera `{ctx.guild.name}` przez `{ctx.author}` z powodu `{reason}`")
         except HTTPException:
             pass
 
