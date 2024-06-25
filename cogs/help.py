@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands
-from femcord.permissions import Permissions
+import femcord.femcord as femcord
+from femcord.femcord import commands
+from femcord.femcord.permissions import Permissions
 
 permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles")
 

@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands, types, HTTPException
+import femcord.femcord as femcord
+from femcord.femcord import commands, types, HTTPException
 from models import Guilds
 from typing import Union
 import datetime, re
@@ -65,7 +65,7 @@ class Admin(commands.Cog):
             await ctx.reply(f"Zbanowano `{member.user}` z powodu `{reason}`")
 
             try:
-                await member.user.send(f"Zostałes zbanowany na serwerze `{ctx.guild.name}` przez `{ctx.author}` z powodu `{reason}`")
+                await member.user.send(f"Zostałeś zbanowany na serwerze `{ctx.guild.name}` przez `{ctx.author}` z powodu `{reason}`")
             except HTTPException:
                 pass
 
@@ -86,7 +86,7 @@ class Admin(commands.Cog):
         await ctx.reply(f"Odbanowano `{user}` z powodu `{reason}`")
 
         try:
-            await user.send(f"Zostałes odbanowany na serwerze `{ctx.guild.name}` przez `{ctx.author}` z powodu `{reason}`")
+            await user.send(f"Zostałeś odbanowany na serwerze `{ctx.guild.name}` przez `{ctx.author}` z powodu `{reason}`")
         except HTTPException:
             pass
 

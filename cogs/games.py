@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands
-from femcord.types import Emoji
+import femcord.femcord as femcord
+from femcord.femcord import commands
+from femcord.femcord.types import Emoji
 from korrumzthegame import Renderer
 from typing import Union
 import asyncio, random

@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands, types, InvalidArgument, HTTPException
-from femcord.http import Route
-from femcord.permissions import Permissions
-from femcord.enums import Intents
-from femcord.utils import get_index
+import femcord.femcord as femcord
+from femcord.femcord import commands, types, InvalidArgument, HTTPException
+from femcord.femcord.http import Route
+from femcord.femcord.permissions import Permissions
+from femcord.femcord.enums import Intents
+from femcord.femcord.utils import get_index
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup, ResultSet
 from datetime import datetime

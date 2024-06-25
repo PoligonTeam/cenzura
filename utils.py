@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import types
+import femcord.femcord as femcord
+from femcord.femcord import types
 from femscript import FemscriptException
 from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError
 from models import Artists, LastFM, Lyrics

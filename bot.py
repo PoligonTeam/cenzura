@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands, types
-from femcord.http import Route
-from femcord.permissions import Permissions
+import femcord.femcord as femcord
+from femcord.femcord import commands, types
+from femcord.femcord.http import Route
+from femcord.femcord.permissions import Permissions
 from femscript import Femscript, var
 from tortoise import Tortoise
 from utils import request
@@ -28,7 +28,7 @@ from poligonlgbt import Poligon
 from datetime import datetime
 from enum import Enum
 from typing import Callable, Union, Optional, List
-import asyncio, uvloop, socket, struct, json, random, psutil, re, os, time, config, logging
+import asyncio, uvloop, socket, struct, json, random, psutil, os, time, config, logging
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 

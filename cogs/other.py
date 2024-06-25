@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands, types
+import femcord.femcord as femcord
+from femcord.femcord import commands, types
 from femscript import Femscript, var, FemscriptException
 from utils import *
 from types import CoroutineType

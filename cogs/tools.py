@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands
+import femcord.femcord as femcord
+from femcord.femcord import commands
 from poligonlgbt import get_extension
 from api_client import ApiClient, ApiError
 from aiohttp import ClientSession, FormData
@@ -207,12 +207,12 @@ class Tools(commands.Cog):
             async with ClientSession() as session:
                 async with session.get("https://instances.hyper.lol/instances.json", headers={"User-Agent": self.bot.user_agent}) as response:
                     data = await response.json()
-                    data = [instance for instance in data if instance["api_online"] and instance["score"] == 100 and instance["protocol"] == "https" and instance["api"] != "api.cobalt.tools"]
+                    data = [instance for instance in data if instance["api_online"] and int(instance["score"]) == 100 and instance["protocol"] == "https" and instance["api"] != "api.cobalt.tools"]
 
                     cobalt = random.choice(data)["api"]
 
                 async with session.post("https://" + cobalt + "/api/json", headers={"Accept": "application/json"}, json={"url": url, "isAudioOnly": bool(audio_only), "filenamePattern": "pretty"}) as response:
-                    data = await response.json()
+                    data = json.loads(await response.text())
 
                     match data["status"]:
                         case "stream":

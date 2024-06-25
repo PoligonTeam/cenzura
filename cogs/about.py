@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands
+import femcord.femcord as femcord
+from femcord.femcord import commands
 from datetime import datetime
 
 class About(commands.Cog):

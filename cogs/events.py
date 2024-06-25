@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands
-from femcord.commands import Context
-from femcord.types import Guild, Member, User, Message
-from femcord.commands.context import Context
+import femcord.femcord as femcord
+from femcord.femcord import commands
+from femcord.femcord.commands import Context
+from femcord.femcord.types import Guild, Member, User, Message
+from femcord.femcord.commands.context import Context
 from femscript import Femscript
 from utils import *
 from models import Guilds

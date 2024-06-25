@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands, types, HTTPException
+import femcord.femcord as femcord
+from femcord.femcord import commands, types, HTTPException
 from femscript import Femscript
 from utils import *
 from aiohttp import ClientSession
@@ -41,29 +41,6 @@ class Music(commands.Cog):
             with open("./cogs/templates/lastfm/" + filename, "r") as file:
                 self.templates[filename.split(".")[0]] = file.read()
 
-    async def on_load(self):
-        if self.bot.gateway is not None:
-            self.client = await femlink.Client(self.bot.gateway.bot_user.id, LAVALINK_IP, LAVALINK_PORT, LAVALINK_PASSWORD)
-
-            await asyncio.sleep(1)
-            await self.connect("704439884340920441", "853657308152070144", mute=True, deaf=True)
-
-            player = self.client.get_player("704439884340920441")
-
-            while player is None:
-                player = self.client.get_player("704439884340920441")
-                await asyncio.sleep(0.5)
-
-            tracks = await self.client.get_tracks("https://radio.poligon.lgbt/listen/station_1/radio.mp3")
-
-            await player.play(tracks[0])
-
-            print("joined poligon and started playing radio")
-
-            self.lastfm_users = {
-                user.user_id: user for user in (await LastFM.all())
-            }
-
     def connect(self, guild, channel = None, *, mute = False, deaf = False) -> None:
         return self.bot.gateway.ws.send(femcord.enums.Opcodes.VOICE_STATE_UPDATE, {
             "guild_id": guild.id if isinstance(guild, types.Guild) else guild,
@@ -82,7 +59,12 @@ class Music(commands.Cog):
 
     @commands.Listener
     async def on_ready(self) -> None:
-        await self.on_load()
+        self.client = await femlink.Client(self.bot.gateway.bot_user.id, LAVALINK_IP, LAVALINK_PORT, LAVALINK_PASSWORD)
+        print("created lavalink client")
+
+        self.lastfm_users = {
+            user.user_id: user for user in (await LastFM.all())
+        }
 
     @commands.Listener
     async def on_voice_server_update(self, data: dict) -> None:

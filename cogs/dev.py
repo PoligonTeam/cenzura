@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord
-from femcord import commands, types
+import femcord.femcord as femcord
+from femcord.femcord import commands, types
 from datetime import datetime, timedelta
 from typing import Union
 import asyncio, time, ast, inspect, models

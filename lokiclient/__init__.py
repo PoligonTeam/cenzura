@@ -16,8 +16,8 @@ limitations under the License.
 
 import aiohttp
 from datetime import datetime
-from femcord.commands import Context
-from femcord.types import Guild
+from femcord.femcord.commands import Context
+from femcord.femcord.types import Guild
 from scheduler.scheduler import Scheduler
 from typing import List, Optional
 

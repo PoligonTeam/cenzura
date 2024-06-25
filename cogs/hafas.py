@@ -1,5 +1,5 @@
-import femcord
-from femcord import commands
+import femcord.femcord as femcord
+from femcord.femcord import commands
 from datetime import datetime, timedelta
 from hafas import HafasClient, Station, NotFound
 from utils import table
