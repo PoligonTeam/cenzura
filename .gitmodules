@@ -4,3 +4,6 @@
 [submodule "scheduler"]
 	path = scheduler
 	url = https://github.com/czubix/scheduler
+[submodule "femcord"]
+	path = femcord
+	url = https://github.com/czubix/femcord
