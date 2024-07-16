@@ -18,10 +18,15 @@ import femcord.femcord as femcord
 from femcord.femcord import commands
 import socket, aiohttp
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
+
 class SmartHome(commands.Cog):
     hidden = True
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.address = "192.168.100.4", 8080
@@ -65,37 +70,5 @@ class SmartHome(commands.Cog):
 
         await ctx.reply("ok")
 
-    @commands.command()
-    @commands.is_owner
-    async def mute(self, ctx):
-        async with aiohttp.ClientSession() as session:
-            await session.get("http://192.168.100.67:8080/apps/discord/mute")
-
-        await ctx.reply("ok")
-
-    @commands.command()
-    @commands.is_owner
-    async def unmute(self, ctx):
-        async with aiohttp.ClientSession() as session:
-            await session.get("http://192.168.100.67:8080/apps/discord/unmute")
-
-        await ctx.reply("ok")
-
-    @commands.command()
-    @commands.is_owner
-    async def deaf(self, ctx):
-        async with aiohttp.ClientSession() as session:
-            await session.get("http://192.168.100.67:8080/apps/discord/deaf")
-
-        await ctx.reply("ok")
-
-    @commands.command()
-    @commands.is_owner
-    async def undeaf(self, ctx):
-        async with aiohttp.ClientSession() as session:
-            await session.get("http://192.168.100.67:8080/apps/discord/undeaf")
-
-        await ctx.reply("ok")
-
-def setup(bot: commands.Bot) -> None:
+def setup(bot: "Bot") -> None:
     bot.load_cog(SmartHome(bot))

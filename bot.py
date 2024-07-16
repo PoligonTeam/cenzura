@@ -18,7 +18,7 @@ import femcord.femcord as femcord
 from femcord.femcord import commands, types
 from femcord.femcord.http import Route
 from femcord.femcord.permissions import Permissions
-from femscript import Femscript, var
+from femscript import Femscript, var, AST
 from tortoise import Tortoise
 from utils import request
 from lokiclient import LokiClient
@@ -27,7 +27,7 @@ from scheduler.scheduler import Scheduler
 from poligonlgbt import Poligon
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Union, Optional, List
+from typing import Callable, Union, Optional, Tuple, List, Dict, Any, TypedDict
 import asyncio, uvloop, socket, struct, json, random, psutil, os, time, config, logging
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -38,10 +38,110 @@ class Opcodes(Enum):
     DEFAULT_PREFIX = 3
     STATS = 4
     BOT = 5
+    CAPTCHA = 6
+
+class Context(femcord.commands.Context):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    async def get_translation(self, translation: str, args: Tuple[Any] = None) -> Union[str, femcord.Embed]:
+        if not hasattr(self.command.cog, "translations"):
+            raise Exception(f"cog {self.command.cog.name} has no translations")
+
+        if not hasattr(self.guild, "language"):
+            db_guild = await Guilds.filter(guild_id=self.guild.id).first()
+
+            self.guild.prefix = db_guild.prefix
+            self.guild.language = db_guild.language
+            self.guild.welcome_message = db_guild.welcome_message
+            self.guild.leave_message = db_guild.leave_message
+            self.guild.autorole = db_guild.autorole
+
+        femscript = Femscript(variables = [
+            {
+                "name": "arg%d" % index,
+                "value": Femscript.to_fs(value)
+            }
+            for index, value in enumerate(args or [])
+        ])
+
+        femscript.ast = [
+            self.command.cog.translations[self.guild.language][translation],
+            {
+                "type": "Keyword",
+                "token": {
+                    "type": "Return",
+                    "value": "",
+                    "number": 0.0,
+                    "list": [],
+                    "bytes": b""
+                },
+                "children": [
+                    {
+                        "type": "Token",
+                        "token": {
+                            "type": "Var",
+                            "value": translation,
+                            "number": 0.0,
+                            "list": [],
+                            "bytes": b""
+                        },
+                        "children": [
+                            {
+                                "type": "Token",
+                                "token": {
+                                    "type": "List",
+                                    "value": "",
+                                    "number": 0.0,
+                                    "list": [],
+                                    "bytes": b""
+                                },
+                                "children": [
+                                    {
+                                        "type": "Token",
+                                        "token": {
+                                            "type": "Var",
+                                            "value": "arg%d" % index,
+                                            "number": 0.0,
+                                            "list": [],
+                                            "bytes": b""
+                                        },
+                                        "children": []
+                                    }
+                                    for index in range(len(args or []))
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+
+        femscript.wrap_function(femcord.Embed)
+
+        return await femscript.execute()
+
+    async def send_translation(self, translation: str, format_args: Tuple[Any] = None, *args, **kwargs) -> types.Message:
+        result = await self.get_translation(translation, format_args)
+
+        if isinstance(result, femcord.Embed):
+            kwargs["embed"] = result
+            result = None
+
+        return await self.send(result, *args, **kwargs)
+
+    async def reply_translation(self, translation: str, format_args: Tuple[Any] = None, *args, **kwargs) -> types.Message:
+        result = await self.get_translation(translation, format_args)
+
+        if isinstance(result, femcord.Embed):
+            kwargs["embed"] = result
+            result = None
+
+        return await self.reply(result, *args, **kwargs)
 
 class Bot(commands.Bot):
     def __init__(self, *, start_time: float = time.time()) -> None:
-        super().__init__(name="fembot", command_prefix=self.get_prefix, intents=femcord.Intents().all(), owners=config.OWNERS)
+        super().__init__(name="fembot", command_prefix=self.get_prefix, intents=femcord.Intents().all(), owners=config.OWNERS, context=Context)
 
         self.start_time = start_time
 
@@ -62,7 +162,7 @@ class Bot(commands.Bot):
 
         self.process = psutil.Process()
 
-        self.su_role: types.Role = types.Role(
+        self.su_role = types.Role(
             self,
             id = "su",
             name = "su",
@@ -93,7 +193,27 @@ class Bot(commands.Bot):
             db_guild = await Guilds.filter(guild_id=guild.id).first()
 
             if db_guild is None:
-                db_guild = await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[], database={}, permissions={}, schedules=[])
+                db_guild = await Guilds.create(
+                    guild_id = guild.id,
+                    prefix = config.PREFIX,
+                    welcome_message = "",
+                    leave_message = "",
+                    autorole = "",
+                    custom_commands = [],
+                    database = {},
+                    permissions = {},
+                    schedules = [],
+                    language = "en",
+                    verification_role = "",
+                    verification_message = "",
+                    verification_channel = ""
+                )
+
+            guild.prefix = db_guild.prefix
+            guild.language = db_guild.language
+            guild.welcome_message = db_guild.welcome_message
+            guild.leave_message = db_guild.leave_message
+            guild.autorole = db_guild.autorole
 
         await self.scheduler.create_schedule(self.update_presences, "10m", name="update_presences")()
 
@@ -173,8 +293,11 @@ class Bot(commands.Bot):
 
     async def dashboard_receiver(self) -> None:
         try:
-            data, _ = self.socket.recvfrom(4)
-            op = Opcodes(struct.unpack("<I", data)[0])
+            data, _ = self.socket.recvfrom(8)
+            op, length = struct.unpack("<II", data)
+            op = Opcodes(op)
+            data, _ = self.socket.recvfrom(length)
+            data = json.loads(data)
 
             if op is Opcodes.COGS:
                 for index, cog in enumerate(self.cogs):
@@ -228,6 +351,19 @@ class Bot(commands.Bot):
                     "username": self.gateway.bot_user.username,
                     "avatar": self.gateway.bot_user.avatar,
                 })
+            elif op is Opcodes.CAPTCHA:
+                guild = self.gateway.get_guild(data["guild_id"])
+
+                if guild is None:
+                    return
+
+                member = await guild.get_member(data["user_id"])
+
+                if member is not None:
+                    try:
+                        await member.add_role(guild.get_role(data["role_id"]))
+                    except femcord.http.HTTPException:
+                        pass
         except socket.error:
             return
 
@@ -305,6 +441,23 @@ class Bot(commands.Bot):
         message.guild.prefix = db_guild.prefix
 
         return prefixes + [message.guild.prefix or config.PREFIX]
+
+    def get_translations_for(self, name: str) -> Dict[str, Dict[str, AST]]:
+        translations = {}
+
+        for lang in os.listdir("./cogs/translations/" + name):
+            lang, extension = lang.split(".")
+            translations[lang] = {}
+
+            with open("./cogs/translations/" + name + "/" + lang + "." + extension) as file:
+                content = file.read()
+
+            femscript = Femscript(content)
+
+            for ast in femscript.ast:
+                translations[lang][ast["children"][0]["token"]["value"]] = ast
+
+        return translations
 
     async def paginator(self, function: Callable, ctx: femcord.commands.Context, content: Optional[str] = None, **kwargs: dict) -> None:
         pages: list = kwargs.pop("pages", None)

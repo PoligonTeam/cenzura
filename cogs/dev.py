@@ -17,13 +17,17 @@ limitations under the License.
 import femcord.femcord as femcord
 from femcord.femcord import commands, types
 from datetime import datetime, timedelta
-from typing import Union
 import asyncio, time, ast, inspect, models
+
+from typing import Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
 
 class Dev(commands.Cog):
     hidden = True
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
 
     def insert_returns(self, body: list) -> None:
@@ -54,7 +58,7 @@ class Dev(commands.Cog):
         return eval("_eval()", env)
 
     @commands.command(description="cenzura is a bot, the bot is cenzura", usage="(code)")
-    async def eval(self, ctx: commands.Context, *, code):
+    async def eval(self, ctx: "Context", *, code):
         if not ctx.author.id in self.bot.owners:
             return await self.bot.get_command("femscript")(ctx, code=code)
 
@@ -82,7 +86,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura is a bot, the bot is cenzura")
     @commands.is_owner
-    async def command_stats(self, ctx: commands.Context, *, command: commands.Command = None):
+    async def command_stats(self, ctx: "Context", *, command: commands.Command = None):
         query = "{type=\"command\"}" if not command else f"{{type=\"command\", command=\"{command.name}\"}}"
 
         stats = await self.bot.loki.get_logs(query, start=(datetime.utcnow() - timedelta(days=1)).timestamp(), limit=1000)
@@ -106,7 +110,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura is a bot, the bot is cenzura", usage="(command)", aliases=["src"])
     @commands.is_owner
-    async def source(self, ctx: commands.Context, *, command):
+    async def source(self, ctx: "Context", *, command):
         command = command.split(" ")
         command_object = self.bot.get_command(command[0])
 
@@ -122,7 +126,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura is a bot, the bot is cenzura")
     @commands.is_owner
-    async def load(self, ctx: commands.Context, extensions: str):
+    async def load(self, ctx: "Context", extensions: str):
         loaded = []
 
         for extension in extensions.split():
@@ -134,7 +138,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura is a bot, the bot is cenzura")
     @commands.is_owner
-    async def reload(self, ctx: commands.Context, extensions: str):
+    async def reload(self, ctx: "Context", extensions: str):
         reloaded = []
 
         for extension in extensions.split():
@@ -147,7 +151,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura is a bot, the bot is cenzura")
     @commands.is_owner
-    async def unload(self, ctx: commands.Context, extensions: str):
+    async def unload(self, ctx: "Context", extensions: str):
         unloaded = []
 
         for extension in extensions.split():
@@ -159,7 +163,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura is a bot, the bot is cenzura", usage="[user] (command) [arguments]")
     @commands.is_owner
-    async def su(self, ctx: commands.Context, member: Union[types.Member, str], command = None, *, args = None):
+    async def su(self, ctx: "Context", member: Union[types.Member, str], command = None, *, args = None):
         if isinstance(member, str):
             if command is not None:
                 _args = command
@@ -194,7 +198,7 @@ class Dev(commands.Cog):
 
     @commands.command(description="cenzura is a bot, the bot is cenzura", usage="(command) [arguments]")
     @commands.is_owner
-    async def perf(self, ctx: commands.Context, command, *, args = None):
+    async def perf(self, ctx: "Context", command, *, args = None):
         fake_message = self.bot.gateway.copy(ctx.message)
 
         fake_message.content = (await self.bot.get_prefix(self.bot, ctx.message))[-1] + command
@@ -220,5 +224,5 @@ class Dev(commands.Cog):
 
         await ctx.reply(f"Executed in `{after - before:.2f}s`")
 
-def setup(bot: commands.Bot) -> None:
+def setup(bot: "Bot") -> None:
     bot.load_cog(Dev(bot))

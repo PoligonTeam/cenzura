@@ -1,0 +1,131 @@
+fn too_long(length, max) {
+    return format("Provided text is too long (`{length}`/`{max}`)");
+}
+
+fn too_short(length, min) {
+    return format("Provided text is too short (`{length}`/`{min}`)");
+}
+
+fn ship_return_text(username1, username2, username3, percent) {
+    return format("**{username1}** + **{username2}** = **{username3}**\nThey love each other for **{percent}%**!");
+}
+
+fn encode_hidden_missing() {
+    return "You did not provide the hidden text";
+}
+
+fn information_about(name) {
+    return format("Information about {name}:");
+}
+
+fn ui_username() {
+    return "Username:";
+}
+
+fn ui_nickname() {
+    return "Nickname:";
+}
+
+fn roles() {
+    return "Roles:"
+}
+
+fn ui_date_joined() {
+    return "Date joined:";
+}
+
+fn date_created() {
+    return "Date created:";
+}
+
+fn ui_badges() {
+    return "Badges:";
+}
+
+fn ui_avatar() {
+    return "Avatar:";
+}
+
+fn ui_guild() {
+    return "Guild:";
+}
+
+fn ui_privacy_policy() {
+    return "Privacy policy:";
+}
+
+fn ui_tags() {
+    return "Tags:";
+}
+
+fn ui_intents() {
+    return "Intents:";
+}
+
+fn ui_permissions() {
+    return "Permissions:";
+}
+
+fn ui_add_bot() {
+    return "Add bot";
+}
+
+fn si_owner() {
+    return "Owner:";
+}
+
+fn si_users() {
+    return "Users:";
+}
+
+fn si_channels() {
+    return "Channels:";
+}
+
+fn si_emojis() {
+    return "Emojis:";
+}
+
+fn si_stickers() {
+    return "Stickers:";
+}
+
+fn si_boosts() {
+    return "Boosts:";
+}
+
+fn si_level() {
+    return "Level:";
+}
+
+fn si_custom_url() {
+    return "Custom url:";
+}
+
+fn si_icon() {
+    return "Icon:";
+}
+
+fn si_banner() {
+    return "Banner:";
+}
+
+fn ii_name() {
+    return "Name:";
+}
+
+fn ii_description() {
+    return "Description:";
+}
+
+fn ii_nsfw_level() {
+    return "Nsfw level:";
+}
+
+fn ii_member_count() {
+    return "Approximate member count:";
+}
+
+fn ii_splash() {
+    return "Invite background:";
+}

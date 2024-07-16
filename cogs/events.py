@@ -17,14 +17,22 @@ limitations under the License.
 import femcord.femcord as femcord
 from femcord.femcord import commands
 from femcord.femcord.commands import Context
-from femcord.femcord.types import Guild, Member, User, Message
+from femcord.femcord.types import Guild, Member, User, Message, Interaction
+from femcord.femcord.enums import MessageFlags
 from femcord.femcord.commands.context import Context
 from femscript import Femscript
+from bot import Opcodes
 from utils import *
 from models import Guilds
+import hashlib, config
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
 
 class Events(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
 
         @bot.before_call
@@ -39,7 +47,21 @@ class Events(commands.Cog):
         exists = await Guilds.exists(guild_id=guild.id)
 
         if not exists:
-            await Guilds.create(guild_id=guild.id, prefix="1", welcome_message="", leave_message="", autorole="", custom_commands=[], database={}, permissions={}, schedules=[])
+            await Guilds.create(
+                guild_id = guild.id,
+                prefix = config.PREFIX,
+                welcome_message = "",
+                leave_message = "",
+                autorole = "",
+                custom_commands = [],
+                database = {},
+                permissions = {},
+                schedules = [],
+                language = "en",
+                verification_role = "",
+                verification_message = "",
+                verification_channel = ""
+            )
 
         await self.bot.loki.add_guild_log(guild)
 
@@ -87,10 +109,7 @@ class Events(commands.Cog):
                 channel = guild.get_channel(femscript.channel_id)
 
                 if channel is not None:
-                    if isinstance(result, femcord.Embed):
-                        await channel.send(embed=result)
-                    else:
-                        await channel.send(result)
+                    await channel.send(**{"content" if not isinstance(result, femcord.Embed) else "embed": result})
 
         if guild.autorole:
             await member.add_role(guild.get_role(guild.autorole))
@@ -128,10 +147,7 @@ class Events(commands.Cog):
                 channel = guild.get_channel(femscript.channel_id)
 
                 if channel is not None:
-                    if isinstance(result, femcord.Embed):
-                        await channel.send(embed=result)
-                    else:
-                        await channel.send(result)
+                    await channel.send(**{"content" if not isinstance(result, femcord.Embed) else "embed": result})
 
     @commands.Listener
     async def on_message_create(self, message: Message):
@@ -142,5 +158,24 @@ class Events(commands.Cog):
             if message.content in (await self.bot.get_prefix(self.bot, message))[:4]:
                 return await message.reply(f"Prefix on this server is `{(await self.bot.get_prefix(self.bot, message))[-1]}`")
 
-def setup(bot: commands.Bot) -> None:
+    @commands.Listener
+    async def on_interaction_create(self, interaction: Interaction):
+        if interaction.data.custom_id == "verification" + interaction.guild.id:
+            query = Guilds.filter(guild_id=interaction.guild.id)
+            guild_db = await query.first()
+
+            if guild_db.verification_message == interaction.message.id and guild_db.verification_channel == interaction.channel.id:
+                self.bot.send_packet(Opcodes.CAPTCHA, {
+                    "guild_id": interaction.guild.id,
+                    "user_id": interaction.member.user.id,
+                    "role_id": guild_db.verification_role,
+                    "guild_icon": interaction.guild.icon_as("png"),
+                    "user_avatar": interaction.member.user.avatar_as("png")
+                })
+
+                captcha_id = hashlib.md5(f"{interaction.guild.id}:{interaction.member.user.id}".encode()).hexdigest()
+
+                await interaction.callback(femcord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, "<https://cenzura.poligon.lgbt/captcha/" + captcha_id + ">", flags=[MessageFlags.EPHEMERAL])
+
+def setup(bot: "Bot") -> None:
     bot.load_cog(Events(bot))

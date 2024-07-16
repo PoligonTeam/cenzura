@@ -18,6 +18,11 @@ import femcord.femcord as femcord
 from femcord.femcord import commands
 from femcord.femcord.permissions import Permissions
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
+
 permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles")
 
 BOTINVITE = f"https://discord.com/oauth2/authorize?client_id=%s&permissions={permissions.get_int()}&scope=bot"
@@ -28,7 +33,7 @@ WEBSITE = "https://cenzura.poligon.lgbt"
 class Help(commands.Cog):
     hidden = True
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
         self.interactions = []
 
@@ -113,7 +118,7 @@ class Help(commands.Cog):
             await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=components)
 
     @commands.command(description="Shows help", usage="[command]", aliases=["hlep", "hepl"])
-    async def help(self, ctx: commands.Context, *, command = None):
+    async def help(self, ctx: "Context", *, command = None):
         if command is not None:
             command = command.split(" ")
             command_object = self.bot.get_command(command[0])
@@ -189,5 +194,5 @@ class Help(commands.Cog):
         message = await ctx.reply(embed=embed, components=components)
         self.interactions.append(("help", ctx.author.id, ctx.channel.id, message.id))
 
-def setup(bot: commands.Bot) -> None:
+def setup(bot: "Bot") -> None:
     bot.load_cog(Help(bot))

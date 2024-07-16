@@ -4,8 +4,13 @@ from datetime import datetime, timedelta
 from hafas import HafasClient, Station, NotFound
 from utils import table
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
+
 class Hafas(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
 
     async def get_board(self, ctx, name, type, amount):
@@ -35,7 +40,7 @@ class Hafas(commands.Cog):
             return text
 
     @commands.command(description="Shows departures from a station")
-    async def departures(self, ctx: commands.Context, amount: int, *, name: str):
+    async def departures(self, ctx: "Context", amount: int, *, name: str):
         if not 0 < amount < 25:
             return await ctx.reply("You must provide a number from 1 to 24")
 
@@ -46,7 +51,7 @@ class Hafas(commands.Cog):
         await self.bot.paginator(ctx.reply, ctx, pages=pages, prefix="```\n", suffix="```")
 
     @commands.command(description="Shows arrivals to a station")
-    async def arrivals(self, ctx: commands.Context, amount: int, *, name: str):
+    async def arrivals(self, ctx: "Context", amount: int, *, name: str):
         if not 0 < amount < 25:
             return await ctx.reply("You must provide a number from 1 to 24")
 
@@ -56,7 +61,7 @@ class Hafas(commands.Cog):
         await self.bot.paginator(ctx.reply, ctx, pages=pages, prefix="```\n", suffix="```")
 
     @commands.command(description="Shows a journey between two stations")
-    async def journey(self, ctx: commands.Context, *, string: str):
+    async def journey(self, ctx: "Context", *, string: str):
         try:
             departure, arrival = string.split("|")
         except ValueError:
@@ -87,5 +92,5 @@ class Hafas(commands.Cog):
 
             await ctx.reply(embeds=embeds)
 
-def setup(bot: commands.Bot) -> None:
+def setup(bot: "Bot") -> None:
     bot.load_cog(Hafas(bot))

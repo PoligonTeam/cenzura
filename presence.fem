@@ -43,7 +43,7 @@ add_presence {
 add_presence {
     borrow(StatusTypes, ActivityTypes);
 
-    name = "senis";
+    name = "femboy moaning asmr";
     status_type = &StatusTypes.DND;
     activity_type = &ActivityTypes.LISTENING;
 };
@@ -60,6 +60,14 @@ add_presence {
     borrow(joke, StatusTypes, ActivityTypes);
 
     name = &joke;
+    status_type = &StatusTypes.DND;
+    activity_type = &ActivityTypes.PLAYING;
+};
+
+add_presence {
+    borrow(StatusTypes, ActivityTypes);
+
+    name = "automaty";
     status_type = &StatusTypes.DND;
     activity_type = &ActivityTypes.PLAYING;
 };

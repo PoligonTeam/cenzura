@@ -1,0 +1,131 @@
+fn too_long(length, max) {
+    return format("Podany tekst jest za długi (`{length}`/`{max}`)");
+}
+
+fn too_short(length, min) {
+    return format("Podany tekst jest za krótki (`{length}`/`{min}`)");
+}
+
+fn ship_return_text(username1, username2, username3, percent) {
+    return format("**{username1}** + **{username2}** = **{username3}**\nKochają się na **{percent}%**!");
+}
+
+fn encode_hidden_missing() {
+    return "Nie podano ukrytego tekstu";
+}
+
+fn information_about(username) {
+    return format("Informacje o {username}:");
+}
+
+fn ui_username() {
+    return "Nazwa użytkownika:";
+}
+
+fn ui_nickname() {
+    return "Pseudonim:";
+}
+
+fn roles() {
+    return "Role:"
+}
+
+fn ui_date_joined() {
+    return "Data dołączenia:";
+}
+
+fn date_created() {
+    return "Data stworzenia:";
+}
+
+fn ui_badges() {
+    return "Odznaki:";
+}
+
+fn ui_avatar() {
+    return "Awatar:";
+}
+
+fn ui_guild() {
+    return "Serwer:";
+}
+
+fn ui_privacy_policy() {
+    return "Polityka prywatności:";
+}
+
+fn ui_tags() {
+    return "Tagi:";
+}
+
+fn ui_intents() {
+    return "Intenty:";
+}
+
+fn ui_permissions() {
+    return "Permisje:";
+}
+
+fn ui_add_bot() {
+    return "Dodaj bota";
+}
+
+fn si_owner() {
+    return "Właściciel:";
+}
+
+fn si_users() {
+    return "Użytkownicy:";
+}
+
+fn si_channels() {
+    return "Kanały:";
+}
+
+fn si_emojis() {
+    return "Emotki:";
+}
+
+fn si_stickers() {
+    return "Naklejki:";
+}
+
+fn si_boosts() {
+    return "Ulepszenia:";
+}
+
+fn si_level() {
+    return "Poziom:";
+}
+
+fn si_custom_url() {
+    return "Własny link:";
+}
+
+fn si_icon() {
+    return "Ikona:";
+}
+
+fn si_banner() {
+    return "Baner:";
+}
+
+fn ii_name() {
+    return "Nazwa:";
+}
+
+fn ii_description() {
+    return "Opis:";
+}
+
+fn ii_nsfw_level() {
+    return "Poziom nieodpowiednich treści:";
+}
+
+fn ii_member_count() {
+    return "Przybliżona liczba użytkowników:";
+}
+
+fn ii_splash() {
+    return "Tło zaproszenia:";
+}

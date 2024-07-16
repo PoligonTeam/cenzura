@@ -25,6 +25,11 @@ from enum import Enum
 from typing import Tuple
 import random, re, json, string
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
+
 URL_PATTERN = re.compile(r"((http|https):\/\/)?(www\.)?[-a-z0-9@:%._\+~#=]{1,256}\.[a-z0-9()]{1,69}\b[-a-z0-9()@:%_\+.~#!?&//=]*", re.IGNORECASE)
 
 STATUS = [
@@ -65,7 +70,7 @@ class WebsiteInfo:
 class Tools(commands.Cog):
     name = "Narzędzia"
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
 
     # @commands.Listener
@@ -80,7 +85,7 @@ class Tools(commands.Cog):
     #             self.rdap_services = data["services"]
 
     # @commands.command(description="wyszukuje informacje o domenie", usage="(domena)", aliases=["domain", "domena", "domaininfo", "domenainfo"])
-    # async def whois(self, ctx: commands.Context, domain):
+    # async def whois(self, ctx: "Context", domain):
     #     tld = domain.split(".")[-1]
 
     #     rdap_service = None
@@ -119,7 +124,7 @@ class Tools(commands.Cog):
     #             await ctx.reply(embed=embed)
 
     @commands.command(description="Checks Google Safe Browsing status", usage="(link)", aliases=["safe", "sb"])
-    async def safebrowsing(self, ctx: commands.Context, url: str):
+    async def safebrowsing(self, ctx: "Context", url: str):
         async with ClientSession() as session:
             async with session.get("https://transparencyreport.google.com/transparencyreport/api/v3/safebrowsing/status", params={"site": url}) as response:
                 if response.status != 200:
@@ -148,7 +153,7 @@ class Tools(commands.Cog):
                 await ctx.reply(embed=embed)
 
     @commands.command(description="Pobiera film z youtube - max 2 minuty", usage="(link)", aliases=["yt", "youtube"])
-    async def ytdl(self, ctx: commands.Context, url: str):
+    async def ytdl(self, ctx: "Context", url: str):
         async with ApiClient(self.bot.local_api_base_url) as client:
             try:
                 data = await client.ytdl(url)
@@ -158,7 +163,7 @@ class Tools(commands.Cog):
         await ctx.reply(files=[("video.mp4", data.video)])
 
     @commands.command(description="Robi screenshot strony", aliases=["ss"])
-    async def screenshot(self, ctx: commands.Context, url: str, full_page: bool = False):
+    async def screenshot(self, ctx: "Context", url: str, full_page: bool = False):
         async with femcord.Typing(ctx.message):
             result = URL_PATTERN.match(url)
 
@@ -189,7 +194,7 @@ class Tools(commands.Cog):
         await self.bot.wait_for("interaction_create", curl, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
 
     @commands.command(description="Downloads video via cobalt", aliases=["ytdl", "tiktok", "shorts"])
-    async def cobalt(self, ctx: commands.Context, url: str, audio_only: int = 0):
+    async def cobalt(self, ctx: "Context", url: str, audio_only: int = 0):
         async def get_file(url: str) -> Tuple[str, bytes]:
             async with session.get(url) as response:
                 content = await response.content.read()
@@ -209,7 +214,7 @@ class Tools(commands.Cog):
                     data = await response.json()
                     data = [instance for instance in data if instance["api_online"] and int(instance["score"]) == 100 and instance["protocol"] == "https" and instance["api"] != "api.cobalt.tools"]
 
-                    cobalt = random.choice(data)["api"]
+                    cobalt = random.choice(data)["api"] if data else "cobalt.tools"
 
                 async with session.post("https://" + cobalt + "/api/json", headers={"Accept": "application/json"}, json={"url": url, "isAudioOnly": bool(audio_only), "filenamePattern": "pretty"}) as response:
                     data = json.loads(await response.text())
@@ -228,7 +233,9 @@ class Tools(commands.Cog):
                                 content = await response.text()
                                 soup = BeautifulSoup(content)
                                 gif = soup.select_one(".result-image > img").attrs["src"]
-                            await ctx.reply(files=files)
+                            for files in [files[i:i+10] for i in range(0, len(files), 10)]:
+                                async with femcord.Typing(ctx.message):
+                                    await ctx.reply(files=files)
                             async with femcord.Typing(ctx.message):
                                 _, gif = await get_file("https://en.bloggif.com/" + gif)
                                 await ctx.reply(files=[("output.gif", gif)])
@@ -240,7 +247,7 @@ class Tools(commands.Cog):
             await ctx.reply("An unexpected error occurred")
 
     # @commands.command(description="Nagrywa filmik ze strony", aliases=["recban", "record"])
-    # async def rec(self, ctx: commands.Context, url):
+    # async def rec(self, ctx: "Context", url):
     #     if not ctx.author.id in self.bot.owners:
     #         return await ctx.reply("nie możesz!!1!")
 
@@ -268,5 +275,5 @@ class Tools(commands.Cog):
 
     #             await browser.close()
 
-def setup(bot: commands.Bot) -> None:
+def setup(bot: "Bot") -> None:
     bot.load_cog(Tools(bot))

@@ -16,19 +16,26 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands, types, HTTPException
+from femscript import Femscript
+from utils import convert
 from models import Guilds
-from typing import Union
 import datetime, re
+
+from typing import Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context, Context
 
 class Admin(commands.Cog):
     name = "Moderacyjne"
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
+        self.translations = self.bot.get_translations_for("mod")
 
     @commands.command(description="Wyrzuca użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("kick_members")
-    async def kick(self, ctx: commands.Context, member: types.Member, *, reason = "nie podano powodu"):
+    async def kick(self, ctx: "Context", member: types.Member, *, reason = "nie podano powodu"):
         if not ctx.guild.me.permissions.has("kick_members"):
             return await ctx.reply("Bot nie ma uprawnień (`kick_members`)")
 
@@ -49,7 +56,7 @@ class Admin(commands.Cog):
 
     @commands.command(description="Banuje użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("ban_members")
-    async def ban(self, ctx: commands.Context, member: Union[types.Member, types.User], *, reason = "nie podano powodu"):
+    async def ban(self, ctx: "Context", member: Union[types.Member, types.User], *, reason = "nie podano powodu"):
         if not ctx.guild.me.permissions.has("ban_members"):
             return await ctx.reply("Bot nie ma uprawnień (`ban_members`)")
 
@@ -77,7 +84,7 @@ class Admin(commands.Cog):
 
     @commands.command(description="Odbanowuje użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("ban_members")
-    async def unban(self, ctx: commands.Context, user: types.User, *, reason = "nie podano powodu"):
+    async def unban(self, ctx: "Context", user: types.User, *, reason = "nie podano powodu"):
         if not ctx.guild.me.permissions.has("ban_members"):
             return await ctx.reply("Bot nie ma uprawnień (`ban_members`)")
 
@@ -92,7 +99,7 @@ class Admin(commands.Cog):
 
     @commands.command(description="Usuwa wiadomości na kanale", usage="(limit) [użytkownik]", aliases=["purge"])
     @commands.has_permissions("manage_messages")
-    async def clear(self, ctx: commands.Context, limit: int, user: types.User = None):
+    async def clear(self, ctx: "Context", limit: int, user: types.User = None):
         if not ctx.guild.me.permissions.has("manage_messages"):
             return await ctx.reply("Bot nie ma uprawnień (`manage_messages`)")
 
@@ -109,7 +116,7 @@ class Admin(commands.Cog):
         await ctx.reply(f"Usunięto `{limit}` wiadomości")
 
     @commands.group(description="Set commands")
-    async def set(self, ctx: commands.Context):
+    async def set(self, ctx: "Context"):
         cog = self.bot.get_cog("Help")
         embed = cog.get_help_embed(ctx.command)
 
@@ -117,7 +124,7 @@ class Admin(commands.Cog):
 
     @set.command(description="Ustawia prefix", usage="(prefix)")
     @commands.has_permissions("manage_guild")
-    async def prefix(self, ctx: commands.Context, prefix):
+    async def prefix(self, ctx: "Context", prefix):
         if len(prefix) > 5:
             return await ctx.reply(f"Prefix jest za długi (`{len(prefix)}/5`)")
 
@@ -126,9 +133,83 @@ class Admin(commands.Cog):
 
         await ctx.reply("Ustawiono prefix")
 
+    @set.command(description="Ustawia język", usage="(en/pl)", aliases=["lang"])
+    @commands.has_permissions("manage_guild")
+    async def language(self, ctx: "Context", lang: str):
+        if lang not in ("en", "pl"):
+            return await ctx.reply("Wybierz dostępny język (`en`/`pl`)")
+
+        await Guilds.filter(guild_id=ctx.guild.id).update(language=lang)
+        ctx.guild.language = lang
+
+        await ctx.reply("Ustawiono język")
+
+    @set.command(description="Verification", usage="[code]", aliases=["verification"])
+    @commands.has_permissions("manage_guild")
+    async def captcha(self, ctx: "Context", *, code):
+        query = Guilds.filter(guild_id=ctx.guild.id)
+        guild_db = await query.first()
+
+        if (match := re.match(r"(?:<#)?(\d+)>? (?:<@&)?(\d+)>? ([\s\S]+)", code)) is not None:
+            channel_id = match.group(1)
+            role_id = match.group(2)
+            message = match.group(3)
+
+            args = re.findall(r"\{([^{}]+)\}", message)
+            message = re.sub(r"\{([^{}]+)\}", r"{}", message)
+
+            code = f"set_channel(\"{channel_id}\");\n" \
+                   f"set_role(\"{role_id}\");\n" \
+                   f"return format(\"{message}\", {", ".join(args)});"
+
+        femscript = Femscript(code)
+
+        @femscript.wrap_function()
+        def set_channel(channel_id: str) -> None:
+            femscript.channel_id = channel_id
+
+        @femscript.wrap_function()
+        def set_role(role_id: str) -> None:
+            femscript.role_id = role_id
+
+        femscript.wrap_function(femcord.Embed)
+
+        result = await femscript.execute()
+
+        if not hasattr(femscript, "channel_id"):
+            return await ctx.reply("You didn't set the channel id")
+
+        if not hasattr(femscript, "role_id"):
+            return await ctx.reply("You didn't set the role id")
+
+        channel = ctx.guild.get_channel(femscript.channel_id)
+        role = ctx.guild.get_role(femscript.role_id)
+
+        if not channel:
+            return await ctx.reply("This channel doesn't exist")
+
+        if not role:
+            return await ctx.reply("This role doesn't exist")
+
+        components = femcord.Components(
+            femcord.Row(
+                femcord.Button(
+                    await ctx.get_translation("captcha_button_text"),
+                    custom_id = "verification" + ctx.guild.id,
+                    style = femcord.ButtonStyles.SECONDARY
+                )
+            )
+        )
+
+        message = await channel.send(**{"content" if not isinstance(result, femcord.Embed) else "embed": result}, components=components)
+
+        await query.update(verification_role=role.id, verification_message=message.id, verification_channel=channel.id)
+
+        await ctx.reply("Sent verification message")
+
     @set.command(description="Welcome message", usage="[code]", aliases=["welcome", "welcomemsg"])
     @commands.has_permissions("manage_guild")
-    async def welcomemessage(self, ctx: commands.Context, *, code = None):
+    async def welcomemessage(self, ctx: "Context", *, code = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
         guild_db = await query.first()
 
@@ -144,9 +225,9 @@ class Admin(commands.Cog):
             events = self.bot.get_cog("Events")
             return await events.on_guild_member_add(ctx.guild, ctx.member)
 
-        if (match := re.match(r"(<#)?(\d+)>? ([\s\S]+)", code)) is not None:
-            channel_id = match.group(2)
-            message = match.group(3)
+        if (match := re.match(r"(?:<#)?(\d+)>? ([\s\S]+)", code)) is not None:
+            channel_id = match.group(1)
+            message = match.group(2)
 
             args = re.findall(r"\{([^{}]+)\}", message)
             message = re.sub(r"\{([^{}]+)\}", r"{}", message)
@@ -167,7 +248,7 @@ class Admin(commands.Cog):
 
     @set.command(description="Leave message", usage="[code]", aliases=["leave", "leavemsg"])
     @commands.has_permissions("manage_guild")
-    async def leavemessage(self, ctx: commands.Context, *, code = None):
+    async def leavemessage(self, ctx: "Context", *, code = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
         guild_db = await query.first()
 
@@ -183,9 +264,9 @@ class Admin(commands.Cog):
             events = self.bot.get_cog("Events")
             return await events.on_guild_member_remove(ctx.guild, ctx.author)
 
-        if (match := re.match(r"(<#)?(\d+)>? ([\s\S]+)", code)) is not None:
-            channel_id = match.group(2)
-            message = match.group(3)
+        if (match := re.match(r"(?:<#)?(\d+)>? ([\s\S]+)", code)) is not None:
+            channel_id = match.group(1)
+            message = match.group(2)
 
             args = re.findall(r"\{([^{}]+)\}", message)
             message = re.sub(r"\{([^{}]+)\}", r"{}", message)
@@ -206,7 +287,7 @@ class Admin(commands.Cog):
 
     @set.command(description="Ustawia autorole", usage="[rola]")
     @commands.has_permissions("manage_guild", "manage_roles")
-    async def autorole(self, ctx: commands.Context, role: Union[types.Role, str] = None):
+    async def autorole(self, ctx: "Context", role: Union[types.Role, str] = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
 
         if role is None:
@@ -223,5 +304,5 @@ class Admin(commands.Cog):
 
         await ctx.reply("Ustawiono autorole")
 
-def setup(bot: commands.Bot) -> None:
+def setup(bot: "Bot") -> None:
     bot.load_cog(Admin(bot))

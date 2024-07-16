@@ -23,22 +23,24 @@ from urllib.parse import urlparse, parse_qs
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:108.0) Gecko/20100101 Firefox/108.0",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 }
 
-COOKIES = {
-    "app_version": "3.0.4.1"
-}
+COOKIES = {"app_version": "3.0.4.1"}
+
 
 class ApiError(Exception):
     pass
 
+
 class NotFound(Exception):
     pass
+
 
 class TransportTypes(enum.Enum):
     TRAIN = "TRAIN"
     HafasNoTrain = "HAFAS_NO_TRAIN"
+
 
 class TransportOperators(enum.Enum):
     PKPInterCityExpressPremium = "EIP"
@@ -54,13 +56,16 @@ class TransportOperators(enum.Enum):
     NightJet = "NJ"
     EuroNight = "EN"
 
+
 def _operator_image(operator: TransportOperators):
     return f"https://bilkom.pl/img/carriers/{operator.value.lower()}.png"
+
 
 @dataclass
 class StationGeolocation:
     lat: float
     lon: float
+
 
 @dataclass
 class Station:
@@ -79,7 +84,12 @@ class Station:
 
     def __post_init__(self):
         self.geolocation = StationGeolocation(**self.geolocation)
-        self.stop_time = self.real_departure_date - self.real_arrival_date if self.real_departure_date and self.real_arrival_date else None
+        self.stop_time = (
+            self.real_departure_date - self.real_arrival_date
+            if self.real_departure_date and self.real_arrival_date
+            else None
+        )
+
 
 @dataclass
 class MeansOfTransport:
@@ -95,6 +105,7 @@ class MeansOfTransport:
         self.operator = TransportOperators(self.operator_id)
         self.operator_image = _operator_image(self.operator)
 
+
 @dataclass
 class JourneyTimes:
     departure: int
@@ -104,8 +115,8 @@ class JourneyTimes:
     duration: int
     delay: int = None
 
-    def __post_init__(self):
-        ...
+    def __post_init__(self): ...
+
 
 @dataclass
 class Journey:
@@ -120,6 +131,7 @@ class Journey:
         self.times = JourneyTimes(*self.times)
         self.route_type = TransportTypes(self.route_type)
         self.means_of_transport = MeansOfTransport(*self.means_of_transport)
+
 
 @dataclass
 class BoardRow:
@@ -140,6 +152,7 @@ class BoardRow:
         self.operator = TransportOperators(parse_qs(urlparse(self.url).query)["tc"][0])
         self.operator_image = _operator_image(self.operator)
 
+
 class HafasClient:
     def __init__(self, session: aiohttp.ClientSession = None):
         self.own_session = True if session is None else False
@@ -148,14 +161,19 @@ class HafasClient:
     async def __aenter__(self) -> "HafasClient":
         return self
 
-    async def __aexit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]):
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ):
         if self.own_session is True:
             await self.session.close()
 
     async def search_station(self, name: str) -> List[Station]:
-        async with self.session.get("https://bilkom.pl/stacje/szukaj", headers=HEADERS, params={
-            "q": name
-        }) as response:
+        async with self.session.get(
+            "https://bilkom.pl/stacje/szukaj", headers=HEADERS, params={"q": name}
+        ) as response:
             if not response.status == 200:
                 raise ApiError()
 
@@ -164,22 +182,41 @@ class HafasClient:
             if not data["stations"]:
                 raise NotFound()
 
-            return [Station(station["name"], station["extId"], station["id"], station["geoPoint"]) for station in data["stations"]]
+            return [
+                Station(
+                    station["name"],
+                    station["extId"],
+                    station["id"],
+                    station["geoPoint"],
+                )
+                for station in data["stations"]
+            ]
 
-    async def get_journey(self, departure_station: Station, arrival_station: Station, date: datetime, limit: int = 1) -> List[Journey]:
-        async with self.session.get("https://bilkom.pl/podroz", headers=HEADERS, cookies=COOKIES, params={
-            "carrierKeys": "P2,P5,P7,O1,PZ,P0,P9,P4,P1,P3,P6,P8",
-            "fromStation": departure_station.name,
-            "poczatkowa": departure_station.id_string,
-            "toStation": arrival_station.name,
-            "docelowa": arrival_station.id_string,
-            "data": date.strftime("%d%m%Y%H%M"),
-            "date": date.strftime("%d/%m/%Y"),
-            "time": date.strftime("%H:%M"),
-            "przyjazd": "false",
-            "minChangeTime": "10",
-            "_csrf": ""
-        }) as response:
+    async def get_journey(
+        self,
+        departure_station: Station,
+        arrival_station: Station,
+        date: datetime,
+        limit: int = 1,
+    ) -> List[Journey]:
+        async with self.session.get(
+            "https://bilkom.pl/podroz",
+            headers=HEADERS,
+            cookies=COOKIES,
+            params={
+                "carrierKeys": "P2,P5,P7,O1,PZ,P0,P9,P4,P1,P3,P6,P8",
+                "fromStation": departure_station.name,
+                "poczatkowa": departure_station.id_string,
+                "toStation": arrival_station.name,
+                "docelowa": arrival_station.id_string,
+                "data": date.strftime("%d%m%Y%H%M"),
+                "date": date.strftime("%d/%m/%Y"),
+                "time": date.strftime("%H:%M"),
+                "przyjazd": "false",
+                "minChangeTime": "10",
+                "_csrf": "",
+            },
+        ) as response:
             if not response.status == 200:
                 raise ApiError()
 
@@ -213,29 +250,32 @@ class HafasClient:
                             station["duration"],
                             station["platform"],
                             station["track"],
-                            station["platformAndTrack"]
-                        ) for station in journey["stops"]
+                            station["platformAndTrack"],
+                        )
+                        for station in journey["stops"]
                     ]
 
-                    completeJourneys.append(Journey(
-                        (
-                            journey["startDate"],
-                            journey["realStartDate"],
-                            journey["stopDate"],
-                            journey["realStopDate"],
-                            journey["duration"],
-                        ),
-                        journey["routeType"],
-                        stops[0],
-                        stops[-1],
-                        stops,
-                        (
-                            journey["meansOfTransport"]["id"],
-                            journey["meansOfTransport"]["name"],
-                            journey["meansOfTransport"]["type"],
-                            journey["meansOfTransport"]["detailedName"],
+                    completeJourneys.append(
+                        Journey(
+                            (
+                                journey["startDate"],
+                                journey["realStartDate"],
+                                journey["stopDate"],
+                                journey["realStopDate"],
+                                journey["duration"],
+                            ),
+                            journey["routeType"],
+                            stops[0],
+                            stops[-1],
+                            stops,
+                            (
+                                journey["meansOfTransport"]["id"],
+                                journey["meansOfTransport"]["name"],
+                                journey["meansOfTransport"]["type"],
+                                journey["meansOfTransport"]["detailedName"],
+                            ),
                         )
-                    ))
+                    )
 
                 if not completeJourneys:
                     raise NotFound()
@@ -243,19 +283,24 @@ class HafasClient:
                 return completeJourneys
 
     async def _get_board(self, station: Station, _type: str, date: datetime):
-        async with self.session.get("https://bilkom.pl/stacje/tablica", headers=HEADERS, cookies=COOKIES, params={
-            "stacja": station.station_id,
-            "przyjazd": str(_type == "arrivals"),
-            "data": date.strftime("%d%m%Y%H%M"),
-            "time": date.strftime("%H:%M")
-        }) as response:
+        async with self.session.get(
+            "https://bilkom.pl/stacje/tablica",
+            headers=HEADERS,
+            cookies=COOKIES,
+            params={
+                "stacja": station.station_id,
+                "przyjazd": str(_type == "arrivals"),
+                "data": date.strftime("%d%m%Y%H%M"),
+                "time": date.strftime("%H:%M"),
+            },
+        ) as response:
             if not response.status == 200:
                 raise ApiError()
 
             content = await response.content.read()
 
             soup = bs4.BeautifulSoup(content, "html.parser")
-            timetable_rows = soup.find_all("a", {"class": "timeTableRow"})
+            timetable_rows = soup.find_all("div", {"class": "timeTableRow"})
 
             if not timetable_rows:
                 raise NotFound()
@@ -265,10 +310,17 @@ class HafasClient:
                     (time := row.find("div", {"class": "date-time-hidden"})).text,
                     time.get("data-difference", 0),
                     row.find("div", {"class": "direction"}).text,
-                    row.find("div", {"class": "number"}).text,
-                    track.text if (track := row.find("div", {"class": "track"})) is not None else "",
-                    row["href"]
-                ) for row in timetable_rows
+                    row.find("div", {"class": "mobile-carrier"}).text,
+                    (
+                        track.text
+                        if (track := row.find("div", {"class": "track"})) is not None
+                        else ""
+                    ),
+                    row.find("div", {"class": "btnWrapper"})
+                    .find("a", {"btn"})
+                    .get("href"),
+                )
+                for row in timetable_rows
             ]
 
     async def get_arrivals(self, station: Station, date: datetime) -> List[BoardRow]:

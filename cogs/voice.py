@@ -17,10 +17,15 @@ limitations under the License.
 import femcord.femcord as femcord
 from femcord.femcord import commands
 from femcord.femcord.voice import Player, PCMAudio
-import io
+import math, numpy, io
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
 
 class Voice(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
 
     # @commands.Listener
@@ -28,9 +33,12 @@ class Voice(commands.Cog):
         self.voice = await Player(self.bot, **data)
 
         with open("./assets/palion_zielone.raw", "rb") as file:
-            data = file.read()
+            content = file.read()
 
-        self.voice.play(PCMAudio(io.BytesIO(data)))
+        # content = numpy.array([math.sin(2 * math.pi * x * (174.61 + math.sin(x)) / 48000) for x in range(48000 * 60 * 2)], dtype=numpy.float32)
+        # content = numpy.int16(content * 32767).tobytes()
 
-def setup(bot: commands.Bot) -> None:
+        self.voice.play(PCMAudio(io.BytesIO(content)))
+
+def setup(bot: "Bot") -> None:
     bot.load_cog(Voice(bot))

@@ -19,14 +19,19 @@ from femcord.femcord import commands
 from utils import fg
 import traceback, random
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
+
 class ErrorHandler(commands.Cog):
     hidden = True
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
 
     @commands.Listener
-    async def on_error(self, ctx: commands.Context, error):
+    async def on_error(self, ctx: "Context", error):
         if isinstance(error, commands.CommandNotFound):
             return await ctx.reply("Command not found")
 
@@ -83,5 +88,5 @@ class ErrorHandler(commands.Cog):
 
         await self.bot.paginator(ctx.reply, ctx, formatted_error, prefix="```py\n", suffix="```", page=-1)
 
-def setup(bot: commands.Bot) -> None:
+def setup(bot: "Bot") -> None:
     bot.load_cog(ErrorHandler(bot))

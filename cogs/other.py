@@ -17,12 +17,17 @@ limitations under the License.
 import femcord.femcord as femcord
 from femcord.femcord import commands, types
 from femscript import Femscript, var, FemscriptException
+from poligonlgbt import get_extension
 from utils import *
 from types import CoroutineType
 from models import Guilds
-from typing import List, Dict, Tuple, Literal, TypedDict, Any
 from enum import Enum
 import config, datetime
+
+from typing import List, Dict, Tuple, Literal, TypedDict, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
 
 class CommandOperation(Enum):
     UPDATE = 0
@@ -54,7 +59,7 @@ class CustomCommands(commands.Cog):
             self.prefixes.append("")
 
 class Other(commands.Cog):
-    def __init__(self, bot: commands.Bot, custom_commands_cog: commands.Cog) -> None:
+    def __init__(self, bot: "Bot", custom_commands_cog: commands.Cog) -> None:
         self.bot = bot
         self.custom_commands_cog = custom_commands_cog
 
@@ -64,7 +69,21 @@ class Other(commands.Cog):
             db_guild = await Guilds.filter(guild_id=guild.id).first()
 
             if db_guild is None:
-                db_guild = await Guilds.create(guild_id=guild.id, prefix=config.PREFIX, welcome_message="", leave_message="", autorole="", custom_commands=[], database={}, permissions={}, schedules=[])
+                db_guild = await Guilds.create(
+                    guild_id = guild.id,
+                    prefix = config.PREFIX,
+                    welcome_message = "",
+                    leave_message = "",
+                    autorole = "",
+                    custom_commands = [],
+                    database = {},
+                    permissions = {},
+                    schedules = [],
+                    language = "en",
+                    verification_role = "",
+                    verification_message = "",
+                    verification_channel = ""
+                )
 
             for custom_command in db_guild.custom_commands:
                 try:
@@ -75,7 +94,7 @@ class Other(commands.Cog):
                     pass
 
     @commands.command(description="pisaju skrypt", usage="(code)", aliases=["fs", "fscript", "cs", "cscript"])
-    async def femscript(self, ctx: commands.Context, *, code):
+    async def femscript(self, ctx: "Context", *, code):
         guild = Guilds.get(guild_id=ctx.guild.id)
         database = (await guild).database
 
@@ -135,7 +154,22 @@ class Other(commands.Cog):
         await guild.update(database=database)
 
         if isinstance(result, femcord.Embed):
-            return await ctx.reply(embed=result)
+            to_check = ("image", "thumbnail", "author", "footer")
+            files = []
+
+            for item in to_check:
+                if hasattr(result, item):
+                    image_key = "url" if item in ("image", "thumbnail") else "icon_url"
+                    data = getattr(result, item)[image_key]
+                    if not isinstance(data, bytes):
+                        continue
+                    files.append((item + ".png", bytes(data)))
+                    getattr(result, item)[image_key] = "attachment://" + item + ".png"
+
+            return await ctx.reply(embed=result, files=files)
+
+        if isinstance(result, bytes) and get_extension(result) == "png":
+            return await ctx.reply(files=[(ctx.author.id + ".png", result)])
 
         result = str(result)
 
@@ -234,7 +268,7 @@ class Other(commands.Cog):
         return command_data.pop("operation"), command_data
 
     def create_custom_command(self, guild_id: str, command_data: CommandData, code: str) -> commands.Command:
-        async def func(ctx: commands.Context, args: list = None) -> Any:
+        async def func(ctx: "Context", args: list = None) -> Any:
             async with femcord.Typing(ctx.message):
                 guild = Guilds.get(guild_id=ctx.guild.id)
 
@@ -319,7 +353,22 @@ class Other(commands.Cog):
                 await guild.update(database=database)
 
                 if isinstance(result, femcord.Embed):
-                    return await ctx.reply(embed=result)
+                    to_check = ("image", "thumbnail", "author", "footer")
+                    files = []
+
+                    for item in to_check:
+                        if hasattr(result, item):
+                            image_key = "url" if item in ("image", "thumbnail") else "icon_url"
+                            data = getattr(result, item)[image_key]
+                            if not isinstance(data, bytes):
+                                continue
+                            files.append((item + ".png", bytes(data)))
+                            getattr(result, item)[image_key] = "attachment://" + item + ".png"
+
+                    return await ctx.reply(embed=result, files=files)
+
+                if isinstance(result, bytes) and get_extension(result) == "png":
+                    return await ctx.reply(files=[(ctx.author.id + ".png", result)])
 
                 await self.bot.paginator(ctx.reply, ctx, str(result) or "(empty result)", replace=False)
 
@@ -357,7 +406,7 @@ class Other(commands.Cog):
 
     @commands.command(description="Creating a custom command", usage="(code)", aliases=["cc", "createcommand"])
     @commands.has_permissions("manage_guild")
-    async def customcommand(self, ctx: commands.Context, *, code):
+    async def customcommand(self, ctx: "Context", *, code):
         code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
                f"# GUILD: {ctx.guild.id}\n" \
                f"# CHANNEL: {ctx.channel.id}\n" \
@@ -415,6 +464,6 @@ class Other(commands.Cog):
 
         await ctx.reply(text)
 
-def setup(bot: commands.Bot) -> None:
+def setup(bot: "Bot") -> None:
     bot.load_cog(custom_commands_cog := CustomCommands())
     bot.load_cog(Other(bot, custom_commands_cog))

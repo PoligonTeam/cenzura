@@ -18,8 +18,13 @@ import femcord.femcord as femcord
 from femcord.femcord import commands
 from datetime import datetime
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
+
 class About(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
 
     async def get_ping_text(self):
@@ -36,11 +41,11 @@ class About(commands.Cog):
         return text
 
     @commands.command(description="pong")
-    async def ping(self, ctx: commands.Context):
+    async def ping(self, ctx: "Context"):
         await ctx.reply(await self.get_ping_text())
 
     @commands.command(description="Bot statistics", aliases=["stats", "botinfo"])
-    async def botstats(self, ctx: commands.Context):
+    async def botstats(self, ctx: "Context"):
         diff = datetime.now() - self.bot.started_at
         stats = await self.bot.get_stats()
 
@@ -54,5 +59,5 @@ class About(commands.Cog):
 
         await ctx.reply(embed=femcord.Embed(title="Bot statistics:", description=description, color=self.bot.embed_color))
 
-def setup(bot: commands.Bot) -> None:
+def setup(bot: "Bot") -> None:
     bot.load_cog(About(bot))

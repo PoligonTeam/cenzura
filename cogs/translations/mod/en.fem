@@ -1,0 +1,3 @@
+fn captcha_button_text() {
+    return "Verify";
+}

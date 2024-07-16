@@ -190,7 +190,9 @@ class Client:
 
         if data["channel_id"] is None:
             self._voice_state.clear()
-            del self.players[self.get_player(data["guild_id"])]
+            player = self.get_player(data["guild_id"])
+            if player:
+                del self.players[player]
             return
 
         if data["session_id"] == self._voice_state.session_id:

@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import asyncio, socket, struct, base64, hmac, hashlib, json, os, time, logging, config
+import asyncio, socket, struct, base64, hmac, hashlib, json, os, math, io, random, time, logging, config
 from aiohttp import web, abc, ClientSession
+from concurrent.futures import ThreadPoolExecutor
+from PIL import Image
 from scheduler.scheduler import Scheduler
 from enum import Enum
-from typing import Union, List, Tuple, Sequence
+from typing import Union, List, Tuple, Sequence, Any
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -41,12 +43,92 @@ def to_base64(data: Union[bytes, str]) -> str:
 def from_base64(data: str) -> bytes:
     return base64.b64decode(from_url_safe(data + "=" * (len(data) % 4)))
 
+BACKGROUND_SIZE = 1000, 1000
+IMAGE_SIZE = 200, 200
+BACKGROUNDS = os.listdir("./assets/captcha/backgrounds")
+IMAGES = os.listdir("./assets/captcha/images")
+
+def get_positions(x, y) -> List[Tuple[int, int]]:
+    x_start = math.floor(x / IMAGE_SIZE[0])
+    y_start = math.floor(y / IMAGE_SIZE[1])
+
+    x_end = math.floor((x + IMAGE_SIZE[0] - 1) / IMAGE_SIZE[0])
+    y_end = math.floor((y + IMAGE_SIZE[1] - 1) / IMAGE_SIZE[1])
+
+    positions = []
+
+    for y in range(y_start, y_end + 1):
+        for x in range(x_start, x_end + 1):
+            positions.append((x, y))
+
+    return positions
+
+def get_random_position() -> Tuple[int, int]:
+    return random.randint(0, BACKGROUND_SIZE[0] - IMAGE_SIZE[1]), random.randint(0, BACKGROUND_SIZE[1] - IMAGE_SIZE[1])
+
+def get_random_background() -> str:
+    return "./assets/captcha/backgrounds/" + random.choice(BACKGROUNDS)
+
+def get_random_image() -> str:
+    return "./assets/captcha/images/" + random.choice(IMAGES)
+
+def create_image(image1: io.BytesIO, image2: io.BytesIO, future: asyncio.Future) -> None:
+    image = Image.open(get_random_background()).resize(BACKGROUND_SIZE, Image.Resampling.LANCZOS)
+
+    image1 = Image.open(image1).convert("RGB").resize(IMAGE_SIZE, Image.Resampling.LANCZOS)
+    image2 = Image.open(image2).convert("RGB").resize(IMAGE_SIZE, Image.Resampling.LANCZOS)
+
+    for _ in range(4):
+        random_image = Image.open(get_random_image()).convert("RGB").resize(IMAGE_SIZE, Image.Resampling.LANCZOS)
+        x, y = get_random_position()
+        image.paste(random_image, (x, y))
+
+    x1, y1 = get_random_position()
+    x2, y2 = get_random_position()
+
+    if x1 / 200 % 1 > 0.85 or x1 / 200 % 1 < 0.15:
+        x1 = round(x1 / 200) * 200
+    if y1 / 200 % 1 > 0.85 or y1 / 200 % 1 < 0.15:
+        y1 = round(y1 / 200) * 200
+    if x2 / 200 % 1 > 0.85 or x2 / 200 % 1 < 0.15:
+        x1 = round(x1 / 200) * 200
+    if y2 / 200 % 1 > 0.85 or y2 / 200 % 1 < 0.15:
+        y2 = round(y2 / 200) * 200
+
+    image.paste(image1, (x1, y1))
+    image.paste(image2, (x2, y2))
+
+    captcha = io.BytesIO()
+    image.save(captcha, "PNG")
+
+    future.set_result(
+        (
+            list(set(get_positions(x1, y1) + get_positions(x2, y2))),
+            captcha.getvalue()
+        )
+    )
+
+async def generate_captcha(image1: io.BytesIO, image2: io.BytesIO) -> Tuple[str, bytes]:
+    async def async_create_image(image1: io.BytesIO, image2: io.BytesIO) -> Tuple[Any]:
+        future = loop.create_future()
+        await loop.run_in_executor(ThreadPoolExecutor(), create_image, image1, image2, future)
+        return await future
+
+    positions, captcha = await loop.create_task(async_create_image(image1, image2))
+
+    data = "".join([str(item) for item in sorted([int("%d%d" % (x, y)) for x, y in positions])])
+
+    _hash = hashlib.sha256(data.encode()).hexdigest()
+
+    return _hash, captcha
+
 class Opcodes(Enum):
     COGS = 1
     COMMANDS = 2
     DEFAULT_PREFIX = 3
     STATS = 4
     BOT = 5
+    CAPTCHA = 6
 
 class Cache:
     def __init__(self) -> None:
@@ -55,6 +137,7 @@ class Cache:
         self.stats: dict = None
         self.bot: dict = None
         self.tokens: List[Tuple[str, str]] = []
+        self.captcha: Dict[str, dict] = {}
 
 class AccessLogger(abc.AbstractAccessLogger):
     def log(self, request: web.Request, response: web.Response, time: float) -> None:
@@ -95,7 +178,9 @@ class Server(web.Application):
         if os.path.exists(config.DASHBOARD_SOCKET_PATH):
             os.remove(config.DASHBOARD_SOCKET_PATH)
         self.socket.bind(config.DASHBOARD_SOCKET_PATH)
-        self.send_packets(Opcodes.BOT, Opcodes.STATS, Opcodes.DEFAULT_PREFIX, Opcodes.COGS)
+
+        for opcode in (Opcodes.BOT, Opcodes.STATS, Opcodes.DEFAULT_PREFIX, Opcodes.COGS):
+            self.send_packet(opcode, {})
 
         self.middlewares.append(self.middleware)
         self.add_routes(router)
@@ -115,9 +200,12 @@ class Server(web.Application):
         self.scheduler.create_schedule(self.update_cache, "1h", name="update_cache")
         self.scheduler.create_schedule(self.update_stats, "10m", name="update_stats")
 
-    def send_packets(self, *ops: Sequence[Opcodes]) -> None:
-        for op in ops:
-            self.socket.sendto(struct.pack("<I", op.value), config.FEMBOT_SOCKET_PATH)
+    def send_packet(self, op: Opcodes, data: dict) -> None:
+        data = json.dumps(data, separators=(",", ":")).encode()
+        header_data = struct.pack("<II", op.value, len(data))
+
+        self.socket.sendto(header_data, config.FEMBOT_SOCKET_PATH)
+        self.socket.sendto(data, config.FEMBOT_SOCKET_PATH)
 
     async def socket_handler(self) -> None:
         try:
@@ -129,7 +217,7 @@ class Server(web.Application):
 
             if op is Opcodes.COGS:
                 if data["index"] + 1 == data["cogs_count"]:
-                    self.send_packets(Opcodes.COMMANDS)
+                    self.send_packet(Opcodes.COMMANDS, {})
 
                 for element in ("index", "cogs_count", "commands_count"):
                     data.pop(element)
@@ -149,6 +237,18 @@ class Server(web.Application):
                 self.cache.stats = data
             elif op is Opcodes.BOT:
                 self.cache.bot = data
+            elif op is Opcodes.CAPTCHA:
+                captcha_id = hashlib.md5(f"{data["guild_id"]}:{data["user_id"]}".encode()).hexdigest()
+
+                async with ClientSession() as session:
+                    async with session.get(data["guild_icon"]) as response:
+                        data["guild_icon"] = io.BytesIO(await response.content.read())
+                    async with session.get(data["user_avatar"]) as response:
+                        data["user_avatar"] = io.BytesIO(await response.content.read())
+
+                _hash, captcha = await generate_captcha(data["guild_icon"], data["user_avatar"])
+
+                self.cache.captcha[captcha_id] = data | {"hash": _hash, "captcha": captcha}
 
             logging.info(f"Received {op.name} from {self.cache.bot['username']}")
         except socket.error:
@@ -156,10 +256,12 @@ class Server(web.Application):
 
     async def update_cache(self) -> None:
         self.cache.cogs = []
-        self.send_packets(Opcodes.BOT, Opcodes.DEFAULT_PREFIX, Opcodes.COGS)
+
+        for opcode in (Opcodes.BOT, Opcodes.DEFAULT_PREFIX, Opcodes.COGS):
+            self.send_packet(opcode, {})
 
     async def update_stats(self) -> None:
-        self.send_packets(Opcodes.STATS)
+        self.send_packet(Opcodes.STATS, {})
 
     def close(self) -> None:
         self.scheduler.task.cancel()
@@ -324,6 +426,49 @@ class Server(web.Application):
             "cogs": request.app.cache.cogs,
             "default_prefix": request.app.cache.default_prefix
         })
+
+    @router.options("/captcha/{captcha_id}")
+    async def captcha(request: web.Request) -> web.Response:
+        return web.Response(headers={"Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET,POST"})
+
+    @router.get("/captcha/{captcha_id}")
+    async def captcha(request: web.Request) -> web.Response:
+        captcha_id = request.match_info.get("captcha_id")
+
+        if not captcha_id in request.app.cache.captcha:
+            return web.Response(status=404)
+
+        captcha = request.app.cache.captcha[captcha_id]
+
+        return web.Response(body=captcha["captcha"], content_type="image/png")
+
+    @router.post("/captcha/{captcha_id}")
+    async def captcha(request: web.Request) -> web.Response:
+        captcha_id = request.match_info.get("captcha_id")
+
+        if not captcha_id in request.app.cache.captcha:
+            return web.Response(status=404)
+
+        captcha = request.app.cache.captcha[captcha_id]
+
+        data = await request.json()
+        _hash = data.get("hash")
+
+        if not _hash:
+            return web.Response(status=400)
+
+        if not _hash == captcha["hash"]:
+            return web.Response(status=400)
+
+        request.app.send_packet(Opcodes.CAPTCHA, {
+            "guild_id": captcha["guild_id"],
+            "user_id": captcha["user_id"],
+            "role_id": captcha["role_id"]
+        })
+
+        del request.app.cache.captcha[captcha_id]
+
+        return web.Response(status=200)
 
 if __name__ == "__main__":
     loop = asyncio.new_event_loop()

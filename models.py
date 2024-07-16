@@ -16,7 +16,7 @@ limitations under the License.
 
 from tortoise.models import Model
 from tortoise.fields import Field, IntField, TextField, JSONField
-import json
+import json, config
 
 class TextArray(Field):
     SQL_TYPE = "text[]"
@@ -59,6 +59,10 @@ class Guilds(Model):
     database = JSONField()
     permissions = JSONField()
     schedules = TextArray()
+    language = TextField()
+    verification_role = TextField()
+    verification_message = TextField()
+    verification_channel = TextField()
 
 class Users(Model):
     id = IntField(pk=True)

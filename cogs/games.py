@@ -18,15 +18,20 @@ import femcord.femcord as femcord
 from femcord.femcord import commands
 from femcord.femcord.types import Emoji
 from korrumzthegame import Renderer
-from typing import Union
+from concurrent.futures import ThreadPoolExecutor
 import asyncio, random
 
+from typing import Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bot import Bot, Context
+
 class Games(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: "Bot") -> None:
         self.bot = bot
 
     @commands.command(description="https://korrumzthegame.wtf", usage="[name] [avatar-number_1-20]", aliases=["ktg"])
-    async def korrumzthegame(self, ctx: commands.Context, username: Union[int, str] = None, avatar: int = None):
+    async def korrumzthegame(self, ctx: "Context", username: Union[int, str] = None, avatar: int = None):
         if isinstance(username, int) and avatar is None:
             avatar = username
             username = None
@@ -60,7 +65,10 @@ class Games(commands.Cog):
 
         await asyncio.sleep(0.5)
 
-        renderer.update()
+        async def async_render():
+            await self.bot.loop.run_in_executor(ThreadPoolExecutor(), renderer.update)
+
+        await self.bot.loop.create_task(async_render())
 
         embed = femcord.Embed(title="Pull requests:", color=self.bot.embed_color)
         embed.set_thumbnail(url=f"https://korrumzthegame.wtf/images/player{renderer.client.image_number}.png")
@@ -94,5 +102,5 @@ class Games(commands.Cog):
 
         await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
 
-def setup(bot: commands.Bot) -> None:
+def setup(bot: "Bot") -> None:
     bot.load_cog(Games(bot))
