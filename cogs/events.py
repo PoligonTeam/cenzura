@@ -21,7 +21,6 @@ from femcord.femcord.types import Guild, Member, User, Message, Interaction
 from femcord.femcord.enums import MessageFlags
 from femcord.femcord.commands.context import Context
 from femscript import Femscript
-from bot import Opcodes
 from utils import *
 from models import Guilds
 import hashlib, config
@@ -160,12 +159,24 @@ class Events(commands.Cog):
 
     @commands.Listener
     async def on_interaction_create(self, interaction: Interaction):
-        if interaction.data.custom_id == "verification" + interaction.guild.id:
+        if interaction.data.custom_id == "giveaway":
+            invites = await self.bot.http.request(femcord.http.Route("GET", "guilds", interaction.guild.id, "invites"))
+
+            count = 0
+            for invite in invites:
+                if invite["inviter"]["id"] == interaction.member.user.id:
+                    count += invite["uses"]
+
+            if count < 5:
+                return await interaction.callback(femcord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, f"Potrzebujesz jeszcze {5 - count} zaproszeń aby móc dołączyć do konkursu", flags=[MessageFlags.EPHEMERAL])
+
+            await interaction.callback(femcord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, "Dołączyłeś do konkursu", flags=[MessageFlags.EPHEMERAL])
+        elif interaction.data.custom_id == "verification" + interaction.guild.id:
             query = Guilds.filter(guild_id=interaction.guild.id)
             guild_db = await query.first()
 
             if guild_db.verification_message == interaction.message.id and guild_db.verification_channel == interaction.channel.id:
-                self.bot.send_packet(Opcodes.CAPTCHA, {
+                await self.bot.ipc.emit("new_captcha", {
                     "guild_id": interaction.guild.id,
                     "user_id": interaction.member.user.id,
                     "role_id": guild_db.verification_role,

@@ -14,13 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import asyncio, socket, struct, base64, hmac, hashlib, json, os, math, io, random, time, logging, config
+import asyncio, uvloop, struct, base64, hmac, hashlib, json, os, math, io, random, time, logging, config
 from aiohttp import web, abc, ClientSession
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 from scheduler.scheduler import Scheduler
+from femipc import Client
 from enum import Enum
-from typing import Union, List, Tuple, Sequence, Any
+from typing import Union, List, Tuple, Dict, Any
+
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -122,14 +125,6 @@ async def generate_captcha(image1: io.BytesIO, image2: io.BytesIO) -> Tuple[str,
 
     return _hash, captcha
 
-class Opcodes(Enum):
-    COGS = 1
-    COMMANDS = 2
-    DEFAULT_PREFIX = 3
-    STATS = 4
-    BOT = 5
-    CAPTCHA = 6
-
 class Cache:
     def __init__(self) -> None:
         self.cogs: List[dict] = []
@@ -173,20 +168,15 @@ class Server(web.Application):
         self.scheduler: Scheduler = None
         self.cache = Cache()
 
-        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        self.socket.setblocking(False)
-        if os.path.exists(config.DASHBOARD_SOCKET_PATH):
-            os.remove(config.DASHBOARD_SOCKET_PATH)
-        self.socket.bind(config.DASHBOARD_SOCKET_PATH)
-
-        for opcode in (Opcodes.BOT, Opcodes.STATS, Opcodes.DEFAULT_PREFIX, Opcodes.COGS):
-            self.send_packet(opcode, {})
+        self.ipc = Client(config.DASHBOARD_SOCKET_PATH, [config.FEMBOT_SOCKET_PATH])
 
         self.middlewares.append(self.middleware)
         self.add_routes(router)
         self.router.add_view("/verify/{guild_id}/{token}", Verify)
 
     async def run(self, *, host: str, port: int) -> None:
+        await self.ipc_init()
+
         runner = web.AppRunner(self, access_log_class=AccessLogger)
         await runner.setup()
         site = web.TCPSite(runner, host, port)
@@ -194,78 +184,46 @@ class Server(web.Application):
 
         self.session = ClientSession()
 
-        self.scheduler = Scheduler(check_interval=0.1)
+        self.scheduler = Scheduler()
 
-        self.scheduler.create_schedule(self.socket_handler, "0s", name="socket_handler")
-        self.scheduler.create_schedule(self.update_cache, "1h", name="update_cache")
-        self.scheduler.create_schedule(self.update_stats, "10m", name="update_stats")
+        await self.scheduler.create_schedule(self.update_cache, "10m", name="update_cache")()
+        await self.scheduler.create_schedule(self.update_cogs, "1h", name="update_cogs")()
 
-    def send_packet(self, op: Opcodes, data: dict) -> None:
-        data = json.dumps(data, separators=(",", ":")).encode()
-        header_data = struct.pack("<II", op.value, len(data))
+    async def ipc_init(self) -> None:
+        @self.ipc.on("cogs")
+        async def on_cogs(cogs: List[dict]) -> None:
+            self.cache.cogs = cogs
 
-        self.socket.sendto(header_data, config.FEMBOT_SOCKET_PATH)
-        self.socket.sendto(data, config.FEMBOT_SOCKET_PATH)
+        @self.ipc.on("cache")
+        async def on_cache(prefix: str, stats: dict, bot: dict) -> None:
+            self.cache.default_prefix = prefix
+            self.cache.stats = stats
+            self.cache.bot = bot
 
-    async def socket_handler(self) -> None:
-        try:
-            data, _ = self.socket.recvfrom(8)
-            op, length = struct.unpack("<II", data)
-            op = Opcodes(op)
-            data, _ = self.socket.recvfrom(length)
-            data = json.loads(data)
+        @self.ipc.on("new_captcha")
+        async def on_new_captcha(captcha: dict) -> None:
+            captcha_id = hashlib.md5(f"{captcha["guild_id"]}:{captcha["user_id"]}".encode()).hexdigest()
 
-            if op is Opcodes.COGS:
-                if data["index"] + 1 == data["cogs_count"]:
-                    self.send_packet(Opcodes.COMMANDS, {})
+            async with ClientSession() as session:
+                async with session.get(captcha["guild_icon"]) as response:
+                    captcha["guild_icon"] = io.BytesIO(await response.content.read())
+                async with session.get(captcha["user_avatar"]) as response:
+                    captcha["user_avatar"] = io.BytesIO(await response.content.read())
 
-                for element in ("index", "cogs_count", "commands_count"):
-                    data.pop(element)
+            _hash, captcha_image = await generate_captcha(captcha["guild_icon"], captcha["user_avatar"])
 
-                self.cache.cogs.append(data)
-            elif op is Opcodes.COMMANDS:
-                for cog in self.cache.cogs:
-                    if cog["name"] == data["cog"]:
-                        if data["guild_id"] is None:
-                            for element in ("index", "commands_count"):
-                                data.pop(element)
-
-                            cog["commands"].append(data)
-            elif op is Opcodes.DEFAULT_PREFIX:
-                self.cache.default_prefix = data["default_prefix"]
-            elif op is Opcodes.STATS:
-                self.cache.stats = data
-            elif op is Opcodes.BOT:
-                self.cache.bot = data
-            elif op is Opcodes.CAPTCHA:
-                captcha_id = hashlib.md5(f"{data["guild_id"]}:{data["user_id"]}".encode()).hexdigest()
-
-                async with ClientSession() as session:
-                    async with session.get(data["guild_icon"]) as response:
-                        data["guild_icon"] = io.BytesIO(await response.content.read())
-                    async with session.get(data["user_avatar"]) as response:
-                        data["user_avatar"] = io.BytesIO(await response.content.read())
-
-                _hash, captcha = await generate_captcha(data["guild_icon"], data["user_avatar"])
-
-                self.cache.captcha[captcha_id] = data | {"hash": _hash, "captcha": captcha}
-
-            logging.info(f"Received {op.name} from {self.cache.bot['username']}")
-        except socket.error:
-            pass
+            self.cache.captcha[captcha_id] = captcha | {"hash": _hash, "captcha": captcha_image}
 
     async def update_cache(self) -> None:
+        await self.ipc.emit("get_cache")
+
+    async def update_cogs(self) -> None:
         self.cache.cogs = []
-
-        for opcode in (Opcodes.BOT, Opcodes.DEFAULT_PREFIX, Opcodes.COGS):
-            self.send_packet(opcode, {})
-
-    async def update_stats(self) -> None:
-        self.send_packet(Opcodes.STATS, {})
+        await self.ipc.emit("get_cogs")
 
     def close(self) -> None:
         self.scheduler.task.cancel()
-        self.socket.close()
+        self.ipc.close()
 
     @classmethod
     def generate_token(cls, user_id: str, timestamp: int, secret_key: str) -> str:
@@ -460,11 +418,7 @@ class Server(web.Application):
         if not _hash == captcha["hash"]:
             return web.Response(status=400)
 
-        request.app.send_packet(Opcodes.CAPTCHA, {
-            "guild_id": captcha["guild_id"],
-            "user_id": captcha["user_id"],
-            "role_id": captcha["role_id"]
-        })
+        await request.app.ipc.emit("captcha_result", captcha["guild_id"], captcha["user_id"], captcha["role_id"])
 
         del request.app.cache.captcha[captcha_id]
 

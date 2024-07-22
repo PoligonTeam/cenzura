@@ -38,26 +38,6 @@ class Fun(commands.Cog):
     def __init__(self, bot: "Bot") -> None:
         self.bot = bot
         self.translations = self.bot.get_translations_for("fun")
-        self.garfield_emojis = {"0": "1072691610254585927", "1": "1072691612578234438", "2": "1072691613802954753", "3": "1072691615610712235",
-                                "4": "1072691617829494905", "5": "1072691620245413938", "6": "1072691622573248642", "7": "1072691624158695476",
-                                "8": "1072691627149238282", "9": "1072691628713717760", "a": "930949124151443546", "b": "930949123870429286",
-                                "c": "930949123836895312", "d": "930949123757203457", "e": "930949123866263572", "f": "930949124172419152",
-                                "g": "930949124017238027", "h": "930949124050808892", "i": "930949124046590032", "j": "930949123719430196",
-                                "k": "930949124147277894", "l": "930949124008849408", "m": "930949124835131402", "n": "930949124235362344",
-                                "o": "930949124008865882", "p": "930949123706880014", "q": "930949125426528357", "r": "930949124336021564",
-                                "s": "930949124226961408", "t": "930949123966898207", "u": "930949124466032740", "v": "930949124046590033",
-                                "w": "930949123866263573", "x": "930949124105334795", "y": "930949124172419153", "z": "930949124046594049",
-                                " ": "930949124138889236"}
-        self.public_flags_emojis = {"DISCORD_EMPLOYEE": "933476948343144508", "PARTNERED_SERVER_OWNER": "933476948246675506",
-                                    "HYPESQUAD_EVENTS": "933476948234096661", "BUG_HUNTER_LEVEL_1": "933476948225687623",
-                                    "BRAVERY": "933476948234096660", "BRILLIANCE": "933476948389294170", "BALANCE": "933476948292796427",
-                                    "EARLY_SUPPORTER": "933476948338966578", "BUG_HUNTER_LEVEL_2": "933476948276019220",
-                                    "VERIFIED_BOT_DEVELOPER": "933476948594790460", "CERTIFIED_MODERATOR": "933476947915333633",
-                                    "ACTIVE_DEVELOPER": "1040346532144238652"}
-        self.application_command_badge = "1072689600658673734"
-        self.status_emojis = {"ONLINE": "977693019279077399", "IDLE": "977693019321028649", "DND": "977693019430076456",
-                              "INVISIBLE": "977693019518160916", "OFFLINE": "977693019518160916", "MOBILEONLINE": "1002296215456714953",
-                              "MOBILEIDLE": "1002296213913214976", "MOBILEDND": "1002296212503932988"}
         self.results = {}
         self.urls = {}
 
@@ -183,12 +163,14 @@ class Fun(commands.Cog):
         if len(text) > 60:
             return await ctx.reply_translation("too_long", (len(text), 60))
 
+        allowed_chars = [emoji.name.split("_")[1] for emoji in self.bot.gateway.emojis if emoji.name.startswith("garfield_")]
+
         garfield_text = ""
 
         for char in text:
             char = char.lower()
-            if char in self.garfield_emojis:
-                garfield_text += f"<:garfield_{'space' if char == ' ' else char}:{self.garfield_emojis[char]}>"
+            if char in allowed_chars or char == " ":
+                garfield_text += str(self.bot.gateway.get_emoji(name="garfield_" + (char if char != " " else "space")))
                 continue
 
             garfield_text += char
@@ -528,10 +510,13 @@ class Fun(commands.Cog):
                 client_status = member.presence.client_status
                 if client_status.desktop:
                     desktop_status = client_status.desktop.name
-                    text += f"<:{desktop_status}:{self.status_emojis[desktop_status]}>"
+                    text += str(self.bot.gateway.get_emoji(name=desktop_status))
+                if client_status.web:
+                    web_status = client_status.web.name
+                    text += str(self.bot.gateway.get_emoji(name=web_status))
                 if client_status.mobile:
                     mobile_status = client_status.mobile.name
-                    text += f"<:MOBILE{mobile_status}:{self.status_emojis['MOBILE' + mobile_status]}>"
+                    text += str(self.bot.gateway.get_emoji(name="MOBILE" + mobile_status))
                 for activity in member.presence.activities:
                     if activity.type is femcord.ActivityTypes.CUSTOM:
                         text += " "
@@ -545,7 +530,7 @@ class Fun(commands.Cog):
             embed.add_field(name=await ctx.get_translation("ui_date_joined"), value=f"{femcord.types.t @ member.joined_at} ({femcord.types.t['R'] @ member.joined_at})")
         embed.add_field(name=await ctx.get_translation("date_created"), value=f"{femcord.types.t @ user.created_at} ({femcord.types.t['R'] @ user.created_at})")
         if user.public_flags:
-            embed.add_field(name=await ctx.get_translation("ui_badges"), value=" ".join(f"<:{flag.name}:{self.public_flags_emojis[flag.name]}>" for flag in user.public_flags if flag.name in self.public_flags_emojis))
+            embed.add_field(name=await ctx.get_translation("ui_badges"), value=" ".join(str(self.bot.gateway.get_emoji(name=flag.name)) for flag in user.public_flags))
         embed.add_field(name=await ctx.get_translation("ui_avatar"), value=f"[link]({user.avatar_url})")
         if user.bot is True:
             link = f"https://discord.com/oauth2/authorize?client_id={user.id}&permissions=0&scope=bot"
@@ -564,7 +549,7 @@ class Fun(commands.Cog):
             if data["flags"] & 1 << 18:
                 intents.append(Intents.GUILD_MESSAGES)
             if data["flags"] & 1 << 23:
-                embed.add_field(name=await ctx.get_translation("ui_badges"), value=f"<:APPLICATION_COMMAND_BADGE:{self.application_command_badge}>")
+                embed.add_field(name=await ctx.get_translation("ui_badges"), value=str(self.bot.gateway.get_emoji(name="APPLICATION_COMMAND_BADGE")))
 
             if data["description"]:
                 embed.description = data["description"]

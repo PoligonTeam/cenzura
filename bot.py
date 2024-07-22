@@ -24,21 +24,13 @@ from utils import request
 from lokiclient import LokiClient
 from models import Guilds
 from scheduler.scheduler import Scheduler
+from femipc import Client
 from poligonlgbt import Poligon
 from datetime import datetime
-from enum import Enum
-from typing import Callable, Union, Optional, Tuple, List, Dict, Any, TypedDict
-import asyncio, uvloop, socket, struct, json, random, psutil, os, time, config, logging
+from typing import Callable, Union, Optional, Tuple, List, Dict, Any
+import asyncio, uvloop, random, psutil, os, time, config, logging
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-class Opcodes(Enum):
-    COGS = 1
-    COMMANDS = 2
-    DEFAULT_PREFIX = 3
-    STATS = 4
-    BOT = 5
-    CAPTCHA = 6
 
 class Context(femcord.commands.Context):
     def __init__(self, *args, **kwargs) -> None:
@@ -151,9 +143,9 @@ class Bot(commands.Bot):
         self.presence_index: int = 0
         self.presence_indexes: List[int] = []
         self.scheduler: Scheduler = Scheduler()
+        self.ipc = Client(config.FEMBOT_SOCKET_PATH, [config.DASHBOARD_SOCKET_PATH])
         self.loki: LokiClient = LokiClient(config.LOKI_BASE_URL, self.scheduler)
         self.poligon: Poligon = None
-        self.socket: socket.socket = None
 
         self.embed_color = 0xb22487
         self.user_agent = "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.3) AppleWebkit/538.1 (KHTML, like Gecko) SamsungBrowser/1.0 TV Safari/538.1"
@@ -217,20 +209,11 @@ class Bot(commands.Bot):
 
         await self.scheduler.create_schedule(self.update_presences, "10m", name="update_presences")()
 
-        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        self.socket.setblocking(False)
-        if os.path.exists(config.FEMBOT_SOCKET_PATH):
-            os.remove(config.FEMBOT_SOCKET_PATH)
-        self.socket.bind(config.FEMBOT_SOCKET_PATH)
-
-        receiver_schedule = self.scheduler.create_schedule(self.dashboard_receiver, "1s", name="dashboard_receiver")
-        self.scheduler.hide_schedules(receiver_schedule)
-
         print(f"logged in {self.gateway.bot_user.username} ({time.time() - self.start_time:.2f}s)")
 
     async def on_close(self) -> None:
         await Tortoise.close_connections()
-        self.socket.close()
+        self.ipc.close()
         await self.loki.send()
 
         print("closed db connection")
@@ -242,6 +225,10 @@ class Bot(commands.Bot):
         await Tortoise.generate_schemas()
 
         print("connected to database")
+
+        await self.init_ipc()
+
+        print("initialised ipc events")
 
         self.poligon = await Poligon(config.POLIGON_LGBT_API_KEY, config.POLIGON_LGBT_UPLOAD_KEY)
 
@@ -284,36 +271,18 @@ class Bot(commands.Bot):
             "timestamp": self.started_at.timestamp()
         }
 
-    def send_packet(self, op: Opcodes, data: dict) -> None:
-        data = json.dumps(data, separators=(",", ":")).encode()
-        header_data = struct.pack("<II", op.value, len(data))
+    async def init_ipc(self) -> None:
+        @self.ipc.on("get_cogs")
+        async def get_cogs() -> None:
+            cogs = []
 
-        self.socket.sendto(header_data, config.DASHBOARD_SOCKET_PATH)
-        self.socket.sendto(data, config.DASHBOARD_SOCKET_PATH)
+            for cog in self.cogs:
+                commands = []
 
-    async def dashboard_receiver(self) -> None:
-        try:
-            data, _ = self.socket.recvfrom(8)
-            op, length = struct.unpack("<II", data)
-            op = Opcodes(op)
-            data, _ = self.socket.recvfrom(length)
-            data = json.loads(data)
+                for command in cog.walk_commands():
+                    if command.guild_id is not None:
+                        continue
 
-            if op is Opcodes.COGS:
-                for index, cog in enumerate(self.cogs):
-                    self.send_packet(Opcodes.COGS, {
-                        "index": index,
-                        "cogs_count": len(self.cogs),
-                        "name": cog.name,
-                        "description": cog.description,
-                        "hidden": cog.hidden,
-                        "commands_count": len(cog.walk_commands()),
-                        "commands": []
-                    })
-            elif op is Opcodes.COMMANDS:
-                commands = self.walk_commands()
-
-                for index, command in enumerate(commands):
                     usage = []
 
                     if command.usage is not None:
@@ -325,9 +294,7 @@ class Bot(commands.Bot):
                             elif argument[0] == "[":
                                 usage.append([argument[1:-1], 1])
 
-                    self.send_packet(Opcodes.COMMANDS, {
-                        "index": index,
-                        "commands_count": len(commands),
+                    commands.append({
                         "type": command.type.value,
                         "parent": command.parent,
                         "cog": command.cog.name,
@@ -339,33 +306,39 @@ class Bot(commands.Bot):
                         "aliases": command.aliases,
                         "guild_id": command.guild_id
                     })
-            elif op is Opcodes.DEFAULT_PREFIX:
-                self.send_packet(Opcodes.DEFAULT_PREFIX, {
-                    "default_prefix": config.PREFIX
+
+                cogs.append({
+                    "name": cog.name,
+                    "description": cog.description,
+                    "hidden": cog.hidden,
+                    "commands_count": len(cog.walk_commands()),
+                    "commands": commands
                 })
-            elif op is Opcodes.STATS:
-                self.send_packet(Opcodes.STATS, await self.get_stats())
-            elif op is Opcodes.BOT:
-                self.send_packet(Opcodes.BOT, {
-                    "id": self.gateway.bot_user.id,
-                    "username": self.gateway.bot_user.username,
-                    "avatar": self.gateway.bot_user.avatar,
-                })
-            elif op is Opcodes.CAPTCHA:
-                guild = self.gateway.get_guild(data["guild_id"])
 
-                if guild is None:
-                    return
+            await self.ipc.emit("cogs", cogs)
 
-                member = await guild.get_member(data["user_id"])
+        @self.ipc.on("get_cache")
+        async def get_cache() -> None:
+            await self.ipc.emit("cache", config.PREFIX, await self.get_stats(), {
+                "id": self.gateway.bot_user.id,
+                "username": self.gateway.bot_user.username,
+                "avatar": self.gateway.bot_user.avatar
+            })
 
-                if member is not None:
-                    try:
-                        await member.add_role(guild.get_role(data["role_id"]))
-                    except femcord.http.HTTPException:
-                        pass
-        except socket.error:
-            return
+        @self.ipc.on("captcha_result")
+        async def catpcha_result(guild_id: str, user_id: str, role_id: str) -> None:
+            guild = self.gateway.get_guild(guild_id)
+
+            if guild is None:
+                return
+
+            member = await guild.get_member(user_id)
+
+            if member is not None:
+                try:
+                    await member.add_role(guild.get_role(role_id))
+                except femcord.http.HTTPException:
+                    pass
 
     async def update_presences(self) -> None:
         with open("presence.fem", "r") as file:
