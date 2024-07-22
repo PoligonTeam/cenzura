@@ -7,3 +7,6 @@
 [submodule "femcord"]
 	path = femcord
 	url = https://github.com/czubix/femcord
+[submodule "femipc"]
+	path = femipc
+	url = https://github.com/czubix/femipc
