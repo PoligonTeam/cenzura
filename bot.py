@@ -24,7 +24,7 @@ from utils import request
 from lokiclient import LokiClient
 from models import Guilds
 from scheduler.scheduler import Scheduler
-from femipc import Client
+from ipc import IPC
 from poligonlgbt import Poligon
 from datetime import datetime
 from typing import Callable, Union, Optional, Tuple, List, Dict, Any
@@ -143,7 +143,7 @@ class Bot(commands.Bot):
         self.presence_index: int = 0
         self.presence_indexes: List[int] = []
         self.scheduler: Scheduler = Scheduler()
-        self.ipc = Client(config.FEMBOT_SOCKET_PATH, [config.DASHBOARD_SOCKET_PATH])
+        self.ipc = IPC(self, config.FEMBOT_SOCKET_PATH, [config.DASHBOARD_SOCKET_PATH])
         self.loki: LokiClient = LokiClient(config.LOKI_BASE_URL, self.scheduler)
         self.poligon: Poligon = None
 
@@ -226,10 +226,6 @@ class Bot(commands.Bot):
 
         print("connected to database")
 
-        await self.init_ipc()
-
-        print("initialised ipc events")
-
         self.poligon = await Poligon(config.POLIGON_LGBT_API_KEY, config.POLIGON_LGBT_UPLOAD_KEY)
 
         print("created poligon.lgbt client")
@@ -268,77 +264,9 @@ class Bot(commands.Bot):
             },
             "cpu": psutil.cpu_percent(),
             "latencies": await self.get_latency_data(),
-            "timestamp": self.started_at.timestamp()
+            "timestamp": self.started_at.timestamp(),
+            "last_update": time.time()
         }
-
-    async def init_ipc(self) -> None:
-        @self.ipc.on("get_cogs")
-        async def get_cogs() -> None:
-            cogs = []
-
-            for cog in self.cogs:
-                commands = []
-
-                for command in cog.walk_commands():
-                    if command.guild_id is not None:
-                        continue
-
-                    usage = []
-
-                    if command.usage is not None:
-                        arguments = command.usage.split(" ")
-
-                        for argument in arguments:
-                            if argument[0] == "(":
-                                usage.append([argument[1:-1], 0])
-                            elif argument[0] == "[":
-                                usage.append([argument[1:-1], 1])
-
-                    commands.append({
-                        "type": command.type.value,
-                        "parent": command.parent,
-                        "cog": command.cog.name,
-                        "name": command.name,
-                        "description": command.description,
-                        "usage": usage,
-                        "enabled": command.enabled,
-                        "hidden": command.hidden,
-                        "aliases": command.aliases,
-                        "guild_id": command.guild_id
-                    })
-
-                cogs.append({
-                    "name": cog.name,
-                    "description": cog.description,
-                    "hidden": cog.hidden,
-                    "commands_count": len(cog.walk_commands()),
-                    "commands": commands
-                })
-
-            await self.ipc.emit("cogs", cogs)
-
-        @self.ipc.on("get_cache")
-        async def get_cache() -> None:
-            await self.ipc.emit("cache", config.PREFIX, await self.get_stats(), {
-                "id": self.gateway.bot_user.id,
-                "username": self.gateway.bot_user.username,
-                "avatar": self.gateway.bot_user.avatar
-            })
-
-        @self.ipc.on("captcha_result")
-        async def catpcha_result(guild_id: str, user_id: str, role_id: str) -> None:
-            guild = self.gateway.get_guild(guild_id)
-
-            if guild is None:
-                return
-
-            member = await guild.get_member(user_id)
-
-            if member is not None:
-                try:
-                    await member.add_role(guild.get_role(role_id))
-                except femcord.http.HTTPException:
-                    pass
 
     async def update_presences(self) -> None:
         with open("presence.fem", "r") as file:

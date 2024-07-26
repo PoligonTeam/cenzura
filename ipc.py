@@ -1,0 +1,200 @@
+"""
+Copyright 2022-2024 PoligonTeam
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
+
+from femipc.femipc import Client, listener
+
+from femcord.femcord.http import HTTPException
+
+from femcord.femcord.utils import get_index
+
+from models import Guilds
+
+import config
+
+from typing import List, Union, TypedDict, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .bot import Bot
+    from femcord.femcord.types import Guild
+
+class UserDict(TypedDict):
+    id: str
+    username: str
+    avatar: str
+
+class ChannelDict(TypedDict):
+    id: str
+    name: str
+
+class RoleDict(TypedDict):
+    id: str
+    name: str
+
+class GuildDict(TypedDict):
+    id: str
+    name: str
+    icon: str
+    channels: List[ChannelDict]
+    roles: List[RoleDict]
+
+class IPC(Client):
+    def __init__(self, bot: "Bot", path: str, peers: List[str]) -> None:
+        super().__init__(path, peers)
+
+        self.bot = bot
+
+    def user_has_permissions(self, guild: "Guild", user_id: str) -> bool:
+        if user_id in (member.user.id for member in guild.members):
+            index = get_index(guild.members, user_id, key=lambda m: m.user.id)
+            member = guild.members[index]
+
+            return guild.owner.user.id == user_id or member.permissions.has("ADMINISTRATOR")
+
+        return False
+
+    def guild_to_dict(self, guild: "Guild") -> GuildDict:
+        return GuildDict(
+            id = guild.id,
+            name = guild.name,
+            icon = guild.icon,
+            channels = [
+                ChannelDict(
+                    id = channel.id,
+                    name = channel.name
+                )
+                for channel in guild.channels
+            ],
+            roles = [
+                RoleDict(
+                    id = role.id,
+                    name = role.name
+                )
+                for role in guild.roles
+            ]
+        )
+
+    @listener("get_cogs")
+    async def get_cogs(self) -> List[dict]:
+        cogs = []
+
+        for cog in self.bot.cogs:
+            commands = []
+
+            for command in cog.walk_commands():
+                if command.guild_id is not None:
+                    continue
+
+                usage = []
+
+                if command.usage is not None:
+                    arguments = command.usage.split(" ")
+
+                    for argument in arguments:
+                        if argument[0] == "(":
+                            usage.append([argument[1:-1], 0])
+                        elif argument[0] == "[":
+                            usage.append([argument[1:-1], 1])
+
+                commands.append({
+                    "type": command.type.value,
+                    "parent": command.parent,
+                    "cog": command.cog.name,
+                    "name": command.name,
+                    "description": command.description,
+                    "usage": usage,
+                    "enabled": command.enabled,
+                    "hidden": command.hidden,
+                    "aliases": command.aliases,
+                    "guild_id": command.guild_id
+                })
+
+            cogs.append({
+                "name": cog.name,
+                "description": cog.description,
+                "hidden": cog.hidden,
+                "commands_count": len(cog.walk_commands()),
+                "commands": commands
+            })
+
+        print(__import__("datetime").datetime.now(), "received get_cogs")
+
+        return cogs
+
+    @listener("get_cache")
+    async def get_cache(self) -> tuple:
+        print(__import__("datetime").datetime.now(), "received get_cache")
+
+        return config.PREFIX, await self.bot.get_stats(), {
+            "id": self.bot.gateway.bot_user.id,
+            "username": self.bot.gateway.bot_user.username,
+            "avatar": self.bot.gateway.bot_user.avatar
+        }
+
+    @listener("add_role")
+    async def add_role(self, guild_id: str, user_id: str, role_id: str) -> None:
+        guild = self.bot.gateway.get_guild(guild_id)
+
+        if guild is None:
+            return
+
+        member = await guild.get_member(user_id)
+
+        if member is not None:
+            try:
+                await member.add_role(guild.get_role(role_id))
+            except HTTPException:
+                pass
+
+    @listener("get_user")
+    async def get_user(self, user_id: str) -> UserDict:
+        user = await self.bot.gateway.get_user(user_id)
+
+        return UserDict(
+            id = user.id,
+            username = user.username,
+            avatar = user.avatar
+        )
+
+    @listener("get_guilds_for")
+    async def get_guilds_for(self, user_id: str) -> GuildDict:
+        guilds: List[GuildDict] = []
+
+        for guild in self.bot.gateway.guilds:
+            if self.user_has_permissions(guild, user_id):
+                guilds.append(self.guild_to_dict(guild))
+
+        return guilds
+
+    @listener("get_guild_db")
+    async def get_guild_db(self, guild_id: str, user_id: str) -> Union[Guilds, int]:
+        guild = self.bot.gateway.get_guild(guild_id)
+
+        if not guild:
+            return 404
+
+        if not self.user_has_permissions(guild, user_id):
+            return 403
+
+        guild = self.bot.gateway.get_guild(guild_id)
+        guild_db = await Guilds.get(guild_id=guild_id)
+        guild_db = guild_db.__dict__
+
+        for element in ("_partial", "_saved_in_db", "_custom_generated_pk", "id", "guild_id"):
+            del guild_db[element]
+
+        guild_db["guild"] = self.guild_to_dict(guild)
+        
+        return guild_db

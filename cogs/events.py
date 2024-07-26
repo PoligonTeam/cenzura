@@ -159,19 +159,7 @@ class Events(commands.Cog):
 
     @commands.Listener
     async def on_interaction_create(self, interaction: Interaction):
-        if interaction.data.custom_id == "giveaway":
-            invites = await self.bot.http.request(femcord.http.Route("GET", "guilds", interaction.guild.id, "invites"))
-
-            count = 0
-            for invite in invites:
-                if invite["inviter"]["id"] == interaction.member.user.id:
-                    count += invite["uses"]
-
-            if count < 5:
-                return await interaction.callback(femcord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, f"Potrzebujesz jeszcze {5 - count} zaproszeń aby móc dołączyć do konkursu", flags=[MessageFlags.EPHEMERAL])
-
-            await interaction.callback(femcord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, "Dołączyłeś do konkursu", flags=[MessageFlags.EPHEMERAL])
-        elif interaction.data.custom_id == "verification" + interaction.guild.id:
+        if interaction.data.custom_id == "verification" + interaction.guild.id:
             query = Guilds.filter(guild_id=interaction.guild.id)
             guild_db = await query.first()
 
@@ -182,7 +170,7 @@ class Events(commands.Cog):
                     "role_id": guild_db.verification_role,
                     "guild_icon": interaction.guild.icon_as("png"),
                     "user_avatar": interaction.member.user.avatar_as("png")
-                })
+                }, nowait=True)
 
                 captcha_id = hashlib.md5(f"{interaction.guild.id}:{interaction.member.user.id}".encode()).hexdigest()
 

@@ -9,4 +9,5 @@ psutil
 pyfiglet
 tortoise-orm[asyncpg]
 yt-dlp
-maturin
+maturi
+pyjwt
