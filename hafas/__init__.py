@@ -42,23 +42,8 @@ class TransportTypes(enum.Enum):
     HafasNoTrain = "HAFAS_NO_TRAIN"
 
 
-class TransportOperators(enum.Enum):
-    PKPInterCityExpressPremium = "EIP"
-    PKPExpressInterCity = "EIC"
-    PKPInterCity = "IC"
-    PKPTLK = "TLK"
-    RegionalTrain = "REG"
-    KolejeWielkopolskie = "KW"
-    KolejeMazowieckie = "KM"
-    SzybkaKolejMiejska = "SKM"
-
-    EuroCity = "EC"
-    NightJet = "NJ"
-    EuroNight = "EN"
-
-
-def _operator_image(operator: TransportOperators):
-    return f"https://bilkom.pl/img/carriers/{operator.value.lower()}.png"
+def _operator_image(operator: str) -> str:
+    return f"https://bilkom.pl/img/carriers/{operator.lower()}.png"
 
 
 @dataclass
@@ -97,13 +82,11 @@ class MeansOfTransport:
     name: str
     transport_type: TransportTypes
     detailed_name: str = None
-    operator: TransportOperators = None
     operator_image: str = None
 
     def __post_init__(self):
         self.transport_type = TransportTypes(self.transport_type)
-        self.operator = TransportOperators(self.operator_id)
-        self.operator_image = _operator_image(self.operator)
+        self.operator_image = _operator_image(self.operator_id)
 
 
 @dataclass
@@ -142,14 +125,14 @@ class BoardRow:
     track: str
     url: str
     time_with_delay: datetime = None
-    operator: TransportOperators = None
+    operator: str = None
     operator_image: str = None
 
     def __post_init__(self):
         self.time = datetime.fromtimestamp(int(self.time) / 1000)
         self.delay = int(self.delay)
         self.time_with_delay = self.time + timedelta(minutes=self.delay)
-        self.operator = TransportOperators(parse_qs(urlparse(self.url).query)["tc"][0])
+        self.operator = parse_qs(urlparse(self.url).query)["tc"][0]
         self.operator_image = _operator_image(self.operator)
 
 

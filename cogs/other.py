@@ -24,7 +24,7 @@ from models import Guilds
 from enum import Enum
 import config, datetime
 
-from typing import List, Dict, Tuple, Literal, TypedDict, Any, TYPE_CHECKING
+from typing import Literal, TypedDict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context
@@ -40,8 +40,8 @@ class CommandData(TypedDict):
     name: str
     description: str
     usage: str
-    aliases: List[str]
-    arguments: Dict[str, Literal["str", "int", "Channel", "Role", "User"]]
+    aliases: list[str]
+    arguments: dict[str, Literal["str", "int", "Channel", "Role", "User"]]
     prefix: str
 
 class CustomCommands(commands.Cog):
@@ -52,11 +52,8 @@ class CustomCommands(commands.Cog):
         self.prefixes = []
 
     def append_prefix(self, prefix):
-        self.prefixes.append(prefix)
-
-        if "" in self.prefixes:
-            self.prefixes.remove("")
-            self.prefixes.append("")
+        if prefix not in self.prefixes:
+            self.prefixes.append(prefix)
 
 class Other(commands.Cog):
     def __init__(self, bot: "Bot", custom_commands_cog: commands.Cog) -> None:
@@ -122,11 +119,11 @@ class Other(commands.Cog):
 
         if ctx.member.permissions.has(femcord.enums.Permissions.MANAGE_GUILD):
             @femscript.wrap_function()
-            def get_all() -> Dict[str, object]:
+            def get_all() -> dict[str, object]:
                 return database
 
             @femscript.wrap_function()
-            def get(key: str) -> Any:
+            def get_value(key: str) -> Any:
                 return database.get(key)
 
             @femscript.wrap_function()
@@ -178,7 +175,7 @@ class Other(commands.Cog):
         if len(result) < 100:
             prefix_suffix = ""
 
-        await self.bot.paginator(ctx.reply, ctx, result or "(empty result)", prefix=prefix_suffix, suffix=prefix_suffix)
+        await ctx.reply_paginator(result or "(empty result)", prefix=prefix_suffix, suffix=prefix_suffix)
 
     @commands.Listener
     async def on_message_create(self, message):
@@ -198,7 +195,7 @@ class Other(commands.Cog):
 
                 return await self.bot.process_commands(fake_message)
 
-    async def get_command_data(self, code: str) -> Tuple[CommandOperation, CommandData]:
+    async def get_command_data(self, code: str) -> tuple[CommandOperation, CommandData]:
         femscript = Femscript(code)
 
         command_data = {
@@ -217,7 +214,7 @@ class Other(commands.Cog):
         femscript.ast = femscript.ast[0:1]
 
         @femscript.wrap_function()
-        def command(*, name: str, description: str = None, usage: str = None, aliases: List[str] = None, arguments: Dict[str, str] = None, prefix: str = None) -> None:
+        def command(*, name: str, description: str = None, usage: str = None, aliases: list[str] = None, arguments: dict[str, str] = None, prefix: str = None) -> None:
             if not isinstance(name, str):
                 raise FemscriptException("Name must be a string")
             if description and not isinstance(description, str):
@@ -319,7 +316,7 @@ class Other(commands.Cog):
                 femscript = Femscript(code, variables=variables)
 
                 @femscript.wrap_function()
-                def get_all() -> Dict[str, object]:
+                def get_all() -> dict[str, object]:
                     return database
 
                 @femscript.wrap_function()
@@ -370,7 +367,7 @@ class Other(commands.Cog):
                 if isinstance(result, bytes) and get_extension(result) == "png":
                     return await ctx.reply(files=[(ctx.author.id + ".png", result)])
 
-                await self.bot.paginator(ctx.reply, ctx, str(result) or "(empty result)", replace=False)
+                await ctx.reply_paginator(str(result) or "(empty result)", replace=False)
 
         if command_data["usage"] is None and command_data["arguments"]:
             command_data["usage"] = " ".join(["(" + key + ":" + value + ")" for key, value in command_data["arguments"].items()])
@@ -418,18 +415,18 @@ class Other(commands.Cog):
 
         operation, command_data = await self.get_command_data(code)
 
-        if operation == CommandOperation.MISSING_INIT:
+        if operation is CommandOperation.MISSING_INIT:
             return await ctx.reply("Your code hasn't initialised the command")
-        elif operation == CommandOperation.GET_CODE:
+        elif operation is CommandOperation.GET_CODE:
             command = self.bot.get_command(command_data["name"], guild_id=ctx.guild.id)
 
             if not command:
                 raise commands.CommandNotFound()
 
-            return await self.bot.paginator(ctx.reply, ctx, command.other["code"], prefix="```py\n", suffix="```")
-        elif operation == CommandOperation.GET_COMMANDS:
-            return await self.bot.paginator(ctx.reply, ctx, pages=custom_commands, prefix="```py\n", suffix="```")
-        elif operation == CommandOperation.REMOVE_COMMAND:
+            return await ctx.reply_paginator(command.other["code"], prefix="```py\n", suffix="```")
+        elif operation is CommandOperation.GET_COMMANDS:
+            return await ctx.reply_paginator(pages=custom_commands, prefix="```py\n", suffix="```")
+        elif operation is CommandOperation.REMOVE_COMMAND:
             command = self.bot.get_command(command_data["name"], guild_id=ctx.guild.id)
 
             if not command:

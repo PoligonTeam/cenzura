@@ -18,7 +18,7 @@ import aiohttp
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
-from typing import Union, BinaryIO
+from typing import BinaryIO
 from .magic import get_extension
 
 @dataclass
@@ -71,7 +71,7 @@ class Poligon:
     def _delete(self, image: Image) -> aiohttp.client._RequestContextManager:
         return self.session.delete(self.API_URL + "/file/" + image.name, headers={"authorization": self.upload_key})
 
-    async def upload(self, image: Union[str, bytes, BinaryIO], *, filename: str = None) -> Image:
+    async def upload(self, image: str | bytes | BinaryIO, *, filename: str = None) -> Image:
         if isinstance(image, str):
             image = open(image, "rb")
         elif isinstance(image, bytes):

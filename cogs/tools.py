@@ -22,13 +22,12 @@ from aiohttp import ClientSession, FormData
 from datetime import datetime
 from bs4 import BeautifulSoup
 from enum import Enum
-from typing import Tuple
 import random, re, json, string
 
-from typing import TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bot import Bot, Context
+    from bot import Bot, Context, AppContext
 
 URL_PATTERN = re.compile(r"((http|https):\/\/)?(www\.)?[-a-z0-9@:%._\+~#=]{1,256}\.[a-z0-9()]{1,69}\b[-a-z0-9()@:%_\+.~#!?&//=]*", re.IGNORECASE)
 
@@ -162,8 +161,8 @@ class Tools(commands.Cog):
 
         await ctx.reply(files=[("video.mp4", data.video)])
 
-    @commands.command(description="Robi screenshot strony", aliases=["ss"])
-    async def screenshot(self, ctx: "Context", url: str, full_page: bool = False):
+    @commands.hybrid_command(description="Robi screenshot strony", aliases=["ss"])
+    async def screenshot(self, ctx: Union["Context", "AppContext"], url: str, full_page: bool = False):
         async with femcord.Typing(ctx.message):
             result = URL_PATTERN.match(url)
 
@@ -173,29 +172,38 @@ class Tools(commands.Cog):
             if result.group(1) is None:
                 url = "https://" + url
 
+            if isinstance(ctx, commands.AppContext):
+                await ctx.think()
+
             async with ApiClient(self.bot.local_api_base_url) as client:
                 try:
                     data = await client.screenshot(url, full_page)
                 except ApiError as e:
                     return await ctx.reply(e)
 
-            components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl")))
+            components = None
+
+            if isinstance(ctx, commands.Context):
+                components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl")))
 
             message = await ctx.reply(files=[("image.png", data.image)], components=components)
 
-        async def curl(interaction: femcord.types.Interaction):
+        if isinstance(ctx, commands.Context):
+            try:
+                interaction, = await self.bot.wait_for("interaction_create", lambda interaction: interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60)
+            except TimeoutError:
+                components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))
+                return await message.edit(components=components)
+
             await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
-            await self.bot.paginator(message.edit, ctx, data.content, embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
+            await ctx.paginator(message.edit, data.content, embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
 
-        async def on_timeout():
-            components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))
-            await message.edit(components=components)
+    @commands.hybrid_command(description="Downloads video via cobalt", aliases=["ytdl", "tiktok", "shorts"])
+    async def cobalt(self, ctx: Union["Context", "AppContext"], url: str, audio_only: bool | int = 0):
+        if isinstance(ctx, commands.AppContext):
+            await ctx.think()
 
-        await self.bot.wait_for("interaction_create", curl, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
-
-    @commands.command(description="Downloads video via cobalt", aliases=["ytdl", "tiktok", "shorts"])
-    async def cobalt(self, ctx: "Context", url: str, audio_only: int = 0):
-        async def get_file(url: str) -> Tuple[str, bytes]:
+        async def get_file(url: str) -> tuple[str, bytes]:
             async with session.get(url) as response:
                 content = await response.content.read()
 
@@ -211,10 +219,14 @@ class Tools(commands.Cog):
         async with femcord.Typing(ctx.message):
             async with ClientSession() as session:
                 async with session.get("https://instances.hyper.lol/instances.json", headers={"User-Agent": self.bot.user_agent}) as response:
-                    data = await response.json()
-                    data = [instance for instance in data if instance["api_online"] and int(instance["score"]) == 100 and instance["protocol"] == "https" and instance["api"] != "api.cobalt.tools"]
+                    cobalt = "cobalt.tools"
 
-                    cobalt = random.choice(data)["api"] if data else "cobalt.tools"
+                    if response.status == 200:
+                        data = await response.json()
+                        data = [instance for instance in data if instance["api_online"] and int(instance["score"]) == 100 and instance["protocol"] == "https" and instance["api"] != "api.cobalt.tools"]
+
+                        if data:
+                            cobalt = random.choice(data)["api"]
 
                 async with session.post("https://" + cobalt + "/api/json", headers={"Accept": "application/json"}, json={"url": url, "isAudioOnly": bool(audio_only), "filenamePattern": "pretty"}) as response:
                     data = json.loads(await response.text())

@@ -21,7 +21,7 @@ from utils import convert
 from models import Guilds
 import datetime, re
 
-from typing import Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context, Context
@@ -56,7 +56,7 @@ class Admin(commands.Cog):
 
     @commands.command(description="Banuje użytkownika", usage="(użytkownik) [powód]")
     @commands.has_permissions("ban_members")
-    async def ban(self, ctx: "Context", member: Union[types.Member, types.User], *, reason = "nie podano powodu"):
+    async def ban(self, ctx: "Context", member: types.Member | types.User, *, reason = "nie podano powodu"):
         if not ctx.guild.me.permissions.has("ban_members"):
             return await ctx.reply("Bot nie ma uprawnień (`ban_members`)")
 
@@ -220,7 +220,7 @@ class Admin(commands.Cog):
             return await ctx.reply("Disabled")
 
         if code == "get_code()":
-            return await self.bot.paginator(ctx.reply, ctx, guild_db.welcome_message, prefix="```py\n", suffix="```")
+            return await ctx.reply_paginator(guild_db.welcome_message, prefix="```py\n", suffix="```")
         elif code == "emit()":
             events = self.bot.get_cog("Events")
             return await events.on_guild_member_add(ctx.guild, ctx.member)
@@ -259,7 +259,7 @@ class Admin(commands.Cog):
             return await ctx.reply("Disabled")
 
         if code == "get_code()":
-            return await self.bot.paginator(ctx.reply, ctx, guild_db.leave_message, prefix="```py\n", suffix="```")
+            return await ctx.reply_paginator(guild_db.leave_message, prefix="```py\n", suffix="```")
         elif code == "emit()":
             events = self.bot.get_cog("Events")
             return await events.on_guild_member_remove(ctx.guild, ctx.author)
@@ -287,7 +287,7 @@ class Admin(commands.Cog):
 
     @set.command(description="Ustawia autorole", usage="[rola]")
     @commands.has_permissions("manage_guild", "manage_roles")
-    async def autorole(self, ctx: "Context", role: Union[types.Role, str] = None):
+    async def autorole(self, ctx: "Context", role: types.Role | str = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
 
         if role is None:

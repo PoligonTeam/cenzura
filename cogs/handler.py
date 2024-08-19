@@ -19,10 +19,10 @@ from femcord.femcord import commands
 from utils import fg
 import traceback, random
 
-from typing import TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bot import Bot, Context
+    from bot import Bot, Context, AppContext
 
 class ErrorHandler(commands.Cog):
     hidden = True
@@ -31,7 +31,7 @@ class ErrorHandler(commands.Cog):
         self.bot = bot
 
     @commands.Listener
-    async def on_error(self, ctx: "Context", error):
+    async def on_error(self, ctx: Union["Context", "AppContext"], error):
         if isinstance(error, commands.CommandNotFound):
             return await ctx.reply("Command not found")
 
@@ -84,9 +84,11 @@ class ErrorHandler(commands.Cog):
             return await ctx.reply(error)
 
         formatted_error = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-        self.bot.loki.add_command_exception_log(ctx, error, formatted_error)
 
-        await self.bot.paginator(ctx.reply, ctx, formatted_error, prefix="```py\n", suffix="```", page=-1)
+        if not isinstance(ctx, commands.AppContext):
+            self.bot.loki.add_command_exception_log(ctx, error, formatted_error)
+
+        await ctx.reply_paginator(formatted_error, prefix="```py\n", suffix="```", page=-1)
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(ErrorHandler(bot))

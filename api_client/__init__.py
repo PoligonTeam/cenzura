@@ -17,7 +17,7 @@ limitations under the License.
 import aiohttp, base64, bs4, io
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Optional, Union, Type, TypedDict, Dict
+from typing import Optional, Type, TypedDict
 
 ERROR_MAP = {
     "api_down": "API is down",
@@ -84,7 +84,7 @@ class ApiError(Exception):
         self.url = url
 
 class ApiClient:
-    def __init__(self, base_url: str, error_map: Dict[str, str] = ERROR_MAP) -> None:
+    def __init__(self, base_url: str, error_map: dict[str, str] = ERROR_MAP) -> None:
         self.session = aiohttp.ClientSession(base_url=base_url)
         self.error_map = error_map
 
@@ -94,7 +94,7 @@ class ApiClient:
     async def __aexit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]) -> None:
         await self.session.close()
 
-    async def _post(self, url: str, **kwargs) -> Union[ScreenshotResponseDict, YoutubeResponseDict]:
+    async def _post(self, url: str, **kwargs) -> ScreenshotResponseDict | YoutubeResponseDict:
         try:
             async with self.session.post(url, **kwargs) as response:
                 if response.status not in (200, 400, 401):

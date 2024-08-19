@@ -48,7 +48,7 @@ class Hafas(commands.Cog):
         text = text.splitlines()
         pages = ["\n".join(text[num:num+20]) for num in range(0, len(text), 20)]
 
-        await self.bot.paginator(ctx.reply, ctx, pages=pages, prefix="```\n", suffix="```")
+        await ctx.reply_paginator(pages=pages, prefix="```\n", suffix="```")
 
     @commands.command(description="Shows arrivals to a station")
     async def arrivals(self, ctx: "Context", amount: int, *, name: str):
@@ -58,7 +58,8 @@ class Hafas(commands.Cog):
         text = await self.get_board(ctx, name, "arr", amount)
         text = text.splitlines()
         pages = ["\n".join(text[num:num+20]) for num in range(0, len(text), 20)]
-        await self.bot.paginator(ctx.reply, ctx, pages=pages, prefix="```\n", suffix="```")
+
+        await ctx.reply_paginator(pages=pages, prefix="```\n", suffix="```")
 
     @commands.command(description="Shows a journey between two stations")
     async def journey(self, ctx: "Context", *, string: str):

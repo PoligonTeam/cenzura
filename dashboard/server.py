@@ -22,8 +22,6 @@ from datetime import datetime, timedelta, UTC
 
 from .ipc import IPC
 
-from typing import List, Tuple, Dict
-
 logging.basicConfig(level=logging.DEBUG)
 
 PATH = os.path.dirname(os.path.realpath(__file__))
@@ -35,12 +33,12 @@ EPOCH = 1626559200
 
 class Cache:
     def __init__(self) -> None:
-        self.cogs: List[dict] = []
+        self.cogs: list[dict] = []
         self.default_prefix: str = None
         self.stats: dict = None
         self.bot: dict = None
-        self.tokens: List[Tuple[str, str]] = []
-        self.captcha: Dict[str, dict] = {}
+        self.tokens: list[tuple[str, str]] = []
+        self.captcha: dict[str, dict] = {}
 
 class AccessLogger(abc.AbstractAccessLogger):
     def log(self, request: web.Request, response: web.Response, time: float) -> None:
@@ -93,6 +91,10 @@ class Server:
     @router.options(r"/{_:.*}")
     async def options(request: web.Request) -> web.Response:
         return web.Response(headers={"Access-Control-Allow-Headers": "Content-Type,authorization", "Access-Control-Allow-Methods": "GET,POST,PATCH,PUT,DELETE"})
+
+    @router.get(r"/{route:stats|commands}")
+    async def reroute(request: web.Request) -> web.Response:
+        return web.HTTPFound("/bot/" + request.match_info.get("route"))
 
     @router.post("/callback")
     async def callback(request: web.Request) -> web.Response:

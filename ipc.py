@@ -24,7 +24,7 @@ from models import Guilds
 
 import config
 
-from typing import List, Union, TypedDict, TYPE_CHECKING
+from typing import TypedDict, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .bot import Bot
@@ -47,11 +47,11 @@ class GuildDict(TypedDict):
     id: str
     name: str
     icon: str
-    channels: List[ChannelDict]
-    roles: List[RoleDict]
+    channels: list[ChannelDict]
+    roles: list[RoleDict]
 
 class IPC(Client):
-    def __init__(self, bot: "Bot", path: str, peers: List[str]) -> None:
+    def __init__(self, bot: "Bot", path: str, peers: list[str]) -> None:
         super().__init__(path, peers)
 
         self.bot = bot
@@ -87,7 +87,7 @@ class IPC(Client):
         )
 
     @listener("get_cogs")
-    async def get_cogs(self) -> List[dict]:
+    async def get_cogs(self) -> list[dict]:
         cogs = []
 
         for cog in self.bot.cogs:
@@ -129,14 +129,10 @@ class IPC(Client):
                 "commands": commands
             })
 
-        print(__import__("datetime").datetime.now(), "received get_cogs")
-
         return cogs
 
     @listener("get_cache")
     async def get_cache(self) -> tuple:
-        print(__import__("datetime").datetime.now(), "received get_cache")
-
         return config.PREFIX, await self.bot.get_stats(), {
             "id": self.bot.gateway.bot_user.id,
             "username": self.bot.gateway.bot_user.username,
@@ -170,7 +166,7 @@ class IPC(Client):
 
     @listener("get_guilds_for")
     async def get_guilds_for(self, user_id: str) -> GuildDict:
-        guilds: List[GuildDict] = []
+        guilds: list[GuildDict] = []
 
         for guild in self.bot.gateway.guilds:
             if self.user_has_permissions(guild, user_id):
@@ -179,7 +175,7 @@ class IPC(Client):
         return guilds
 
     @listener("get_guild_db")
-    async def get_guild_db(self, guild_id: str, user_id: str) -> Union[Guilds, int]:
+    async def get_guild_db(self, guild_id: str, user_id: str) -> Guilds | int:
         guild = self.bot.gateway.get_guild(guild_id)
 
         if not guild:
@@ -195,6 +191,17 @@ class IPC(Client):
         for element in ("_partial", "_saved_in_db", "_custom_generated_pk", "id", "guild_id"):
             del guild_db[element]
 
+        guild_db["custom_commands"] = [
+            {
+                "name": next(filter(lambda command: command.other.get("code") == custom_command and command.guild_id == guild_id, self.bot.commands)).other["display_name"],
+                "metadata": {
+                    key[2:]: value
+                    for key, value in (custom_command.split(": ", 1) for custom_command in custom_command.split("\n", 4)[:4])
+                },
+                "value": custom_command.split("\n", 5)[5]
+            }
+            for custom_command in guild_db["custom_commands"]
+        ]
         guild_db["guild"] = self.guild_to_dict(guild)
-        
+
         return guild_db

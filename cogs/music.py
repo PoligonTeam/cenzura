@@ -21,12 +21,11 @@ from utils import *
 from aiohttp import ClientSession
 from models import LastFM
 from config import *
-from typing import Union
 from azuracast import NowPlaying
 from lastfm import exceptions
 import hashlib, datetime, asyncio, femlink, re, os
 
-from typing import TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context
@@ -378,8 +377,11 @@ class Music(commands.Cog):
 
     #         await ctx.reply(result)
 
-    @commands.command(description="lastfm - now playing", usage="[user]", aliases=["fmstats", "fm"])
-    async def lastfm(self, ctx: "Context", *, user: types.User = None):
+    @commands.hybrid_command(description="lastfm - now playing", usage="[user]", aliases=["fmstats", "fm"])
+    async def lastfm(self, ctx: Union["Context", "AppContext"], *, user: types.User = None):
+        if isinstance(ctx, commands.AppContext):
+            await ctx.think()
+
         user = user or ctx.author
 
         lastfm = self.lastfm_users.get(user.id)
@@ -486,7 +488,7 @@ class Music(commands.Cog):
             return await ctx.reply("You don't have a linked lastfm account, use `login` to link them")
 
         if re.match(r"get_code(\(\))?;?", script):
-            return await self.bot.paginator(ctx.reply, ctx, lastfm_user.script, prefix="```py\n", suffix="```")
+            return await ctx.reply_paginator(lastfm_user.script, prefix="```py\n", suffix="```")
 
         script = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
                  f"# GUILD: {ctx.guild.id}\n" \
@@ -545,7 +547,7 @@ class Music(commands.Cog):
                     await ctx.reply(f"{types.t['D'] @ pace} ({scrobbles_per_day:.2f} scrobbli dziennie | {scrobbles} w {account_age.days} dni)")
 
     @commands.command(description="Użytkownicy którzy znają artyste", aliases=["wk"])
-    async def whoknows(self, ctx: "Context", *, user_or_track: Union[types.User, str] = None):
+    async def whoknows(self, ctx: "Context", *, user_or_track: types.User | str = None):
         lastfm_users = self.lastfm_users.values()
 
         user = ctx.author
@@ -621,7 +623,7 @@ class Music(commands.Cog):
             await ctx.reply(embed=embed)
 
     @commands.command(description="Użytkownicy którzy znają utwór", usage="[nazwa]", aliases=["wt", "wkt", "whoknowst"])
-    async def whoknowstrack(self, ctx: "Context", *, user_or_track: Union[types.User, str] = None):
+    async def whoknowstrack(self, ctx: "Context", *, user_or_track: types.User | str = None):
         lastfm_users = self.lastfm_users.values()
 
         user = ctx.author
@@ -699,8 +701,11 @@ class Music(commands.Cog):
 
         await ctx.reply(embed=embed)
 
-    @commands.command(description="Pokazuje tekst piosenki", usage="[nazwa]")
-    async def lyrics(self, ctx: "Context", *, name = None):
+    @commands.hybrid_command(description="Pokazuje tekst piosenki", usage="[nazwa]")
+    async def lyrics(self, ctx: Union["Context", "AppContext"], *, name = None):
+        if isinstance(ctx, commands.AppContext):
+            await ctx.think()
+
         async with femcord.Typing(ctx.message):
             artist = ""
 
@@ -732,7 +737,7 @@ class Music(commands.Cog):
                 if name is None:
                     return await ctx.reply("Nie podałeś nazwy")
 
-                lyrics: Lyrics = await get_track_lyrics(artist, name, session)
+                lyrics = await get_track_lyrics(artist, name, session)
 
                 if lyrics is None:
                     return await ctx.reply("Nie ma tekstu dla tej piosenki")
@@ -742,7 +747,7 @@ class Music(commands.Cog):
                          f"# TRACK NAME: {lyrics.title}\n\n" \
                        + lyrics.lyrics
 
-        await self.bot.paginator(ctx.reply, ctx, lyrics, prefix="```md\n", suffix="```", buttons=True)
+        await ctx.reply_paginator(lyrics, prefix="```md\n", suffix="```", buttons=True)
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Music(bot))

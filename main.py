@@ -107,7 +107,7 @@ class StreamHandler(io.StringIO):
             threading.Thread(target=self.tcp_server.send, args=(content,), daemon=True).start()
 
 def main():
-    parser = argparse.ArgumentParser(description="cenzura is a bot, the bot is cenzura")
+    parser = argparse.ArgumentParser(description="fembot is a bot, the bot is fembot")
     parser.add_argument("--logging", "-l", help="enable logging")
     parser.add_argument("--logterminal", "-lt", help="prints logs to specified terminal")
     parser.add_argument("--path", "-p", help="saves logs to specified path")

@@ -16,7 +16,7 @@ limitations under the License.
 
 from dataclasses import dataclass
 
-from typing import List, Union, Any
+from typing import Optional, Any
 
 @dataclass
 class Listeners:
@@ -74,8 +74,8 @@ class Station:
     playlist_pls_url: str
     playlist_m3u_url: str
     is_public: bool
-    mounts: List[Mount]
-    remotes: List[Remote]
+    mounts: list[Mount]
+    remotes: list[Remote]
     hls_enabled: bool
     hls_url: str
     hls_listeners: int
@@ -107,7 +107,7 @@ class Song:
     isrc: str
     lyrics: str
     art: str
-    custom_fields: List[dict]
+    custom_fields: list[dict]
     bottom_text: str = None
     formatted_text: str = None
 
@@ -175,9 +175,9 @@ class NowPlaying:
     live: Live
     now_playing: NowPlayingSong
     playing_next: PlayingNextSong
-    song_history: List[SongHistory]
+    song_history: list[SongHistory]
     is_online: bool
-    cache: Union[None, bool]
+    cache: Optional[bool]
 
     @classmethod
     def from_dict(cls, data: dict):

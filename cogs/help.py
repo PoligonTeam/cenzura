@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from bot import Bot, Context
 
-permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles")
+permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles", "change_nickname")
 
 BOTINVITE = f"https://discord.com/oauth2/authorize?client_id=%s&permissions={permissions.get_int()}&scope=bot"
 SUPPORT = "https://discord.gg/tDQURnVtGC"
@@ -52,7 +52,7 @@ class Help(commands.Cog):
         if interaction.message is None:
             return
 
-        if ("help", interaction.member.user.id, interaction.channel.id, interaction.message.id) in self.interactions:
+        if ("help", interaction.user.id, interaction.channel.id, interaction.message.id) in self.interactions:
             embed = femcord.Embed(title="Help:", color=self.bot.embed_color)
 
             if interaction.data.custom_id == "cog":

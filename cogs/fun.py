@@ -18,7 +18,7 @@ import femcord.femcord as femcord
 from femcord.femcord import commands, types, InvalidArgument, HTTPException
 from femcord.femcord.http import Route
 from femcord.femcord.permissions import Permissions
-from femcord.femcord.enums import Intents
+from femcord.femcord.enums import Intents, ApplicationCommandTypes, PublicFlags
 from femcord.femcord.utils import get_index
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup, ResultSet
@@ -32,7 +32,7 @@ import io, random, urllib.parse, json, re
 from typing import Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bot import Bot, Context
+    from bot import Bot, Context, AppContext
 
 class Fun(commands.Cog):
     def __init__(self, bot: "Bot") -> None:
@@ -41,12 +41,15 @@ class Fun(commands.Cog):
         self.results = {}
         self.urls = {}
 
-    @commands.command(description="User avatar", usage="[user]")
-    async def avatar(self, ctx: "Context", user: types.User = None):
+    @commands.hybrid_command(description="User avatar", usage="[user]", type=ApplicationCommandTypes.USER)
+    async def avatar(self, ctx: Union["Context", "AppContext"], user: types.User = None):
         user = user or ctx.author
-        image = await self.bot.http.session.get(user.avatar_url)
 
-        await ctx.reply(files=[("avatar." + ("gif" if user.avatar[:2] == "a_" else "png"), await image.content.read())])
+        async with ClientSession() as session:
+            async with session.get(user.avatar_url + "?size=512") as response:
+                content = await response.content.read()
+
+        await ctx.reply(files=[("avatar." + ("gif" if user.avatar[:2] == "a_" else "png"), content)])
 
     @commands.command(description="Shows the percentage of love between users", usage="(user) [user]", aliases=["love"])
     async def ship(self, ctx: "Context", user: types.User, user2: types.User = None):
@@ -307,7 +310,7 @@ class Fun(commands.Cog):
     #     self.interactions.append(("calc", ctx.author.id, ctx.channel.id, message.id))
 
     @commands.command(description="inside joke", usage="[user/text/attachment/reply]")
-    async def cantseeme(self, ctx: "Context", *, arg: Union[types.User, str] = None):
+    async def cantseeme(self, ctx: "Context", *, arg: types.User | str = None):
         arg = arg or ctx.author
 
         if ctx.message.referenced_message and ctx.message.referenced_message.attachments:
@@ -478,8 +481,8 @@ class Fun(commands.Cog):
 
         await ctx.reply("https://tapetus.pl/obrazki/n/" + image["href"][:-3].replace(",", "_") + "jpg")
 
-    @commands.command(description="Shows information about user", usage="[user]", aliases=["ui", "user", "cotozacwel", "kimtykurwajestes"])
-    async def userinfo(self, ctx: "Context", user: Union[types.Member, types.User] = None):
+    @commands.hybrid_command(description="Shows information about user", usage="[user]", aliases=["ui", "user", "cotozacwel", "kimtykurwajestes"], type=ApplicationCommandTypes.USER)
+    async def userinfo(self, ctx: Union["Context", "AppContext"], user: types.Member | types.User = None):
         user = user or ctx.member
 
         if isinstance(user, types.Member):
@@ -505,32 +508,31 @@ class Fun(commands.Cog):
                 embed.add_field(name=await ctx.get_translation("ui_nickname"), value=member.nick)
             if member.roles[1:]:
                 embed.add_field(name=await ctx.get_translation("roles"), value=" ".join(types.m @ role for role in member.roles[1:]))
-            if member.presence:
-                text = ""
-                client_status = member.presence.client_status
-                if client_status.desktop:
-                    desktop_status = client_status.desktop.name
-                    text += str(self.bot.gateway.get_emoji(name=desktop_status))
-                if client_status.web:
-                    web_status = client_status.web.name
-                    text += str(self.bot.gateway.get_emoji(name=web_status))
-                if client_status.mobile:
-                    mobile_status = client_status.mobile.name
-                    text += str(self.bot.gateway.get_emoji(name="MOBILE" + mobile_status))
-                for activity in member.presence.activities:
-                    if activity.type is femcord.ActivityTypes.CUSTOM:
-                        text += " "
-                        if activity.emoji and not activity.emoji.id:
-                            text += activity.emoji.name + " "
-                        if activity.state:
-                            text += activity.state
-                        break
-                if text:
-                    embed.add_field(name="Status:", value=text)
+            text = ""
+            client_status = member.presence.client_status
+            if client_status.desktop:
+                desktop_status = client_status.desktop.name
+                text += str(self.bot.gateway.get_emoji(name=desktop_status))
+            if client_status.web:
+                web_status = client_status.web.name
+                text += str(self.bot.gateway.get_emoji(name=web_status))
+            if client_status.mobile:
+                mobile_status = client_status.mobile.name
+                text += str(self.bot.gateway.get_emoji(name="MOBILE" + mobile_status))
+            for activity in member.presence.activities:
+                if activity.type is femcord.ActivityTypes.CUSTOM:
+                    text += " "
+                    if activity.emoji and not activity.emoji.id:
+                        text += activity.emoji.name + " "
+                    if activity.state:
+                        text += activity.state
+                    break
+            if text:
+                embed.add_field(name="Status:", value=text)
             embed.add_field(name=await ctx.get_translation("ui_date_joined"), value=f"{femcord.types.t @ member.joined_at} ({femcord.types.t['R'] @ member.joined_at})")
         embed.add_field(name=await ctx.get_translation("date_created"), value=f"{femcord.types.t @ user.created_at} ({femcord.types.t['R'] @ user.created_at})")
         if user.public_flags:
-            embed.add_field(name=await ctx.get_translation("ui_badges"), value=" ".join(str(self.bot.gateway.get_emoji(name=flag.name)) for flag in user.public_flags))
+            embed.add_field(name=await ctx.get_translation("ui_badges"), value=" ".join(str(self.bot.gateway.get_emoji(name=flag.name)) for flag in user.public_flags if flag is not PublicFlags.BOT_HTTP_INTERACTIONS))
         embed.add_field(name=await ctx.get_translation("ui_avatar"), value=f"[link]({user.avatar_url})")
         if user.bot is True:
             link = f"https://discord.com/oauth2/authorize?client_id={user.id}&permissions=0&scope=bot"
@@ -588,9 +590,19 @@ class Fun(commands.Cog):
         embed = femcord.Embed(title=await ctx.get_translation("information_about", (ctx.guild.name,)), color=self.bot.embed_color)
         embed.set_thumbnail(url=ctx.guild.icon_url)
 
+        statuses = {
+            femcord.StatusTypes.ONLINE: 0,
+            femcord.StatusTypes.DND: 0,
+            femcord.StatusTypes.IDLE: 0,
+            femcord.StatusTypes.OFFLINE: 0
+        }
+
+        for member in ctx.guild.members:
+            statuses[member.presence.status] += 1
+
         embed.add_field(name=await ctx.get_translation("si_owner"), value=types.m @ ctx.guild.owner)
         embed.add_field(name="ID:", value=ctx.guild.id)
-        embed.add_field(name=await ctx.get_translation("si_users"), value=len(ctx.guild.members), inline=True)
+        embed.add_field(name=await ctx.get_translation("si_users"), value=" ".join(f"{value}{self.bot.gateway.get_emoji(name=key.name)}" for key, value in statuses.items()), inline=True)
         embed.add_field(name=await ctx.get_translation("si_channels"), value=len(ctx.guild.channels), inline=True)
         embed.add_field(name=await ctx.get_translation("roles"), value=len(ctx.guild.roles), inline=True)
         embed.add_field(name=await ctx.get_translation("si_emojis"), value=len(ctx.guild.emojis), inline=True)
@@ -801,8 +813,11 @@ class Fun(commands.Cog):
 
         message = await ctx.reply(embed=embed, components=get_components())
 
-        async def on_select(interaction):
-            nonlocal members
+        while True:
+            try:
+                interaction, = await self.bot.wait_for("interaction_create", lambda interaction: interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60 * 5)
+            except TimeoutError:
+                return await message.edit("No one guessed", embeds=[], components=[])
 
             selected_member = members[get_index(members, interaction.data.values[0], key=lambda member: member.user.id)]
 
@@ -813,12 +828,6 @@ class Fun(commands.Cog):
             else:
                 members.remove(selected_member)
                 await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=get_components())
-                await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60 * 5, on_timeout=on_timeout)
-
-        async def on_timeout():
-            await message.edit("No one guessed", embeds=[], components=[])
-
-        await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60 * 5, on_timeout=on_timeout)
 
     @commands.command(description="Random nickname")
     async def nick(self, ctx):

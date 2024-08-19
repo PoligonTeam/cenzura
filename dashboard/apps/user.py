@@ -21,7 +21,7 @@ from aiohttp import web
 from dataclasses import dataclass
 from enum import Enum
 
-from typing import Callable, Awaitable, List, Optional, TypedDict, Any
+from typing import Callable, Awaitable, Optional, TypedDict, Any
 
 router = web.RouteTableDef()
 
@@ -57,8 +57,8 @@ class GuildDict(TypedDict):
     id: str
     name: str
     icon: str
-    channels: List[ChannelDict]
-    roles: List[RoleDict]
+    channels: list[ChannelDict]
+    roles: list[RoleDict]
 
 class EndpointTypes(Enum):
     STRING = 0
@@ -68,6 +68,7 @@ class EndpointTypes(Enum):
     CHANNEL = 4
     ROLE = 5
     FEMSCRIPT = 6
+    CUSTOM_COMMANDS = 7
 
 @dataclass
 class Endpoint:
@@ -76,12 +77,13 @@ class Endpoint:
     subcategory: Optional[str] = None
     min: Optional[int] = None
     max: Optional[int] = None
-    options: Optional[List[Any]] = None
+    options: Optional[list[Any]] = None
+    functions: Optional[dict[str, Callable[..., None]]] = None
     disabled: bool = False
 
-    def check(self, guild: GuildDict, item: Any) -> bool:
+    def check(self, guild: GuildDict, item: str | list[str] | dict[str, str | float]) -> bool:
         if self.type in (EndpointTypes.STRING, EndpointTypes.LIST, EndpointTypes.DICT):
-            return self.max >= item >= self.min
+            return self.max >= len(item) >= self.min
         elif self.type is EndpointTypes.SELECT:
             return item in self.options
         elif self.type is EndpointTypes.CHANNEL:
@@ -89,8 +91,13 @@ class Endpoint:
         elif self.type is EndpointTypes.ROLE:
             return item in (role["id"] for role in guild["roles"])
         elif self.type is EndpointTypes.FEMSCRIPT:
-            if not self.max >= item >= self.min:
+            if not self.max >= len(item) >= self.min:
                 return False
+            return True # TODO: zrobic na to checka
+        elif self.type is EndpointTypes.CUSTOM_COMMANDS:
+            for custom_command in item:
+                if not self.max >= len(custom_command) >= self.min:
+                    return False
             return True # TODO: zrobic na to checka
 
 endpoints = dict(
@@ -139,12 +146,13 @@ endpoints = dict(
         category = "Scripts",
         subcategory = "Messages",
         type = EndpointTypes.FEMSCRIPT,
-        max = 200
+        max = 4000
     ),
     custom_commands = Endpoint(
         category = "Scripts",
         subcategory = "Custom commands",
-        type = EndpointTypes.FEMSCRIPT
+        type = EndpointTypes.CUSTOM_COMMANDS,
+        max = 4000
     )
 )
 
@@ -183,10 +191,10 @@ class User:
     @router.get("/guilds/{guild_id}/options")
     @logged_in
     async def modify_guild(request: web.Request) -> web.Response:
-        endpoint = request.match_info.get("endpoint")
-
         if request.method == "GET":
             return web.json_response({key: value.__dict__ | {"type": value.type.value} for key, value in endpoints.items()})
+
+        endpoint = request.match_info.get("endpoint")
 
         if not endpoint in endpoints:
             return web.HTTPNotFound()

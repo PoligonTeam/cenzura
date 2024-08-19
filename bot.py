@@ -27,20 +27,17 @@ from scheduler.scheduler import Scheduler
 from ipc import IPC
 from poligonlgbt import Poligon
 from datetime import datetime
-from typing import Callable, Union, Optional, Tuple, List, Dict, Any
+from typing import Callable, Awaitable, Optional, Any
 import asyncio, uvloop, random, psutil, os, time, config, logging
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-class Context(femcord.commands.Context):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-    async def get_translation(self, translation: str, args: Tuple[Any] = None) -> Union[str, femcord.Embed]:
+class HybridContext:
+    async def get_translation(self, translation: str, args: tuple[Any] = None) -> str | femcord.Embed:
         if not hasattr(self.command.cog, "translations"):
             raise Exception(f"cog {self.command.cog.name} has no translations")
 
-        if not hasattr(self.guild, "language"):
+        if self.guild and not hasattr(self.guild, "language"):
             db_guild = await Guilds.filter(guild_id=self.guild.id).first()
 
             self.guild.prefix = db_guild.prefix
@@ -58,7 +55,7 @@ class Context(femcord.commands.Context):
         ])
 
         femscript.ast = [
-            self.command.cog.translations[self.guild.language][translation],
+            self.command.cog.translations[self.guild.language if self.guild else "en"][translation],
             {
                 "type": "Keyword",
                 "token": {
@@ -113,7 +110,7 @@ class Context(femcord.commands.Context):
 
         return await femscript.execute()
 
-    async def send_translation(self, translation: str, format_args: Tuple[Any] = None, *args, **kwargs) -> types.Message:
+    async def send_translation(self, translation: str, format_args: tuple[Any] = None, *args, **kwargs) -> types.Message:
         result = await self.get_translation(translation, format_args)
 
         if isinstance(result, femcord.Embed):
@@ -122,7 +119,7 @@ class Context(femcord.commands.Context):
 
         return await self.send(result, *args, **kwargs)
 
-    async def reply_translation(self, translation: str, format_args: Tuple[Any] = None, *args, **kwargs) -> types.Message:
+    async def reply_translation(self, translation: str, format_args: tuple[Any] = None, *args, **kwargs) -> types.Message:
         result = await self.get_translation(translation, format_args)
 
         if isinstance(result, femcord.Embed):
@@ -131,19 +128,116 @@ class Context(femcord.commands.Context):
 
         return await self.reply(result, *args, **kwargs)
 
+    async def paginator(self, function: Callable[..., Awaitable[dict]], check: Callable[[types.Interaction, types.Message | None], bool], content: Optional[str] = None, **kwargs) -> None:
+        pages: list = kwargs.pop("pages", None)
+        prefix: str = kwargs.pop("prefix", "")
+        suffix: str = kwargs.pop("suffix", "")
+        limit: int = kwargs.pop("limit", 2000)
+        timeout: int = kwargs.pop("timeout", 60)
+        page: int = kwargs.pop("page", 0)
+        replace: bool = kwargs.pop("replace", True)
+        buttons: bool = kwargs.pop("buttons", False)
+
+        if limit > 2000:
+            limit = 2000
+
+        length = limit - len(prefix) - len(suffix)
+
+        if pages is None:
+            content = str(content)
+
+            if replace is True:
+                content = content.replace("`", "\\`")
+
+            pages = [prefix + content[i:i+length] + suffix for i in range(0, len(content), length)]
+        else:
+            pages = [prefix + (page if replace is False else page.replace("`", "\\`")) + suffix for page in pages]
+
+        if len(pages) == 1 and buttons is False:
+            return await function(pages[page], **kwargs)
+
+        if page < 0:
+            page = pages.index(pages[page])
+
+        def get_components(disabled: bool = False) -> femcord.Components:
+            return femcord.Components(
+                femcord.Row(
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="previous", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING TRIANGLE}")),
+                    femcord.Button(f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=femcord.ButtonStyles.DANGER),
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="next", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING TRIANGLE}")),
+                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
+                )
+            )
+
+        message = await function(pages[page], components=get_components(), **kwargs)
+
+        if not message:
+            message = self.interaction
+
+        while True:
+            interaction: types.Interaction
+
+            try:
+                interaction, = await self.bot.wait_for("interaction_create", lambda interaction: check(interaction, message), timeout=timeout)
+            except TimeoutError:
+                if isinstance(message, types.Interaction):
+                    await self.edit(pages[page], components=get_components(True), **kwargs)
+                    return
+                await message.edit(pages[page], components=get_components(True), **kwargs)
+                return
+
+            match interaction.data.custom_id:
+                case "first":
+                    page = 0
+                case "previous":
+                    page -= 1
+                    if page < 0:
+                        page = len(pages) - 1
+                case "next":
+                    page += 1
+                    if page >= len(pages):
+                        page = 0
+                case "last":
+                    page = len(pages) - 1
+                case "cancel":
+                    return await message.delete()
+
+            await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, pages[page], components=get_components(), **kwargs)
+
+class Context(HybridContext, commands.Context):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    def send_paginator(self, content: Optional[str] = None, **kwargs) -> Awaitable[None]:
+        return self.paginator(self.send, lambda interaction, message: interaction.user.id == self.author.id and interaction.channel.id == self.channel.id and interaction.message.id == message.id, content, **kwargs)
+
+    def reply_paginator(self, content: Optional[str] = None, **kwargs) -> Awaitable[None]:
+        return self.paginator(self.reply, lambda interaction, message: interaction.user.id == self.author.id and interaction.channel.id == self.channel.id and interaction.message.id == message.id, content, **kwargs)
+
+class AppContext(HybridContext, commands.AppContext):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    def send_paginator(self, content: Optional[str] = None, **kwargs) -> Awaitable[None]:
+        return self.paginator(self.send, lambda interaction, _: interaction.user.id == self.author.id and interaction.channel.id == self.channel.id and interaction.message is not None and interaction.message.interaction_metadata.id == self.interaction.id, content, **kwargs)
+
+    def reply_paginator(self, content: Optional[str] = None, **kwargs) -> Awaitable[None]:
+        return self.paginator(self.reply, lambda interaction, _: interaction.user.id == self.author.id and interaction.channel.id == self.channel.id and interaction.message is not None and interaction.message.interaction_metadata.id == self.interaction.id, content, **kwargs)
+
 class Bot(commands.Bot):
     def __init__(self, *, start_time: float = time.time()) -> None:
-        super().__init__(name="fembot", command_prefix=self.get_prefix, intents=femcord.Intents().all(), owners=config.OWNERS, context=Context)
+        super().__init__(name="fembot", command_prefix=self.get_prefix, intents=femcord.Intents().all(), owners=config.OWNERS, context=Context, app_context=AppContext)
 
         self.start_time = start_time
 
-        self.presences: List[types.Presence] = None
+        self.presences: list[types.Presence] = None
         self.presence_update_interval: int = None
         self.random_presence: bool = False
         self.presence_index: int = 0
-        self.presence_indexes: List[int] = []
+        self.presence_indexes: list[int] = []
         self.scheduler: Scheduler = Scheduler()
-        self.ipc = IPC(self, config.FEMBOT_SOCKET_PATH, [config.DASHBOARD_SOCKET_PATH])
+        self.ipc = IPC(self, config.FEMBOT_SOCKET_PATH, [config.DASHBOARD_SOCKET_PATH,])
         self.loki: LokiClient = LokiClient(config.LOKI_BASE_URL, self.scheduler)
         self.poligon: Poligon = None
 
@@ -208,6 +302,10 @@ class Bot(commands.Bot):
             guild.autorole = db_guild.autorole
 
         await self.scheduler.create_schedule(self.update_presences, "10m", name="update_presences")()
+
+        await self.register_app_commands()
+
+        print("registered application commands")
 
         print(f"logged in {self.gateway.bot_user.username} ({time.time() - self.start_time:.2f}s)")
 
@@ -286,7 +384,7 @@ class Bot(commands.Bot):
             ])
 
             @femscript.wrap_function()
-            def set_update_interval(interval: Union[str, int]):
+            def set_update_interval(interval: str | int):
                 self.presence_update_interval = interval
 
             @femscript.wrap_function()
@@ -328,7 +426,7 @@ class Bot(commands.Bot):
             if self.presence_index >= len(self.presences):
                 self.presence_index = 0
 
-    async def get_prefix(self, _, message: femcord.types.Message) -> List[str]:
+    async def get_prefix(self, _, message: femcord.types.Message) -> list[str]:
         prefixes = ["<@{}>", "<@!{}>", "<@{}> ", "<@!{}> "]
         prefixes = [prefix.format(self.gateway.bot_user.id) for prefix in prefixes]
 
@@ -343,7 +441,7 @@ class Bot(commands.Bot):
 
         return prefixes + [message.guild.prefix or config.PREFIX]
 
-    def get_translations_for(self, name: str) -> Dict[str, Dict[str, AST]]:
+    def get_translations_for(self, name: str) -> dict[str, dict[str, AST]]:
         translations = {}
 
         for lang in os.listdir("./cogs/translations/" + name):
@@ -359,84 +457,6 @@ class Bot(commands.Bot):
                 translations[lang][ast["children"][0]["token"]["value"]] = ast
 
         return translations
-
-    async def paginator(self, function: Callable, ctx: femcord.commands.Context, content: Optional[str] = None, **kwargs: dict) -> None:
-        pages: list = kwargs.pop("pages", None)
-        prefix: str = kwargs.pop("prefix", "")
-        suffix: str = kwargs.pop("suffix", "")
-        limit: int = kwargs.pop("limit", 2000)
-        timeout: int = kwargs.pop("timeout", 60)
-        page: int = kwargs.pop("page", 0)
-        replace: bool = kwargs.pop("replace", True)
-        buttons: bool = kwargs.pop("buttons", False)
-
-        if limit > 2000:
-            limit = 2000
-
-        length = limit - len(prefix) - len(suffix)
-
-        if pages is None:
-            content = str(content)
-
-            if replace is True:
-                content = content.replace("`", "\\`")
-
-            pages = [prefix + content[i:i+length] + suffix for i in range(0, len(content), length)]
-        else:
-            pages = [prefix + (page if replace is False else page.replace("`", "\\`")) + suffix for page in pages]
-
-        if len(pages) == 1 and buttons is False:
-            return await function(pages[page], **kwargs)
-
-        if page < 0:
-            page = pages.index(pages[page])
-
-        def get_components(disabled: Optional[bool] = False) -> femcord.Components:
-            return femcord.Components(
-                femcord.Row(
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="previous", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING TRIANGLE}")),
-                    femcord.Button(f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=femcord.ButtonStyles.DANGER),
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="next", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING TRIANGLE}")),
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
-                )
-            )
-
-        message = await function(pages[page], components=get_components(), **kwargs)
-
-        canceled = False
-
-        async def change_page(interaction: femcord.types.Interaction) -> None:
-            nonlocal page, canceled
-
-            if interaction.data.custom_id == "first":
-                page = 0
-            elif interaction.data.custom_id == "previous":
-                page -= 1
-                if page < 0:
-                    page = len(pages) - 1
-            elif interaction.data.custom_id == "next":
-                page += 1
-                if page >= len(pages):
-                    page = 0
-            elif interaction.data.custom_id == "last":
-                page = len(pages) - 1
-            elif interaction.data.custom_id == "cancel":
-                canceled = True
-                return await message.delete()
-
-            await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, pages[page], components=get_components(disabled=canceled), **kwargs)
-
-            if not canceled:
-                await self.wait_for("interaction_create", change_page, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=timeout, on_timeout=on_timeout)
-
-        async def on_timeout():
-            nonlocal canceled
-            canceled = True
-
-            await message.edit(pages[page], components=get_components(disabled=canceled), **kwargs)
-
-        await self.wait_for("interaction_create", change_page, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=timeout, on_timeout=on_timeout)
 
 if __name__ == "__main__":
     Bot().run(config.TOKEN)

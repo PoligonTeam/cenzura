@@ -23,9 +23,9 @@ from scheduler.scheduler import Scheduler
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 
-import asyncio, hashlib, io, math, os, random
+import asyncio, hashlib, io, math, ast, os, random
 
-from typing import List, Tuple, Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aiohttp.web import Application
@@ -35,7 +35,7 @@ IMAGE_SIZE = 200, 200
 BACKGROUNDS = os.listdir("./assets/captcha/backgrounds")
 IMAGES = os.listdir("./assets/captcha/images")
 
-def get_positions(x, y) -> List[Tuple[int, int]]:
+def get_positions(x, y) -> list[tuple[int, int]]:
     x_start = math.floor(x / IMAGE_SIZE[0])
     y_start = math.floor(y / IMAGE_SIZE[1])
 
@@ -50,7 +50,7 @@ def get_positions(x, y) -> List[Tuple[int, int]]:
 
     return positions
 
-def get_random_position() -> Tuple[int, int]:
+def get_random_position() -> tuple[int, int]:
     return random.randint(0, BACKGROUND_SIZE[0] - IMAGE_SIZE[1]), random.randint(0, BACKGROUND_SIZE[1] - IMAGE_SIZE[1])
 
 def get_random_background() -> str:
@@ -95,8 +95,8 @@ def create_image(image1: io.BytesIO, image2: io.BytesIO, future: asyncio.Future)
         )
     )
 
-async def generate_captcha(image1: io.BytesIO, image2: io.BytesIO, loop: asyncio.AbstractEventLoop) -> Tuple[str, bytes]:
-    async def async_create_image(image1: io.BytesIO, image2: io.BytesIO) -> Tuple[Any]:
+async def generate_captcha(image1: io.BytesIO, image2: io.BytesIO, loop: asyncio.AbstractEventLoop) -> tuple[str, bytes]:
+    async def async_create_image(image1: io.BytesIO, image2: io.BytesIO) -> tuple[Any]:
         future = loop.create_future()
         await loop.run_in_executor(ThreadPoolExecutor(), create_image, image1, image2, future)
         return await future
@@ -110,7 +110,7 @@ async def generate_captcha(image1: io.BytesIO, image2: io.BytesIO, loop: asyncio
     return _hash, captcha
 
 class IPC(Client):
-    def __init__(self, app: "Application", path: str, peers: List[str]) -> None:
+    def __init__(self, app: "Application", path: str, peers: list[str]) -> None:
         super().__init__(path, peers)
 
         self.app = app
@@ -131,7 +131,41 @@ class IPC(Client):
     def close(self) -> None:
         super().close()
         self.scheduler.task.cancel()
-    
+
+    def insert_returns(self, body: list) -> None:
+        if isinstance(body[-1], ast.Expr):
+            body[-1] = ast.Return(body[-1].value)
+            ast.fix_missing_locations(body[-1])
+
+        if isinstance(body[-1], ast.If):
+            self.insert_returns(body[-1].body)
+            self.insert_returns(body[-1].orelse)
+
+        if isinstance(body[-1], ast.With):
+            self.insert_returns(body[-1].body)
+
+    def _eval(self, code: str, env: dict = None) -> asyncio.Future:
+        env = {} or env
+
+        content = "\n".join(f"    {x}" for x in code.splitlines())
+        body = f"async def _eval():\n{content}"
+
+        parsed = ast.parse(body)
+        body = parsed.body[0].body
+
+        self.insert_returns(body)
+
+        exec(compile(parsed, filename="_eval", mode="exec"), env)
+
+        return eval("_eval()", env)
+
+    @listener("eval")
+    async def on_eval(self, code: str) -> str:
+        try:
+            return str(await self._eval(code, {"app": self.app}))
+        except Exception as exc:
+            return str(exc)
+
     @listener("new_captcha")
     async def on_new_captcha(self, captcha: dict) -> None:
         captcha_id = hashlib.md5(f"{captcha["guild_id"]}:{captcha["user_id"]}".encode()).hexdigest()

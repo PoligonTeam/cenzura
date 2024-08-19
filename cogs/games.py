@@ -21,7 +21,7 @@ from korrumzthegame import Renderer
 from concurrent.futures import ThreadPoolExecutor
 import asyncio, random
 
-from typing import Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context
@@ -31,7 +31,7 @@ class Games(commands.Cog):
         self.bot = bot
 
     @commands.command(description="https://korrumzthegame.wtf", usage="[name] [avatar-number_1-20]", aliases=["ktg"])
-    async def korrumzthegame(self, ctx: "Context", username: Union[int, str] = None, avatar: int = None):
+    async def korrumzthegame(self, ctx: "Context", username: int | str = None, avatar: int = None):
         if isinstance(username, int) and avatar is None:
             avatar = username
             username = None
@@ -82,7 +82,13 @@ class Games(commands.Cog):
 
         message = await ctx.reply(embed=embed, components=components, files=[("image.png", renderer.get_image())])
 
-        async def on_select(interaction):
+        while True:
+            try:
+                interaction, = await self.bot.wait_for("interaction_create", lambda interaction: interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60)
+            except TimeoutError:
+                await renderer.client.close()
+                return await message.edit("Session expired", embeds=[], components=[], files=[], other={"attachments": []})
+
             if interaction.data.custom_id == "close":
                 await renderer.client.close()
                 return await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, "Thank you for playing", embed=femcord.Embed(), components=femcord.Components(), files=[], other={"attachments": []})
@@ -93,14 +99,6 @@ class Games(commands.Cog):
             update_embed()
 
             await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, files=[("image.png", renderer.get_image())])
-
-            await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
-
-        async def on_timeout():
-            await renderer.client.close()
-            await message.edit("Session expired", embeds=[], components=[], files=[], other={"attachments": []})
-
-        await self.bot.wait_for("interaction_create", on_select, lambda interaction: interaction.member.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60, on_timeout=on_timeout)
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Games(bot))

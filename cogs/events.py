@@ -19,7 +19,8 @@ from femcord.femcord import commands
 from femcord.femcord.commands import Context
 from femcord.femcord.types import Guild, Member, User, Message, Interaction
 from femcord.femcord.enums import MessageFlags
-from femcord.femcord.commands.context import Context
+from femcord.femcord.commands import Context
+from femcord.femcord.http import Route, HTTPException
 from femscript import Femscript
 from utils import *
 from models import Guilds
@@ -43,6 +44,11 @@ class Events(commands.Cog):
 
     @commands.Listener
     async def on_guild_create(self, guild: Guild):
+        try:
+            await self.bot.http.request(Route("PATCH", "guilds", guild.id, "members", "@me"), data={"nick": "fembot", "pronouns": "she/her"})
+        except HTTPException:
+            pass
+
         exists = await Guilds.exists(guild_id=guild.id)
 
         if not exists:
@@ -62,12 +68,12 @@ class Events(commands.Cog):
                 verification_channel = ""
             )
 
-        await self.bot.loki.add_guild_log(guild)
+        self.bot.loki.add_guild_log(guild)
 
     @commands.Listener
     async def on_guild_delete(self, guild: Guild):
         await Guilds.filter(guild_id=guild.id).delete()
-        await self.bot.loki.add_guild_log(guild, leave=True)
+        self.bot.loki.add_guild_log(guild, leave=True)
 
     @commands.Listener
     async def on_guild_member_add(self, guild: Guild, member: Member):
@@ -159,6 +165,9 @@ class Events(commands.Cog):
 
     @commands.Listener
     async def on_interaction_create(self, interaction: Interaction):
+        if not interaction.guild:
+            return
+
         if interaction.data.custom_id == "verification" + interaction.guild.id:
             query = Guilds.filter(guild_id=interaction.guild.id)
             guild_db = await query.first()
@@ -166,13 +175,13 @@ class Events(commands.Cog):
             if guild_db.verification_message == interaction.message.id and guild_db.verification_channel == interaction.channel.id:
                 await self.bot.ipc.emit("new_captcha", {
                     "guild_id": interaction.guild.id,
-                    "user_id": interaction.member.user.id,
+                    "user_id": interaction.user.id,
                     "role_id": guild_db.verification_role,
                     "guild_icon": interaction.guild.icon_as("png"),
-                    "user_avatar": interaction.member.user.avatar_as("png")
+                    "user_avatar": interaction.user.avatar_as("png")
                 }, nowait=True)
 
-                captcha_id = hashlib.md5(f"{interaction.guild.id}:{interaction.member.user.id}".encode()).hexdigest()
+                captcha_id = hashlib.md5(f"{interaction.guild.id}:{interaction.user.id}".encode()).hexdigest()
 
                 await interaction.callback(femcord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, "<https://cenzura.poligon.lgbt/captcha/" + captcha_id + ">", flags=[MessageFlags.EPHEMERAL])
 

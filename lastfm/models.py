@@ -15,7 +15,6 @@ limitations under the License.
 """
 
 from dataclasses import dataclass
-from typing import Union, List, Dict
 from datetime import datetime
 from urllib.parse import quote_plus
 
@@ -25,7 +24,7 @@ class TrackImage:
     url: str
 
     @classmethod
-    def from_dict(cls, data: Dict):
+    def from_dict(cls, data: dict):
         return cls(data["size"], data["#text"])
 
 @dataclass
@@ -40,7 +39,7 @@ class ArtistStats:
     userplaycount: str
 
     @classmethod
-    def from_dict(cls, data: Dict):
+    def from_dict(cls, data: dict):
         data["userplaycount"] = data.pop("userplaycount", None)
 
         return cls(**data)
@@ -52,7 +51,7 @@ class ArtistBioLinks:
     url: str
 
     @classmethod
-    def from_dict(cls, data: Dict):
+    def from_dict(cls, data: dict):
         data["name"] = data.pop("#text")
         data["url"] = data.pop("href")
 
@@ -63,10 +62,10 @@ class ArtistBio:
     published: str
     summary: str
     content: str
-    links: List[ArtistBioLinks] = None
+    links: list[ArtistBioLinks] = None
 
     @classmethod
-    def from_dict(cls, data: Dict):
+    def from_dict(cls, data: dict):
         if "links" in data:
             data["links"] = ArtistBioLinks.from_dict(data["links"]["link"])
 
@@ -79,14 +78,14 @@ class Artist:
     streamable: str = None
     on_tour: str = None
     mbid: str = None
-    similar: List["Artist"] = None
+    similar: list["Artist"] = None
     stats: ArtistStats = None
-    image: List[TrackImage] = None
-    tags: List[TrackTag] = None
+    image: list[TrackImage] = None
+    tags: list[TrackTag] = None
     bio: str = None
 
     @classmethod
-    def from_dict(cls, data: Union[Dict, str]):
+    def from_dict(cls, data: dict | str):
         if isinstance(data, str):
             data = {
                 "name": data,
@@ -116,12 +115,12 @@ class TrackAlbum:
     name: str
     artist: str = None
     mbid: str = None
-    image: List[TrackImage] = None
+    image: list[TrackImage] = None
     url: str = None
     position: str = None
 
     @classmethod
-    def from_dict(cls, data: Dict):
+    def from_dict(cls, data: dict):
         if "artist" in data:
             data["artist"] = data["artist"]
         if "mbid" not in data:
@@ -144,7 +143,7 @@ class TrackDate:
     date: datetime
 
     @classmethod
-    def from_dict(cls, data: Dict):
+    def from_dict(cls, data: dict):
         data["uts"] = int(data.pop("uts"))
         data["text"] = data.pop("#text")
         data["date"] = datetime.fromtimestamp(int(data["uts"]))
@@ -171,13 +170,13 @@ class Track:
     mbid: str = None
     loved: bool = None
     userloved: bool = None
-    image: List[TrackImage] = None
-    tags: List[TrackTag] = None
+    image: list[TrackImage] = None
+    tags: list[TrackTag] = None
     date: TrackDate = None
     wiki: TrackWiki = None
 
     @classmethod
-    def from_dict(cls, data: Dict):
+    def from_dict(cls, data: dict):
         if "album" in data:
             data["album"] = TrackAlbum.from_dict(data["album"])
         if "userplaycount" in data:
@@ -208,12 +207,12 @@ class Track:
 
 @dataclass
 class RecentTracks:
-    tracks: List[Track]
+    tracks: list[Track]
     username: str
     scrobbles: str
 
     @classmethod
-    def from_dict(cls, data: Dict):
+    def from_dict(cls, data: dict):
         data = data["recenttracks"]
         data["tracks"] = [Track.from_dict(track) for track in data.pop("track")]
 

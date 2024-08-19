@@ -22,7 +22,7 @@ import asyncio, time, ast, inspect, models
 from typing import Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bot import Bot, Context
+    from bot import Bot, Context, AppContext
 
 class Dev(commands.Cog):
     hidden = True
@@ -57,8 +57,8 @@ class Dev(commands.Cog):
 
         return eval("_eval()", env)
 
-    @commands.command(description="cenzura is a bot, the bot is cenzura", usage="(code)")
-    async def eval(self, ctx: "Context", *, code):
+    @commands.hybrid_command(description="fembot is a bot, the bot is fembot", usage="(code)")
+    async def eval(self, ctx: Union["Context", "AppContext"], *, code):
         if not ctx.author.id in self.bot.owners:
             return await self.bot.get_command("femscript")(ctx, code=code)
 
@@ -82,9 +82,23 @@ class Dev(commands.Cog):
             prefix = ""
             suffix = ""
 
-        await self.bot.paginator(ctx.reply, ctx, str(result), prefix=prefix, suffix=suffix)
+        await ctx.reply_paginator(str(result), prefix=prefix, suffix=suffix)
 
-    @commands.command(description="cenzura is a bot, the bot is cenzura")
+    @commands.hybrid_command(description="fembot is a bot, the bot is fembot")
+    @commands.is_owner
+    async def deval(self, ctx: Union["Context", "AppContext"], *, code):
+        result = await self.bot.ipc.emit("eval", code)
+
+        prefix = "```py\n"
+        suffix = "```"
+
+        if len(result) < 100:
+            prefix = ""
+            suffix = ""
+
+        await ctx.reply_paginator(str(result), prefix=prefix, suffix=suffix)
+
+    @commands.command(description="fembot is a bot, the bot is fembot")
     @commands.is_owner
     async def command_stats(self, ctx: "Context", *, command: commands.Command = None):
         query = "{type=\"command\"}" if not command else f"{{type=\"command\", command=\"{command.name}\"}}"
@@ -108,7 +122,7 @@ class Dev(commands.Cog):
 
         await ctx.reply(embed=embed)
 
-    @commands.command(description="cenzura is a bot, the bot is cenzura", usage="(command)", aliases=["src"])
+    @commands.command(description="fembot is a bot, the bot is fembot", usage="(command)", aliases=["src"])
     @commands.is_owner
     async def source(self, ctx: "Context", *, command):
         command = command.split(" ")
@@ -122,9 +136,9 @@ class Dev(commands.Cog):
 
         code = inspect.getsource(command_object.callback)
 
-        await self.bot.paginator(ctx.reply, ctx, code, prefix="```py\n", suffix="```")
+        await ctx.reply_paginator(code, prefix="```py\n", suffix="```")
 
-    @commands.command(description="cenzura is a bot, the bot is cenzura")
+    @commands.command(description="fembot is a bot, the bot is fembot")
     @commands.is_owner
     async def load(self, ctx: "Context", extensions: str):
         loaded = []
@@ -136,7 +150,7 @@ class Dev(commands.Cog):
 
         await ctx.reply("\n".join("\N{INBOX TRAY} `%s`" % extension_name for extension_name in loaded))
 
-    @commands.command(description="cenzura is a bot, the bot is cenzura")
+    @commands.command(description="fembot is a bot, the bot is fembot")
     @commands.is_owner
     async def reload(self, ctx: "Context", extensions: str):
         reloaded = []
@@ -149,7 +163,7 @@ class Dev(commands.Cog):
 
         await ctx.reply("\n".join("\N{CLOCKWISE RIGHTWARDS AND LEFTWARDS OPEN CIRCLE ARROWS} `%s`" % extension_name for extension_name in reloaded))
 
-    @commands.command(description="cenzura is a bot, the bot is cenzura")
+    @commands.command(description="fembot is a bot, the bot is fembot")
     @commands.is_owner
     async def unload(self, ctx: "Context", extensions: str):
         unloaded = []
@@ -161,9 +175,9 @@ class Dev(commands.Cog):
 
         await ctx.reply("\n".join("\N{OUTBOX TRAY} `%s`" % extension_name for extension_name in unloaded))
 
-    @commands.command(description="cenzura is a bot, the bot is cenzura", usage="[user] (command) [arguments]")
+    @commands.command(description="fembot is a bot, the bot is fembot", usage="[user] (command) [arguments]")
     @commands.is_owner
-    async def su(self, ctx: "Context", member: Union[types.Member, str], command = None, *, args = None):
+    async def su(self, ctx: "Context", member: types.Member | str, command = None, *, args = None):
         if isinstance(member, str):
             if command is not None:
                 _args = command
@@ -196,7 +210,7 @@ class Dev(commands.Cog):
 
         await self.bot.process_commands(fake_message, before_call_functions=before_call, after_call_functions=after_call)
 
-    @commands.command(description="cenzura is a bot, the bot is cenzura", usage="(command) [arguments]")
+    @commands.command(description="fembot is a bot, the bot is fembot", usage="(command) [arguments]")
     @commands.is_owner
     async def perf(self, ctx: "Context", command, *, args = None):
         fake_message = self.bot.gateway.copy(ctx.message)

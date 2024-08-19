@@ -16,7 +16,6 @@ limitations under the License.
 
 import asyncio, aiohttp, json
 from enum import Enum
-from typing import List
 from .models import *
 
 class Opcodes(Enum):
@@ -45,7 +44,7 @@ class Player:
         self.client = client
         self.guild_id = guild_id
         self.track: Track = None
-        self.queue: List[Track] = []
+        self.queue: list[Track] = []
         self.position: int = 0
         self.paused: bool = False
         self.volume: int = 100
@@ -116,7 +115,7 @@ class Client:
         self._ssl = _ssl
         self.session_id = None
         self._voice_state: VoiceState = VoiceState()
-        self.players: List[Player] = []
+        self.players: list[Player] = []
 
         self.loop = asyncio.get_event_loop()
         self.session = aiohttp.ClientSession(loop=self.loop)
@@ -206,7 +205,7 @@ class Client:
         if self._voice_state.event is not None:
             await self.send(Opcodes.VOICE_UPDATE, guildId=self._voice_state.event.guild_id, sessionId=self._voice_state.session_id, event=self._voice_state.event.to_dict())
 
-    async def get_tracks(self, identifier: str) -> List[Track]:
+    async def get_tracks(self, identifier: str) -> list[Track]:
         async with self.session.get("%s://%s:%d/v3/loadtracks?identifier=%s" % ("https" if self._ssl else "http", self.host, self.port, identifier), headers=self.headers) as response:
             data = await response.json()
             tracks = []

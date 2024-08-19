@@ -19,7 +19,7 @@ from datetime import datetime
 from femcord.femcord.commands import Context
 from femcord.femcord.types import Guild
 from scheduler.scheduler import Scheduler
-from typing import List, Optional
+from typing import Optional
 
 class LokiException(Exception):
     pass
@@ -49,7 +49,7 @@ class LokiLog:
 class LokiClient:
     def __init__(self, base_url: str, scheduler: Scheduler, interval: str = "5m") -> None:
         self.base_url = base_url
-        self.logs: List[LokiLog] = []
+        self.logs: list[LokiLog] = []
 
         scheduler.create_schedule(self.send, interval)
 
@@ -90,7 +90,7 @@ class LokiClient:
                 "type": "guild.create" if not leave else "guild.delete",
                 "guild": guild.id,
                 "name": guild.name,
-                "owner": guild.owner_id,
+                "owner": guild.owner.user.id,
                 "members": len(guild.members)
             },
             "",
