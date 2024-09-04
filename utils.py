@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import femcord.femcord as femcord
 from femcord.femcord import types
 from femscript import FemscriptException
 from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError
@@ -22,7 +21,12 @@ from models import Artists, LastFM, Lyrics
 from config import LASTFM_API_URL, LASTFM_API_KEY
 from lastfm import Client, Track, exceptions
 from lyrics import GeniusClient, MusixmatchClient, TrackNotFound, LyricsNotFound, Lyrics as LyricsTrack
-import asyncio, config, random, json
+
+import asyncio
+import config
+import random
+import json
+import re
 
 class fg:
     black = "\u001b[30m"
@@ -80,7 +84,7 @@ async def update_lastfm_avatars():
             async with session.get(LASTFM_API_URL + f"?method=user.getinfo&user={user.username}&api_key={LASTFM_API_KEY}&format=json") as response:
                 data = await response.json()
 
-                if not "image" in data:
+                if "image" not in data:
                     return
 
                 elif data["image"][-1] == lastfm_user.avatar:
@@ -154,25 +158,10 @@ def convert(**items):
                 bot = guild.owner.user.bot
             ),
             members = len(guild.members),
-            channels = len(guild.channels),
-            roles = len(guild.roles),
-            emojis = len(guild.emojis),
-            stickers = len(guild.stickers)
-        ),
-        types.Channel: lambda channel: dict(
-            id = channel.id,
-            name = channel.name,
-            topic = channel.topic,
-            nsfw = channel.nsfw,
-            position = channel.position
-        ),
-        types.Role: lambda role: dict(
-            id = role.id,
-            name = role.name,
-            color = role.color,
-            hoist = role.hoist,
-            mentionable = role.mentionable,
-            position = role.position
+            channels = [channel_convert(channel) for channel in guild.channels],
+            roles = [role_convert(role) for role in guild.roles],
+            emojis = [emoji_convert(emoji) for emoji in guild.emojis],
+            stickers = [sticker_convert(sticker) for sticker in guild.stickers]
         ),
         types.User: lambda user: dict(
             id = user.id,
@@ -180,6 +169,35 @@ def convert(**items):
             avatar_url = user.avatar_url,
             bot = user.bot
         ),
+        types.Channel: (channel_convert := lambda channel: dict(
+            type = channel.type.name,
+            id = channel.id,
+            name = channel.name,
+            topic = channel.topic,
+            nsfw = channel.nsfw,
+            position = channel.position
+        )),
+        types.Role: (role_convert := lambda role: dict(
+            id = role.id,
+            name = role.name,
+            color = role.color,
+            hoist = role.hoist,
+            mentionable = role.mentionable,
+            position = role.position
+        )),
+        types.Emoji: (emoji_convert := lambda emoji: dict(
+            id = emoji.id,
+            name = emoji.name,
+            animated = emoji.animated,
+            url = emoji.url
+        )),
+        types.Sticker: (sticker_convert := lambda sticker: dict(
+            id = sticker.id,
+            name = sticker.name,
+            type = sticker.type.name,
+            format_type = sticker.format_type.name,
+            url = sticker.url
+        )),
         Track: lambda track: dict(
             artist = dict(
                 name = track.artist.name,
@@ -213,8 +231,7 @@ def convert(**items):
                     dict(
                         name = tag.name,
                         url = tag.url
-                    )
-                    for tag in track.artist.tags
+                    ) for tag in track.artist.tags
                 ],
                 bio = dict(
                     links = dict(
@@ -253,14 +270,18 @@ def convert(**items):
             ) if track.date else None,
             listeners = track.listeners,
             playcount = track.playcount,
-            scrobbles = track.scrobbles,
+            scrobbles = track.scrobbles or "0",
             tags = [
                 dict(
                     name = tag.name,
                     url = tag.url
-                )
-                for tag in track.tags
-            ]
+                ) for tag in track.tags
+            ],
+            streamable = track.streamable,
+            duration = track.duration,
+            mbid = track.mbid,
+            loved = track.loved,
+            userloved = track.userloved
         )
     }
 
@@ -339,3 +360,56 @@ async def request(method: str, url: str, *, headers: dict = None, cookies: dict 
                 }
         except ClientHttpProxyError as exc:
             raise FemscriptException(f"ClientHttpProxyError: {exc.status}")
+
+token_specification = [
+    ("COMMENT",     r"#.*"),
+    ("STRING",      r"\"(?:\\.|[^\\\"])*\""),
+    ("NUMBER",      r"\b\d+(\.\d*)?\b"),
+    ("BOOL",        r"\b(true|false)\b"),
+    ("NONE",        r"\b(none)\b"),
+    ("KEYWORD",     r"\b(fn|import|return|if|else|and|or|borrow)\b"),
+    ("FUNCTION",    r"\b[_a-zA-Z][_a-zA-Z0-9]*(?:\.[_a-zA-Z][_a-zA-Z0-9]*)*\b(?=\s*(\(|\{))"),
+    ("IDENTIFIER",  r"\b[_a-zA-Z][_a-zA-Z0-9]*\b"),
+    ("OPERATOR",    r"[=+*/-]"),
+    ("BRACKET",     r"[{}()\[\]]"),
+    ("PUNCTUATION", r"[.,&:;]"),
+    ("NEWLINE",     r"\n"),
+    ("SKIP",        r"[ \t]+")
+]
+
+get_token = re.compile("|".join(f"(?P<{kind}>{value})" for kind, value in token_specification)).match
+
+colors = {
+    "COMMENT": fg.green,
+    "STRING": fg.cyan,
+    "NUMBER": fg.red,
+    "BOOL": fg.yellow,
+    "FUNCTION": fg.blue,
+    "IDENTIFIER": fg.white,
+    "OPERATOR": fg.yellow,
+    "KEYWORD": fg.magenta,
+    "BRACKET": fg.cyan,
+    "PUNCTUATION": fg.white
+}
+
+def highlight(code: str) -> str:
+    tokens = []
+    mo = get_token(code)
+
+    while mo is not None:
+        kind = mo.lastgroup
+        value = mo.group(kind)
+        if kind == "STRING":
+            value = value.replace("\n", "\\n")
+        tokens.append((kind, value))
+        mo = get_token(code, mo.end())
+
+    highlighted_code = ""
+
+    for kind, value in tokens:
+        if kind in colors:
+            highlighted_code += colors[kind] + value + fg.reset
+        else:
+            highlighted_code += value
+
+    return highlighted_code

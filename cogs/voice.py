@@ -22,7 +22,7 @@ import math, numpy, io
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bot import Bot, Context
+    from bot import Bot
 
 class Voice(commands.Cog):
     def __init__(self, bot: "Bot") -> None:

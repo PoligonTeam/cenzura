@@ -40,7 +40,7 @@ class Events(Enum):
     WEBSOCKET_CLOSED = "WebSocketClosedEvent"
 
 class Player:
-    def __init__(self, client: "Client", guild_id: str):
+    def __init__(self, client: "Client", guild_id: str) -> None:
         self.client = client
         self.guild_id = guild_id
         self.track: Track = None
@@ -51,32 +51,32 @@ class Player:
         self.loop: bool = False
         self.filters: dict = {}
 
-    def play(self, track: Track):
+    def play(self, track: Track) -> None:
         self.track = track
         return self.client.send(Opcodes.PLAY, guildId=self.guild_id, track=track.encoded)
 
-    def add(self, track: Track):
+    def add(self, track: Track) -> None:
         self.queue.append(track)
 
-    def skip(self):
+    def skip(self) -> None:
         if len(self.queue) > 0:
             return self.play(self.queue.pop(0))
 
         return self.stop()
 
-    def stop(self):
+    def stop(self) -> None:
         self.track = None
         return self.client.send(Opcodes.STOP, guildId=self.guild_id)
 
-    def pause(self):
+    def pause(self) -> None:
         self.paused = True
         return self.client.send(Opcodes.PAUSE, guildId=self.guild_id, pause=self.paused)
 
-    def resume(self):
+    def resume(self) -> None:
         self.paused = False
         return self.client.send(Opcodes.PAUSE, guildId=self.guild_id, pause=self.paused)
 
-    def seek(self, position: int):
+    def seek(self, position: int) -> None:
         if position < 0:
             raise ValueError("Position must be greater than 0")
         elif position > self.track.length:
@@ -86,7 +86,7 @@ class Player:
 
         return self.client.send(Opcodes.SEEK, guildId=self.guild_id, position=position)
 
-    def set_volume(self, volume: int):
+    def set_volume(self, volume: int) -> None:
         if volume < 0 or volume > 1000:
             raise ValueError("Volume must be between 0 and 1000")
 
@@ -94,27 +94,27 @@ class Player:
 
         return self.client.send(Opcodes.VOLUME, guildId=self.guild_id, volume=volume)
 
-    def set_loop(self, loop: bool):
+    def set_loop(self, loop: bool) -> None:
         self.loop = loop
 
-    def set_filters(self, **filters):
+    def set_filters(self, **filters) -> None:
         self.filters = filters
         return self.client.send(Opcodes.FILTERS, guildId=self.guild_id, **filters)
 
 class Client:
-    async def __new__(cls, *args):
+    async def __new__(cls, *args) -> "Client":
         instance = super().__new__(cls)
         await instance.__init__(*args)
         return instance
 
-    async def __init__(self, user_id: str, host: str, port: int, password: str, _ssl: bool = False):
+    async def __init__(self, user_id: str, host: str, port: int, password: str, _ssl: bool = False) -> None:
         self.user_id = user_id
         self.host = host
         self.port = port
         self.password = password
         self._ssl = _ssl
         self.session_id = None
-        self._voice_state: VoiceState = VoiceState()
+        self._voice_state = VoiceState()
         self.players: list[Player] = []
 
         self.loop = asyncio.get_event_loop()
@@ -123,7 +123,7 @@ class Client:
         self.headers = {
             "Authorization": password,
             "User-Id": user_id,
-            "Client-Name": "cenzura/1.0"
+            "Client-Name": "femlink/1.0"
         }
 
         self.ws = await self.session.ws_connect("%s://%s:%d/v3/websocket" % ("wss" if self._ssl else "ws", host, port), headers=self.headers)
@@ -138,7 +138,7 @@ class Client:
             if player.guild_id == guild_id:
                 return player
 
-    async def data_receiver(self):
+    async def data_receiver(self) -> None:
         async for message in self.ws:
             if message.type in (aiohttp.WSMsgType.error, aiohttp.WSMsgType.closed):
                 break
@@ -148,14 +148,14 @@ class Client:
 
                 op = Opcodes(data["op"])
 
-                if op == Opcodes.READY:
+                if op is Opcodes.READY:
                     self.session_id = data["sessionId"]
 
-                elif op == Opcodes.PLAYER_UPDATE:
+                elif op is Opcodes.PLAYER_UPDATE:
                     player = self.get_player(data["guildId"])
                     player.position = data["state"]["position"]
 
-                elif op == Opcodes.EVENT:
+                elif op is Opcodes.EVENT:
                     player = self.get_player(data["guildId"])
                     event = Events(data["type"])
 

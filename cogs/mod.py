@@ -17,7 +17,7 @@ limitations under the License.
 import femcord.femcord as femcord
 from femcord.femcord import commands, types, HTTPException
 from femscript import Femscript
-from utils import convert
+from utils import convert, highlight
 from models import Guilds
 import datetime, re
 
@@ -220,7 +220,7 @@ class Admin(commands.Cog):
             return await ctx.reply("Disabled")
 
         if code == "get_code()":
-            return await ctx.reply_paginator(guild_db.welcome_message, prefix="```py\n", suffix="```")
+            return await ctx.reply_paginator(highlight(guild_db.welcome_message), by_lines=True, base_embed=femcord.Embed(), prefix="```ansi\n", suffix="```")
         elif code == "emit()":
             events = self.bot.get_cog("Events")
             return await events.on_guild_member_add(ctx.guild, ctx.member)
@@ -259,7 +259,7 @@ class Admin(commands.Cog):
             return await ctx.reply("Disabled")
 
         if code == "get_code()":
-            return await ctx.reply_paginator(guild_db.leave_message, prefix="```py\n", suffix="```")
+            return await ctx.reply_paginator(guild_db.leave_message, by_lines=True, base_embed=femcord.Embed(), prefix="```ansi\n", suffix="```")
         elif code == "emit()":
             events = self.bot.get_cog("Events")
             return await events.on_guild_member_remove(ctx.guild, ctx.author)

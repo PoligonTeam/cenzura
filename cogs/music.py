@@ -22,13 +22,13 @@ from aiohttp import ClientSession
 from models import LastFM
 from config import *
 from azuracast import NowPlaying
-from lastfm import exceptions
+from lastfm import Track, Artist, exceptions
 import hashlib, datetime, asyncio, femlink, re, os
 
 from typing import Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bot import Bot, Context
+    from bot import Bot, Context, AppContext
 
 soundcloud_pattern = re.compile(r"(https?:\/\/)?(www.)?(m\.)?soundcloud\.com/.+/.+")
 
@@ -119,10 +119,11 @@ class Music(commands.Cog):
         if not tracks:
             return await ctx.reply("Nie znaleziono żadnych utworów")
 
-        track: femlink.Track = tracks[0]
+        track = tracks[0]
 
         if player.track is None:
             await player.play(track)
+            await self.bot.http.request(femcord.http.Route("PUT", "channels", ctx.member.voice_state.channel.id, "voice-status"), data={"status": track.info.title + " by " + track.info.artist})
             return await ctx.reply("Zaczynam grać `" + track.info.title + " - " + track.info.artist + "`")
 
         player.add(track)
@@ -130,7 +131,7 @@ class Music(commands.Cog):
 
     @commands.command(description="Skips a track")
     async def skip(self, ctx: "Context") -> None:
-        player: femlink.Player = self.client.get_player(ctx.guild.id)
+        player = self.client.get_player(ctx.guild.id)
 
         if player is None:
             return await ctx.reply("Nie gram na żadnym kanale głosowym")
@@ -390,7 +391,7 @@ class Music(commands.Cog):
             if ctx.author is user:
                 return await ctx.reply("You don't have a linked lastfm account, use `login` to link them")
 
-            return await ctx.reply("This user doesn't have a linked lastfm accont")
+            return await ctx.reply("This user doesn't have a linked lastfm account")
 
         async with femcord.Typing(ctx.message):
             async with Client(LASTFM_API_KEY) as client:
@@ -414,26 +415,22 @@ class Music(commands.Cog):
                 if len(tracks.tracks) == 3:
                     data["nowplaying"] = True
 
+                def merge(track: Track, track_info: Track, artist_info: Artist) -> Track:
+                    merge_artist = "stats", "similar", "tags", "bio"
+                    merge_track = "tags", "listeners", "playcount", "scrobbles", "tags", "streamable", "duration", "mbid", "loved", "userloved"
+
+                    for item in merge_artist:
+                        setattr(track.artist, item, getattr(artist_info, item))
+                    for item in merge_track:
+                        setattr(track, item, getattr(track_info, item))
+
+                    return track
+
                 async def append_track(index: int, track: Track) -> None:
                     track_info = await client.track_info(track.artist.name, track.title, lastfm.username)
                     artist_info = await client.artist_info(track.artist.name, lastfm.username)
 
-                    track_data = Track(
-                        artist = artist_info,
-                        image = track.image,
-                        album = track.album,
-                        title = track.title,
-                        url = track.url,
-                        duration = track.duration,
-                        streamable = track.streamable,
-                        listeners = track_info.listeners,
-                        playcount = track_info.playcount,
-                        scrobbles = track_info.scrobbles or "0",
-                        tags = track_info.tags,
-                        date = track.date
-                    )
-
-                    data["tracks"].append((index, track_data))
+                    data["tracks"].append((index, merge(track, track_info, artist_info)))
 
                 for index, track in enumerate(tracks.tracks[:2]):
                     self.bot.loop.create_task(append_track(index, track))
@@ -480,19 +477,17 @@ class Music(commands.Cog):
 
                 await ctx.reply(str(result))
 
-    @commands.command(description="Custom script for lastfm", usage="(script)", aliases=["fms", "fmset"])
-    async def fmscript(self, ctx: "Context", *, script):
+    @commands.hybrid_command(description="Custom script for lastfm", usage="(script)", aliases=["fms", "fmset"])
+    async def fmscript(self, ctx: Union["Context", "AppContext"], *, script):
         lastfm_user = self.lastfm_users.get(ctx.author.id)
 
         if lastfm_user is None:
             return await ctx.reply("You don't have a linked lastfm account, use `login` to link them")
 
         if re.match(r"get_code(\(\))?;?", script):
-            return await ctx.reply_paginator(lastfm_user.script, prefix="```py\n", suffix="```")
+            return await ctx.reply_paginator(highlight(lastfm_user.script), by_lines=True, base_embed=femcord.Embed(), prefix="```ansi\n", suffix="```")
 
         script = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
-                 f"# GUILD: {ctx.guild.id}\n" \
-                 f"# CHANNEL: {ctx.channel.id}\n" \
                  f"# AUTHOR: {ctx.author.id}\n\n" \
                + script
 
@@ -501,12 +496,12 @@ class Music(commands.Cog):
         await lastfm_user.save()
         await ctx.reply("Script has been saved")
 
-    @commands.command(description="Wybieranie szablonu dla komendy lastfm", usage="(szablon)", aliases=["fmmode"], other={"embed": femcord.Embed(description="\nSzablony: `embedfull`, `embedsmall`, `embedmini`")})
-    async def fmtemplate(self, ctx: "Context", template):
+    @commands.hybrid_command(description="Wybieranie szablonu dla komendy lastfm", usage="(szablon)", aliases=["fmmode"], other={"embed": femcord.Embed(description="\nSzablony: `embedfull`, `embedsmall`, `embedmini`")})
+    async def fmtemplate(self, ctx: Union["Context", "AppContext"], template):
         if not template in self.templates:
             return await ctx.reply("Nie ma takiego szablonu")
 
-        await self.fmscript(ctx, script=self.templates[template])
+        await self.fmscript[0](ctx, script=self.templates[template])
 
     @commands.command(description="Tempo do ilości scrobbli", usage="[użytkownik]", aliases=["pc"])
     async def pace(self, ctx: "Context", *, user: types.User = None):

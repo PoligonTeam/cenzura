@@ -22,7 +22,8 @@ from aiohttp import ClientSession, FormData
 from datetime import datetime
 from bs4 import BeautifulSoup
 from enum import Enum
-import random, re, json, string
+from cobaltpy import Cobalt
+import asyncio, random, re, json, string, config, base64
 
 from typing import Union, TYPE_CHECKING
 
@@ -161,8 +162,11 @@ class Tools(commands.Cog):
 
         await ctx.reply(files=[("video.mp4", data.video)])
 
-    @commands.hybrid_command(description="Robi screenshot strony", aliases=["ss"])
+    @commands.hybrid_command(description="Robi screenshot strony", aliases=["ss"], nsfw=True)
     async def screenshot(self, ctx: Union["Context", "AppContext"], url: str, full_page: bool = False):
+        if not isinstance(ctx, commands.AppContext) and not ctx.channel.nsfw:
+            raise commands.NotNsfw
+
         async with femcord.Typing(ctx.message):
             result = URL_PATTERN.match(url)
 
@@ -203,58 +207,44 @@ class Tools(commands.Cog):
         if isinstance(ctx, commands.AppContext):
             await ctx.think()
 
-        async def get_file(url: str) -> tuple[str, bytes]:
-            async with session.get(url) as response:
-                content = await response.content.read()
-
-                if len(content) > 20 * 1024 * 1024:
-                    raise Exception("Content too large")
-
-                if response.headers.get("Content-Disposition"):
-                    filename = re.search(r"filename=\"(.+)\"", response.headers["Content-Disposition"]).group(1)
-                else:
-                    filename = "output." + get_extension(content)
-                return filename, content
-
         async with femcord.Typing(ctx.message):
-            async with ClientSession() as session:
-                async with session.get("https://instances.hyper.lol/instances.json", headers={"User-Agent": self.bot.user_agent}) as response:
-                    cobalt = "cobalt.tools"
+            try:
+                async with Cobalt() as cobalt:
+                    instance = await cobalt.get_best_instance()
+                    cobalt.set_instance(instance)
 
-                    if response.status == 200:
-                        data = await response.json()
-                        data = [instance for instance in data if instance["api_online"] and int(instance["score"]) == 100 and instance["protocol"] == "https" and instance["api"] != "api.cobalt.tools"]
+                    download = await cobalt.download(url, {
+                        "isAudioOnly": bool(audio_only),
+                    })
 
-                        if data:
-                            cobalt = random.choice(data)["api"]
-
-                async with session.post("https://" + cobalt + "/api/json", headers={"Accept": "application/json"}, json={"url": url, "isAudioOnly": bool(audio_only), "filenamePattern": "pretty"}) as response:
-                    data = json.loads(await response.text())
-
-                    match data["status"]:
-                        case "stream":
-                            return await ctx.reply(files=[await get_file(data["url"])])
+                    match download.type:
+                        case "stream" | "audio":
+                            return await ctx.reply(files=[(file.file_name, file.file) for file in download.files])
                         case "picker":
-                            files = [await get_file(item["url"]) for item in data["picker"]]
+                            files = download.files
                             form = FormData()
                             form.add_field("MAX_FILE_SIZE", "1073741824")
                             form.add_field("target", "1")
                             for index, file in enumerate(files):
-                                form.add_field("image[%s]" % index, file[1], filename=file[0])
-                            async with session.post("https://en.bloggif.com/slide?id=" + "".join([random.choice(string.ascii_lowercase + string.digits) for _ in range(32)]), headers={"User-Agent": self.bot.user_agent}, data=form) as response:
+                                if not file.is_audio:
+                                    form.add_field("image[%s]" % index, file.file, filename=file.file_name)
+                            async with cobalt._session.post("https://en.bloggif.com/slide?id=" + "".join([random.choice(string.ascii_lowercase + string.digits) for _ in range(32)]), headers={"User-Agent": self.bot.user_agent}, data=form) as response:
                                 content = await response.text()
                                 soup = BeautifulSoup(content)
                                 gif = soup.select_one(".result-image > img").attrs["src"]
                             for files in [files[i:i+10] for i in range(0, len(files), 10)]:
                                 async with femcord.Typing(ctx.message):
-                                    await ctx.reply(files=files)
+                                    await ctx.reply(files=[(file.file_name, file.file) for file in files if not file.is_audio])
                             async with femcord.Typing(ctx.message):
-                                _, gif = await get_file("https://en.bloggif.com/" + gif)
-                                await ctx.reply(files=[("output.gif", gif)])
-                            if not data["audio"]:
-                                return
+                                async with ClientSession() as session:
+                                    async with session.get("https://en.bloggif.com/" + gif) as response:
+                                        if response.status == 200:
+                                            await ctx.reply(files=[("output.gif", await response.content.read())])
                             async with femcord.Typing(ctx.message):
-                                return await ctx.reply(files=[await get_file(data["audio"])])
+                                await ctx.reply(files=[(file.file_name, file.file) for file in files if file.is_audio])
+                            return
+            except asyncio.TimeoutError:
+                return await ctx.reply("Request timed out")
 
             await ctx.reply("An unexpected error occurred")
 
@@ -286,6 +276,45 @@ class Tools(commands.Cog):
     #             await ctx.reply(files=[("video.webm", open(await page.video.path(), "rb"))])
 
     #             await browser.close()
+
+    @commands.hybrid_command(description="test", type=femcord.enums.ApplicationCommandTypes.MESSAGE)
+    async def upload(self, ctx: Union["Context", "AppContext"], message: femcord.types.Message = None):
+        message = message or ctx.message
+        url = None
+
+        if isinstance(message, str):
+            return await ctx.reply("To use this command the bot must be on the server")
+
+        if message.referenced_message and message.referenced_message.attachments:
+            url = message.referenced_message.attachments[0].proxy_url
+        elif message.attachments:
+            url = message.attachments[0].proxy_url
+
+        if not url:
+            return await ctx.reply("An unexpected error occurred")
+
+        if isinstance(ctx, commands.AppContext):
+            await ctx.think()
+
+        async with femcord.Typing(ctx.message):
+            token = random.choice(config.TOKENS)
+            bot_id = token.split(".", 1)[0]
+            bot_id = bot_id + "=" * (len(bot_id) % 6)
+            bot_id = base64.b64decode(bot_id).decode()
+            api_url = f"https://discord.com/api/v10/applications/{bot_id}/achievements"
+
+            async with ClientSession() as session:
+                async with session.get(url) as response:
+                    image = await response.content.read()
+
+            async with ClientSession(headers={"authorization": "Bot " + token}) as session:
+                async with session.post(api_url, json={"name": ctx.author.id, "description": ctx.author.id, "icon": "data:image/png;base64," + base64.b64encode(image).decode()}) as response:
+                    data = await response.json()
+                    achievement_url = f"https://cdn.discordapp.com/app-assets/{bot_id}/achievements/{data["id"]}/icons/{data["icon_hash"]}.png?size=4096"
+                async with session.delete(api_url + "/" + data["id"]):
+                    pass
+
+            await ctx.reply("<" + achievement_url + ">")
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Tools(bot))

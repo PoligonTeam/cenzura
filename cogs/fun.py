@@ -41,7 +41,7 @@ class Fun(commands.Cog):
         self.results = {}
         self.urls = {}
 
-    @commands.hybrid_command(description="User avatar", usage="[user]", type=ApplicationCommandTypes.USER)
+    @commands.hybrid_command(description="User avatar", usage="[user]", aliases=["av"], type=ApplicationCommandTypes.USER)
     async def avatar(self, ctx: Union["Context", "AppContext"], user: types.User = None):
         user = user or ctx.author
 
@@ -391,15 +391,18 @@ class Fun(commands.Cog):
 
         await ctx.reply(files=[("gay.png", result_image.getvalue())])
 
-    @commands.command(description="Check the cwel", usage="[user/attachment/reply]")
-    async def cwel(self, ctx: "Context", user: types.User = None):
+    @commands.hybrid_command(description="Select the cwel", usage="[user/attachment/reply]", type=ApplicationCommandTypes.USER)
+    async def cwel(self, ctx: Union["Context", "AppContext"], user: types.User = None):
         user = user or ctx.author
         url = user.avatar_url
 
-        if ctx.message.referenced_message and ctx.message.referenced_message.attachments:
-            url = ctx.message.referenced_message.attachments[0].proxy_url
-        elif ctx.message.attachments:
-            url = ctx.message.attachments[0].proxy_url
+        if isinstance(ctx, commands.AppContext):
+            await ctx.think()
+        else:
+            if ctx.message.referenced_message and ctx.message.referenced_message.attachments:
+                url = ctx.message.referenced_message.attachments[0].proxy_url
+            elif ctx.message.attachments:
+                url = ctx.message.attachments[0].proxy_url
 
         async with ClientSession() as session:
             async with session.get(url) as response:

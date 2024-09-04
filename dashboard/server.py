@@ -68,7 +68,12 @@ class Server:
 
             sys.modules[file[:-3]] = module
 
+            @module.router.options(r"/{_:.*}")
+            async def options(request: web.Request) -> web.Response:
+                return web.Response(headers={"Access-Control-Allow-Headers": "Content-Type,authorization", "Access-Control-Allow-Methods": "GET,POST,PATCH,PUT,DELETE"})
+
             subapp = module.get_app(self.app)
+
             self.app.add_subapp(subapp.prefix, subapp.app)
 
     async def run(self, *, host: str, port: int) -> None:

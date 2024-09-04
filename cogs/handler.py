@@ -17,7 +17,8 @@ limitations under the License.
 import femcord.femcord as femcord
 from femcord.femcord import commands
 from utils import fg
-import traceback, random
+import traceback
+import random
 
 from typing import Union, TYPE_CHECKING
 
@@ -31,7 +32,7 @@ class ErrorHandler(commands.Cog):
         self.bot = bot
 
     @commands.Listener
-    async def on_error(self, ctx: Union["Context", "AppContext"], error):
+    async def on_error(self, ctx: Union["Context", "AppContext"], error: Exception) -> None:
         if isinstance(error, commands.CommandNotFound):
             return await ctx.reply("Command not found")
 
@@ -79,6 +80,30 @@ class ErrorHandler(commands.Cog):
 
         elif isinstance(error, commands.NoPermission):
             return await ctx.reply("You do not have permission to use this command")
+
+        elif isinstance(error, femcord.HTTPException):
+            def walk(data, indent=0):
+                text = ""
+                prefix = " " * (indent * 2)
+
+                if isinstance(data, dict):
+                    for key, value in data.items():
+                        if isinstance(value, (dict, list)):
+                            text += f"{prefix}{fg.magenta}{key}{fg.white}:{fg.reset}\n" + walk(value, indent + 1)
+                        else:
+                            text += f"{prefix}{fg.magenta}{key}{fg.white}:{fg.reset} {fg.green}{value}{fg.reset}\n"
+                elif isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, (dict, list)):
+                            text += f"{prefix}-\n" + walk(item, indent + 1)
+                        else:
+                            text += f"{prefix}- {fg.yellow}{item}{fg.reset}\n"
+
+                return text
+
+            formatted_error = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+
+            return await ctx.reply_paginator(pages=[f"```py\n{formatted_error}```", f"```ansi\n{walk(error.original_error["errors"])}```"], replace=False)
 
         elif isinstance(error, AssertionError):
             return await ctx.reply(error)

@@ -24,7 +24,7 @@ from models import Guilds
 from enum import Enum
 import config, datetime
 
-from typing import Literal, TypedDict, Any, TYPE_CHECKING
+from typing import Union, Literal, TypedDict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context
@@ -90,10 +90,13 @@ class Other(commands.Cog):
                 except Exception:
                     pass
 
-    @commands.command(description="pisaju skrypt", usage="(code)", aliases=["fs", "fscript", "cs", "cscript"])
-    async def femscript(self, ctx: "Context", *, code):
-        guild = Guilds.get(guild_id=ctx.guild.id)
-        database = (await guild).database
+    @commands.hybrid_command(description="pisaju skrypt", usage="(code)", aliases=["fs", "fscript", "cs", "cscript"])
+    async def femscript(self, ctx: Union["Context", "AppContext"], *, code):
+        database = {}
+
+        if ctx.guild:
+            guild = Guilds.get(guild_id=ctx.guild.id)
+            database = (await guild).database
 
         fake_token = var("token", "MTAwOTUwNjk4MjEyMzgwMjY4NA.G0LFJN.o7zP2DxrjQDQQIqjtVUEN98jmlB1bEQN1rTchQ")
 
@@ -117,7 +120,7 @@ class Other(commands.Cog):
 
         femscript = Femscript(code, variables=variables)
 
-        if ctx.member.permissions.has(femcord.enums.Permissions.MANAGE_GUILD):
+        if ctx.guild and ctx.member.permissions.has(femcord.enums.Permissions.MANAGE_GUILD):
             @femscript.wrap_function()
             def get_all() -> dict[str, object]:
                 return database
@@ -148,7 +151,8 @@ class Other(commands.Cog):
 
         result = await femscript.execute(debug=ctx.author.id in self.bot.owners)
 
-        await guild.update(database=database)
+        if ctx.guild:
+            await guild.update(database=database)
 
         if isinstance(result, femcord.Embed):
             to_check = ("image", "thumbnail", "author", "footer")
@@ -423,7 +427,7 @@ class Other(commands.Cog):
             if not command:
                 raise commands.CommandNotFound()
 
-            return await ctx.reply_paginator(command.other["code"], prefix="```py\n", suffix="```")
+            return await ctx.reply_paginator(highlight(command.other["code"]), by_lines=True, base_embed=femcord.Embed(), prefix="```ansi\n", suffix="```")
         elif operation is CommandOperation.GET_COMMANDS:
             return await ctx.reply_paginator(pages=custom_commands, prefix="```py\n", suffix="```")
         elif operation is CommandOperation.REMOVE_COMMAND:

@@ -130,28 +130,51 @@ class HybridContext:
 
     async def paginator(self, function: Callable[..., Awaitable[dict]], check: Callable[[types.Interaction, types.Message | None], bool], content: Optional[str] = None, **kwargs) -> None:
         pages: list = kwargs.pop("pages", None)
+        by_lines: bool = kwargs.pop("by_lines", False)
+        base_embed: Optional[femcord.Embed] = kwargs.pop("base_embed", None)
         prefix: str = kwargs.pop("prefix", "")
         suffix: str = kwargs.pop("suffix", "")
-        limit: int = kwargs.pop("limit", 2000)
+        limit: int = kwargs.pop("limit", 4096 if base_embed else 2000)
         timeout: int = kwargs.pop("timeout", 60)
         page: int = kwargs.pop("page", 0)
         replace: bool = kwargs.pop("replace", True)
         buttons: bool = kwargs.pop("buttons", False)
 
-        if limit > 2000:
+        if not base_embed and limit > 2000:
             limit = 2000
 
         length = limit - len(prefix) - len(suffix)
 
-        if pages is None:
-            content = str(content)
+        if by_lines:
+            length = limit - len(prefix) - len(suffix)
+            if pages is None:
+                content_lines = content.splitlines()
+                pages = []
+                current_page = []
+                current_length = 0
 
-            if replace is True:
-                content = content.replace("`", "\\`")
+                for line in content_lines:
+                    if current_length + len(line) + 1 <= length:
+                        current_page.append(line)
+                        current_length += len(line) + 1
+                    else:
+                        pages.append(prefix + "\n".join(current_page) + suffix)
+                        current_page = [line]
+                        current_length = len(line) + 1
 
-            pages = [prefix + content[i:i+length] + suffix for i in range(0, len(content), length)]
+                if current_page:
+                    pages.append(prefix + '\n'.join(current_page) + suffix)
+            else:
+                pages = [prefix + page + suffix for page in pages]
         else:
-            pages = [prefix + (page if replace is False else page.replace("`", "\\`")) + suffix for page in pages]
+            length = limit - len(prefix) - len(suffix)
+            if pages is None:
+                content = str(content)
+                if replace:
+                    content = content.replace("`", "\\`")
+                pages = [prefix + content[i:i+length] + suffix for i in range(0, len(content), length)]
+            else:
+                pages = [prefix + (page if not replace else page.replace("`", "\\`")) + suffix for page in pages]
 
         if len(pages) == 1 and buttons is False:
             return await function(pages[page], **kwargs)
@@ -170,7 +193,12 @@ class HybridContext:
                 )
             )
 
-        message = await function(pages[page], components=get_components(), **kwargs)
+        def get_page(page: int) -> dict[str, str | femcord.Embed]:
+            if base_embed:
+                return dict(embed=femcord.Embed(description=pages[page]) + base_embed)
+            return dict(content=pages[page])
+
+        message = await function(**get_page(page), components=get_components(), **kwargs)
 
         if not message:
             message = self.interaction
@@ -182,9 +210,9 @@ class HybridContext:
                 interaction, = await self.bot.wait_for("interaction_create", lambda interaction: check(interaction, message), timeout=timeout)
             except TimeoutError:
                 if isinstance(message, types.Interaction):
-                    await self.edit(pages[page], components=get_components(True), **kwargs)
+                    await self.edit(**get_page(page), components=get_components(True), **kwargs)
                     return
-                await message.edit(pages[page], components=get_components(True), **kwargs)
+                await message.edit(**get_page(page), components=get_components(True), **kwargs)
                 return
 
             match interaction.data.custom_id:
@@ -203,7 +231,7 @@ class HybridContext:
                 case "cancel":
                     return await message.delete()
 
-            await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, pages[page], components=get_components(), **kwargs)
+            await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, **get_page(page), components=get_components(), **kwargs)
 
 class Context(HybridContext, commands.Context):
     def __init__(self, *args, **kwargs) -> None:
@@ -227,7 +255,7 @@ class AppContext(HybridContext, commands.AppContext):
 
 class Bot(commands.Bot):
     def __init__(self, *, start_time: float = time.time()) -> None:
-        super().__init__(name="fembot", command_prefix=self.get_prefix, intents=femcord.Intents().all(), owners=config.OWNERS, context=Context, app_context=AppContext)
+        super().__init__(name="fembot", command_prefix=self.get_prefix, intents=femcord.Intents().all(), mobile=True, owners=config.OWNERS, context=Context, app_context=AppContext)
 
         self.start_time = start_time
 

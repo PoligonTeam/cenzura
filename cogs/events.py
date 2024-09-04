@@ -44,11 +44,6 @@ class Events(commands.Cog):
 
     @commands.Listener
     async def on_guild_create(self, guild: Guild):
-        try:
-            await self.bot.http.request(Route("PATCH", "guilds", guild.id, "members", "@me"), data={"nick": "fembot", "pronouns": "she/her"})
-        except HTTPException:
-            pass
-
         exists = await Guilds.exists(guild_id=guild.id)
 
         if not exists:

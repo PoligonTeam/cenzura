@@ -9,7 +9,7 @@ if { guilds != "0" } {
         borrow(guilds, StatusTypes, ActivityTypes);
 
         name = format("{} guilds", &guilds);
-        status_type = &StatusTypes.DND;
+        status_type = &StatusTypes.ONLINE;
         activity_type = &ActivityTypes.WATCHING;
     };
 }
@@ -19,7 +19,7 @@ if { users != "0" } {
         borrow(users, StatusTypes, ActivityTypes);
 
         name = format("{} users", &users);
-        status_type = &StatusTypes.DND;
+        status_type = &StatusTypes.ONLINE;
         activity_type = &ActivityTypes.LISTENING;
     };
 }
@@ -28,7 +28,7 @@ add_presence {
     borrow(StatusTypes, ActivityTypes);
 
     name = "poligon.lgbt";
-    status_type = &StatusTypes.DND;
+    status_type = &StatusTypes.ONLINE;
     activity_type = &ActivityTypes.WATCHING;
 };
 
@@ -36,7 +36,7 @@ add_presence {
     borrow(StatusTypes, ActivityTypes);
 
     name = "fortnite";
-    status_type = &StatusTypes.DND;
+    status_type = &StatusTypes.ONLINE;
     activity_type = &ActivityTypes.PLAYING;
 };
 
@@ -44,7 +44,7 @@ add_presence {
     borrow(StatusTypes, ActivityTypes);
 
     name = "femboy moaning asmr";
-    status_type = &StatusTypes.DND;
+    status_type = &StatusTypes.ONLINE;
     activity_type = &ActivityTypes.LISTENING;
 };
 
@@ -52,7 +52,7 @@ add_presence {
     borrow(StatusTypes, ActivityTypes);
 
     name = str(randint(1, 100, true));
-    status_type = &StatusTypes.DND;
+    status_type = &StatusTypes.ONLINE;
     activity_type = &ActivityTypes.PLAYING;
 };
 
@@ -60,7 +60,7 @@ add_presence {
     borrow(joke, StatusTypes, ActivityTypes);
 
     name = &joke;
-    status_type = &StatusTypes.DND;
+    status_type = &StatusTypes.ONLINE;
     activity_type = &ActivityTypes.PLAYING;
 };
 
@@ -68,6 +68,6 @@ add_presence {
     borrow(StatusTypes, ActivityTypes);
 
     name = "automaty";
-    status_type = &StatusTypes.DND;
+    status_type = &StatusTypes.ONLINE;
     activity_type = &ActivityTypes.PLAYING;
 };
