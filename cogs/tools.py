@@ -16,16 +16,22 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands
-from poligonlgbt import get_extension
 from api_client import ApiClient, ApiError
 from aiohttp import ClientSession, FormData
 from datetime import datetime
 from bs4 import BeautifulSoup
 from enum import Enum
 from cobaltpy import Cobalt
-import asyncio, random, re, json, string, config, base64
 
-from typing import Union, TYPE_CHECKING
+import asyncio
+import random
+import re
+import json
+import string
+import config
+import base64
+
+from typing import Union, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context, AppContext
@@ -185,22 +191,24 @@ class Tools(commands.Cog):
                 except ApiError as e:
                     return await ctx.reply(e)
 
-            components = None
+            message = await ctx.reply(files=[("image.png", data.image)], components=femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl"))))
 
-            if isinstance(ctx, commands.Context):
-                components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl")))
+        is_app = isinstance(ctx, commands.AppContext)
+        obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
 
-            message = await ctx.reply(files=[("image.png", data.image)], components=components)
+        def check(interaction: femcord.types.Interaction, _: Optional[femcord.types.Message] = None) -> bool:
+            if is_app:
+                return interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message is not None and interaction.message.interaction_metadata.id == ctx.interaction.id
+            return interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id
 
-        if isinstance(ctx, commands.Context):
-            try:
-                interaction, = await self.bot.wait_for("interaction_create", lambda interaction: interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60)
-            except TimeoutError:
-                components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))
-                return await message.edit(components=components)
+        try:
+            interaction, = await self.bot.wait_for("interaction_create", check, timeout=60)
+        except TimeoutError:
+            components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))
+            return await obj.edit(components=components)
 
-            await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
-            await ctx.paginator(message.edit, data.content, embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
+        await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
+        await ctx.paginator(obj.edit, check, data.content, embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
 
     @commands.hybrid_command(description="Downloads video via cobalt", aliases=["ytdl", "tiktok", "shorts"])
     async def cobalt(self, ctx: Union["Context", "AppContext"], url: str, audio_only: bool | int = 0):

@@ -23,9 +23,15 @@ from scheduler.scheduler import Scheduler
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
 
-import asyncio, hashlib, io, math, ast, os, random
+import asyncio
+import hashlib
+import io
+import math
+import ast
+import os
+import random
 
-from typing import Any, TYPE_CHECKING
+from typing import Optional, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aiohttp.web import Application
@@ -144,7 +150,7 @@ class IPC(Client):
         if isinstance(body[-1], ast.With):
             self.insert_returns(body[-1].body)
 
-    def _eval(self, code: str, env: dict = None) -> asyncio.Future:
+    def _eval(self, code: str, env: Optional[dict[str, Any]] = None) -> asyncio.Future:
         env = {} or env
 
         content = "\n".join(f"    {x}" for x in code.splitlines())

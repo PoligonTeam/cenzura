@@ -82,6 +82,11 @@ class ErrorHandler(commands.Cog):
             return await ctx.reply("You do not have permission to use this command")
 
         elif isinstance(error, femcord.HTTPException):
+            formatted_error = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+
+            if "error" not in error.original_error:
+                return await ctx.reply_paginator(formatted_error, prefix="```py\n", suffix="```", page=-1)
+
             def walk(data, indent=0):
                 text = ""
                 prefix = " " * (indent * 2)
@@ -100,8 +105,6 @@ class ErrorHandler(commands.Cog):
                             text += f"{prefix}- {fg.yellow}{item}{fg.reset}\n"
 
                 return text
-
-            formatted_error = "".join(traceback.format_exception(type(error), error, error.__traceback__))
 
             return await ctx.reply_paginator(pages=[f"```py\n{formatted_error}```", f"```ansi\n{walk(error.original_error["errors"])}```"], replace=False)
 

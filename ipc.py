@@ -16,13 +16,17 @@ limitations under the License.
 
 from femipc.femipc import Client, listener
 
+from femcord.femcord import Embed
+
 from femcord.femcord.http import HTTPException
 
 from femcord.femcord.utils import get_index
 
 from models import Guilds
 
+import hashlib
 import config
+import aiohttp
 
 from typing import TypedDict, TYPE_CHECKING
 
@@ -148,11 +152,13 @@ class IPC(Client):
 
         member = await guild.get_member(user_id)
 
-        if member is not None:
-            try:
-                await member.add_role(guild.get_role(role_id))
-            except HTTPException:
-                pass
+        if member is None:
+            return
+
+        try:
+            await member.add_role(guild.get_role(role_id))
+        except HTTPException:
+            pass
 
     @listener("get_user")
     async def get_user(self, user_id: str) -> UserDict:

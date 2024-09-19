@@ -19,7 +19,7 @@ from femcord.femcord import commands, types
 from datetime import datetime, timedelta
 import asyncio, time, ast, inspect, models
 
-from typing import Union, TYPE_CHECKING
+from typing import Union, Optional, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context, AppContext
@@ -42,7 +42,7 @@ class Dev(commands.Cog):
         if isinstance(body[-1], ast.With):
             self.insert_returns(body[-1].body)
 
-    def _eval(self, code: str, env: dict = None) -> asyncio.Future:
+    def _eval(self, code: str, env: Optional[dict[str, Any]] = None) -> asyncio.Future:
         env = {} or env
 
         content = "\n".join(f"    {x}" for x in code.splitlines())
@@ -59,7 +59,7 @@ class Dev(commands.Cog):
 
     @commands.hybrid_command(description="fembot is a bot, the bot is fembot", usage="(code)")
     async def eval(self, ctx: Union["Context", "AppContext"], *, code):
-        if not ctx.author.id in self.bot.owners:
+        if ctx.author.id not in self.bot.owners:
             return await self.bot.get_command("femscript")(ctx, code=code)
 
         result = await self._eval(code, {
@@ -136,7 +136,7 @@ class Dev(commands.Cog):
 
         code = inspect.getsource(command_object.callback)
 
-        await ctx.reply_paginator(code, prefix="```py\n", suffix="```")
+        await ctx.reply_paginator(code, by_lines=True, prefix="```py\n", suffix="```")
 
     @commands.command(description="fembot is a bot, the bot is fembot")
     @commands.is_owner
@@ -221,20 +221,18 @@ class Dev(commands.Cog):
             fake_message.content += " " + args
 
         before = None
-        after = None
+        future = self.bot.loop.create_future()
 
         async def before_call(ctx):
             nonlocal before
             before = time.perf_counter()
 
         async def after_call(ctx):
-            nonlocal after
-            after = time.perf_counter()
+            future.set_result(time.perf_counter())
 
         await self.bot.process_commands(fake_message, before_call_functions=before_call, after_call_functions=after_call)
 
-        while after is None:
-            await asyncio.sleep(0.01)
+        after = await future
 
         await ctx.reply(f"Executed in `{after - before:.2f}s`")
 

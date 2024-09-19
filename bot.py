@@ -158,14 +158,16 @@ class HybridContext:
                         current_page.append(line)
                         current_length += len(line) + 1
                     else:
-                        pages.append(prefix + "\n".join(current_page) + suffix)
+                        current_page = "\n".join(current_page)
+                        pages.append(prefix + (current_page if not replace else current_page.replace("`", "\\`")) + suffix)
                         current_page = [line]
                         current_length = len(line) + 1
 
                 if current_page:
-                    pages.append(prefix + '\n'.join(current_page) + suffix)
+                    current_page = "\n".join(current_page)
+                    pages.append(prefix + (current_page if not replace else current_page.replace("`", "\\`")) + suffix)
             else:
-                pages = [prefix + page + suffix for page in pages]
+                pages = [prefix + (page if not replace else page.replace("`", "\\`")) + suffix for page in pages]
         else:
             length = limit - len(prefix) - len(suffix)
             if pages is None:
@@ -176,8 +178,13 @@ class HybridContext:
             else:
                 pages = [prefix + (page if not replace else page.replace("`", "\\`")) + suffix for page in pages]
 
+        def get_page(page: int) -> dict[str, str | femcord.Embed]:
+            if base_embed:
+                return dict(embed=femcord.Embed(description=pages[page]) + base_embed)
+            return dict(content=pages[page])
+
         if len(pages) == 1 and buttons is False:
-            return await function(pages[page], **kwargs)
+            return await function(**get_page(page), **kwargs)
 
         if page < 0:
             page = pages.index(pages[page])
@@ -192,11 +199,6 @@ class HybridContext:
                     femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
                 )
             )
-
-        def get_page(page: int) -> dict[str, str | femcord.Embed]:
-            if base_embed:
-                return dict(embed=femcord.Embed(description=pages[page]) + base_embed)
-            return dict(content=pages[page])
 
         message = await function(**get_page(page), components=get_components(), **kwargs)
 
@@ -258,6 +260,7 @@ class Bot(commands.Bot):
         super().__init__(name="fembot", command_prefix=self.get_prefix, intents=femcord.Intents().all(), mobile=True, owners=config.OWNERS, context=Context, app_context=AppContext)
 
         self.start_time = start_time
+        self.user_install_count: int = None
 
         self.presences: list[types.Presence] = None
         self.presence_update_interval: int = None
@@ -330,6 +333,7 @@ class Bot(commands.Bot):
             guild.autorole = db_guild.autorole
 
         await self.scheduler.create_schedule(self.update_presences, "10m", name="update_presences")()
+        await self.scheduler.create_schedule(self.update_user_install_count, "1h", name="update_user_install_count")()
 
         await self.register_app_commands()
 
@@ -378,9 +382,11 @@ class Bot(commands.Bot):
 
     async def get_stats(self):
         memory = psutil.virtual_memory()
+        latency_data = await self.get_latency_data()
 
         return {
             "guilds": len(self.gateway.guilds),
+            "user_install_count": self.user_install_count,
             "users": len(self.gateway.users),
             "commands": len(self.walk_commands()),
             "ram": {
@@ -389,7 +395,7 @@ class Bot(commands.Bot):
                 "available": memory.available
             },
             "cpu": psutil.cpu_percent(),
-            "latencies": await self.get_latency_data(),
+            "latencies": latency_data,
             "timestamp": self.started_at.timestamp(),
             "last_update": time.time()
         }
@@ -453,6 +459,10 @@ class Bot(commands.Bot):
 
             if self.presence_index >= len(self.presences):
                 self.presence_index = 0
+
+    async def update_user_install_count(self) -> None:
+        data = await self.http.request(Route("GET", "applications", "@me"))
+        self.user_install_count = data["approximate_user_install_count"]
 
     async def get_prefix(self, _, message: femcord.types.Message) -> list[str]:
         prefixes = ["<@{}>", "<@!{}>", "<@{}> ", "<@!{}> "]

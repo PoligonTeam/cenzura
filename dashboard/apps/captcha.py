@@ -31,7 +31,7 @@ class Captcha:
     async def captcha(request: web.Request) -> web.Response:
         captcha_id = request.match_info.get("captcha_id")
 
-        if not captcha_id in request.app.root.cache.captcha:
+        if captcha_id not in request.app.root.cache.captcha:
             return web.HTTPNotFound()
 
         captcha = request.app.root.cache.captcha[captcha_id]
@@ -42,7 +42,7 @@ class Captcha:
     async def captcha(request: web.Request) -> web.Response:
         captcha_id = request.match_info.get("captcha_id")
 
-        if not captcha_id in request.app.root.cache.captcha:
+        if captcha_id not in request.app.root.cache.captcha:
             return web.HTTPNotFound()
 
         captcha = request.app.root.cache.captcha[captcha_id]

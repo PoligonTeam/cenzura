@@ -19,19 +19,20 @@ from femcord.femcord import commands
 from femcord.femcord.types import Emoji
 from korrumzthegame import Renderer
 from concurrent.futures import ThreadPoolExecutor
-import asyncio, random
+import asyncio
+import random
 
-from typing import TYPE_CHECKING
+from typing import Union, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bot import Bot, Context
+    from bot import Bot, Context, AppContext
 
 class Games(commands.Cog):
     def __init__(self, bot: "Bot") -> None:
         self.bot = bot
 
-    @commands.command(description="https://korrumzthegame.wtf", usage="[name] [avatar-number_1-20]", aliases=["ktg"])
-    async def korrumzthegame(self, ctx: "Context", username: int | str = None, avatar: int = None):
+    @commands.hybrid_command(description="https://korrumzthegame.wtf", usage="[name] [avatar-number_1-20]", aliases=["ktg"])
+    async def korrumzthegame(self, ctx: Union["Context", "AppContext"], username: int | str = None, avatar: int = None):
         if isinstance(username, int) and avatar is None:
             avatar = username
             username = None
@@ -72,22 +73,34 @@ class Games(commands.Cog):
 
         embed = femcord.Embed(title="Pull requests:", color=self.bot.embed_color)
         embed.set_thumbnail(url=f"https://korrumzthegame.wtf/images/player{renderer.client.image_number}.png")
-        embed.set_image(url=f"attachment://image.png")
+        embed.set_image(url="attachment://image.png")
         embed.set_footer(text="ktg.poligon.lgbt")
 
+        is_app = isinstance(ctx, commands.AppContext)
+
+        if is_app:
+            await ctx.think()
+
         def update_embed():
-            embed.description = "\n".join(f"{player.username if not renderer.client.username == player.username else '**' + player.username + '**'} {player.pull_requests}" for player in sorted(renderer.client.players + [renderer.client], reverse=True, key=lambda player: player.pull_requests))
+            embed.set_description("\n".join(f"{player.username if not renderer.client.username == player.username else '**' + player.username + '**'} {player.pull_requests}" for player in sorted(renderer.client.players + [renderer.client], reverse=True, key=lambda player: player.pull_requests)))
 
         update_embed()
 
         message = await ctx.reply(embed=embed, components=components, files=[("image.png", renderer.get_image())])
 
+        obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
+
+        def check(interaction: femcord.types.Interaction, _: Optional[femcord.types.Message] = None) -> bool:
+            if is_app:
+                return interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message is not None and interaction.message.interaction_metadata.id == ctx.interaction.id
+            return interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id
+
         while True:
             try:
-                interaction, = await self.bot.wait_for("interaction_create", lambda interaction: interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id, timeout=60)
+                interaction, = await self.bot.wait_for("interaction_create", check, timeout=60)
             except TimeoutError:
                 await renderer.client.close()
-                return await message.edit("Session expired", embeds=[], components=[], files=[], other={"attachments": []})
+                return await obj.edit("Session expired", embeds=[], components=[], files=[], other={"attachments": []})
 
             if interaction.data.custom_id == "close":
                 await renderer.client.close()

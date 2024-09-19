@@ -50,6 +50,7 @@ class About(commands.Cog):
         stats = await self.bot.get_stats()
 
         description = f"Guilds: `{stats['guilds']}`\n" \
+                      f"Individual users: `{stats['user_install_count']}`\n" \
                       f"Users: `{stats['users']}`\n\n" \
                       f"Commands: `{stats['commands']}`\n\n" \
                       f"RAM: `{stats['ram']['current'] / 1000 / 1000:.1f} MB ({(stats['ram']['total'] - stats['ram']['available']) / 1000 / 1000 / 1000:.1f} GB / {stats['ram']['total'] / 1000 / 1000 / 1000:.1f} GB)`\n" \
