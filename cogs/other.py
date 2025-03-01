@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,7 +79,8 @@ class Other(commands.Cog):
                     language = "en",
                     verification_role = "",
                     verification_message = "",
-                    verification_channel = ""
+                    verification_channel = "",
+                    eventhandlers = {}
                 )
 
             for custom_command in db_guild.custom_commands:
@@ -118,7 +119,7 @@ class Other(commands.Cog):
             for key, value in (convert(author=ctx.author, channel=ctx.channel, guild=ctx.guild) | database).items()
         ]
 
-        femscript = Femscript(code, variables=variables)
+        femscript = Femscript(code, variables=variables, modules=self.bot.femscript_modules)
 
         if ctx.guild and ctx.member.permissions.has(femcord.enums.Permissions.MANAGE_GUILD):
             @femscript.wrap_function()
@@ -270,7 +271,7 @@ class Other(commands.Cog):
 
     def create_custom_command(self, guild_id: str, command_data: CommandData, code: str) -> commands.Command:
         async def func(ctx: "Context", args: list = None) -> Any:
-            async with femcord.Typing(ctx.message):
+            async with femcord.Typing(ctx.channel):
                 guild = Guilds.get(guild_id=ctx.guild.id)
 
                 if args is not None:
@@ -317,7 +318,7 @@ class Other(commands.Cog):
                     for key, value in (converted | (args or {}) | database).items()
                 ]
 
-                femscript = Femscript(code, variables=variables)
+                femscript = Femscript(code, variables=variables, modules=self.bot.femscript_modules)
 
                 @femscript.wrap_function()
                 def get_all() -> dict[str, object]:

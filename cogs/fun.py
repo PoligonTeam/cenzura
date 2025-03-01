@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,40 +51,44 @@ class Fun(commands.Cog):
 
         await ctx.reply(files=[("avatar." + ("gif" if user.avatar[:2] == "a_" else "png"), content)])
 
-    @commands.command(description="Shows the percentage of love between users", usage="(user) [user]", aliases=["love"])
-    async def ship(self, ctx: "Context", user: types.User, user2: types.User = None):
-        user2 = user2 or ctx.author
+    @commands.hybrid_command(description="Shows the percentage of love between users", usage="(user) [user]", aliases=["love"], type=ApplicationCommandTypes.USER)
+    async def ship(self, ctx: Union["Context", "AppContext"], user: types.User, user2: types.User = None):
+        if isinstance(ctx, commands.AppContext):
+            await ctx.think()
 
-        user_avatar_response = await self.bot.http.session.get(user.avatar_as("png"))
-        user2_avatar_response = await self.bot.http.session.get(user2.avatar_as("png"))
+        async with femcord.Typing(ctx.channel):
+            user2 = user2 or ctx.author
 
-        user_avatar = io.BytesIO(await user_avatar_response.content.read())
-        user2_avatar = io.BytesIO(await user2_avatar_response.content.read())
+            user_avatar_response = await self.bot.http.session.get(user.avatar_as("png"))
+            user2_avatar_response = await self.bot.http.session.get(user2.avatar_as("png"))
 
-        result_image = io.BytesIO()
+            user_avatar = io.BytesIO(await user_avatar_response.content.read())
+            user2_avatar = io.BytesIO(await user2_avatar_response.content.read())
 
-        def create_image() -> None:
-            nonlocal user2_avatar, user2_avatar, result_image
+            result_image = io.BytesIO()
 
-            ship_image = Image.open("./assets/images/ship.jpg").convert("RGBA")
+            def create_image() -> None:
+                nonlocal user2_avatar, user2_avatar, result_image
 
-            user_image = Image.open(user_avatar).convert("RGBA")
-            user2_image = Image.open(user2_avatar).convert("RGBA")
+                ship_image = Image.open("./assets/images/ship.jpg").convert("RGBA")
 
-            user_image = ImageOps.fit(user_image, (300, 300))
-            user2_image = ImageOps.fit(user2_image, (300, 300))
+                user_image = Image.open(user_avatar).convert("RGBA")
+                user2_image = Image.open(user2_avatar).convert("RGBA")
 
-            ship_image.paste(user_image, (360, 250), user_image)
-            ship_image.paste(user2_image, (890, 180), user2_image)
+                user_image = ImageOps.fit(user_image, (300, 300))
+                user2_image = ImageOps.fit(user2_image, (300, 300))
 
-            ship_image.save(result_image, "PNG")
+                ship_image.paste(user_image, (360, 250), user_image)
+                ship_image.paste(user2_image, (890, 180), user2_image)
 
-        async def async_create_image() -> None:
-            await self.bot.loop.run_in_executor(ThreadPoolExecutor(), create_image)
+                ship_image.save(result_image, "PNG")
 
-        await self.bot.loop.create_task(async_create_image())
+            async def async_create_image() -> None:
+                await self.bot.loop.run_in_executor(ThreadPoolExecutor(), create_image)
 
-        await ctx.reply_translation("ship_return_text", (user.username, user2.username, user.username[:len(user.username) // 2].lower() + user2.username[len(user2.username) // 2:].lower(), get_int(user, user2)), files=[("ship.png", result_image.getvalue())])
+            await self.bot.loop.create_task(async_create_image())
+
+            await ctx.reply_translation("ship_return_text", (user.username, user2.username, user.username[:len(user.username) // 2].lower() + user2.username[len(user2.username) // 2:].lower(), get_int(user, user2)), files=[("ship.png", result_image.getvalue())])
 
     @commands.command(description="dog", aliases=["ars", "6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"])
     async def dog(self, ctx: "Context"):
@@ -833,7 +837,7 @@ class Fun(commands.Cog):
                 await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=get_components())
 
     @commands.command(description="Random nickname")
-    async def nick(self, ctx):
+    async def nick(self, ctx: "Context"):
         await ctx.reply(get_random_username())
 
 def setup(bot: "Bot") -> None:

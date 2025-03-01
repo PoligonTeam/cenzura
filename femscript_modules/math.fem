@@ -1,0 +1,31 @@
+math = {
+    fn randint(min, max) {
+        multiplier = max - min;
+        result = min + multiplier * random();
+        math.floor(result)
+    }
+
+    fn random_choice(list) {
+        num = math.randint(0, len(list));
+        getitem(list, num)
+    }
+
+    fn _5050() {
+        0.5 > random()
+    }
+
+    fn round(number) {
+        if {
+            decimal = number % 1;
+            decimal > 0.5
+        } {
+            number + 1 - decimal
+        } else {
+            number - decimal
+        }
+    }
+
+    fn floor(number) {
+        number - number % 1
+    }
+};

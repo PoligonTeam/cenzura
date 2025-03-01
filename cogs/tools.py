@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,12 +16,14 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands
+from scheduler.scheduler import TempDict
 from api_client import ApiClient, ApiError
 from aiohttp import ClientSession, FormData
 from datetime import datetime
 from bs4 import BeautifulSoup
 from enum import Enum
 from cobaltpy import Cobalt
+from groq import Groq
 
 import asyncio
 import random
@@ -74,10 +76,9 @@ class WebsiteInfo:
         self.last_update = datetime.fromtimestamp(int(data[7]) / 1000)
 
 class Tools(commands.Cog):
-    name = "Narzędzia"
-
     def __init__(self, bot: "Bot") -> None:
         self.bot = bot
+        self.groq_contexts: dict[str, Groq] = TempDict(self.bot.scheduler, "1m")
 
     # @commands.Listener
     # async def on_ready(self):
@@ -173,7 +174,7 @@ class Tools(commands.Cog):
         if not isinstance(ctx, commands.AppContext) and not ctx.channel.nsfw:
             raise commands.NotNsfw
 
-        async with femcord.Typing(ctx.message):
+        async with femcord.Typing(ctx.channel):
             result = URL_PATTERN.match(url)
 
             if result is None:
@@ -215,7 +216,7 @@ class Tools(commands.Cog):
         if isinstance(ctx, commands.AppContext):
             await ctx.think()
 
-        async with femcord.Typing(ctx.message):
+        async with femcord.Typing(ctx.channel):
             try:
                 async with Cobalt() as cobalt:
                     instance = await cobalt.get_best_instance()
@@ -241,14 +242,14 @@ class Tools(commands.Cog):
                                 soup = BeautifulSoup(content)
                                 gif = soup.select_one(".result-image > img").attrs["src"]
                             for files in [files[i:i+10] for i in range(0, len(files), 10)]:
-                                async with femcord.Typing(ctx.message):
+                                async with femcord.Typing(ctx.channel):
                                     await ctx.reply(files=[(file.file_name, file.file) for file in files if not file.is_audio])
-                            async with femcord.Typing(ctx.message):
+                            async with femcord.Typing(ctx.channel):
                                 async with ClientSession() as session:
                                     async with session.get("https://en.bloggif.com/" + gif) as response:
                                         if response.status == 200:
                                             await ctx.reply(files=[("output.gif", await response.content.read())])
-                            async with femcord.Typing(ctx.message):
+                            async with femcord.Typing(ctx.channel):
                                 await ctx.reply(files=[(file.file_name, file.file) for file in files if file.is_audio])
                             return
             except asyncio.TimeoutError:
@@ -261,7 +262,7 @@ class Tools(commands.Cog):
     #     if not ctx.author.id in self.bot.owners:
     #         return await ctx.reply("nie możesz!!1!")
 
-    #     async with femcord.Typing(ctx.message):
+    #     async with femcord.Typing(ctx.channel):
     #         result = re.match(r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,69}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)", url)
 
     #         if not result:
@@ -285,44 +286,22 @@ class Tools(commands.Cog):
 
     #             await browser.close()
 
-    @commands.hybrid_command(description="test", type=femcord.enums.ApplicationCommandTypes.MESSAGE)
-    async def upload(self, ctx: Union["Context", "AppContext"], message: femcord.types.Message = None):
-        message = message or ctx.message
-        url = None
+    @commands.command(description="artificial monkey", aliases=["monkey", "ask"])
+    @commands.is_nsfw
+    async def ai(self, ctx: "Context", *, message):
+        async with femcord.Typing(ctx.channel):
+            groq = self.groq_contexts.get(ctx.author.id,
+                Groq(config.GROQ_API_KEYS, "deepseek-r1-distill-llama-70b",
+                    f"Będziesz komunikował się po polsku z użytkownikiem o nazwie {ctx.author.username}. " \
+                    "Nazywasz się Maryla Rodowicz. Identyfikujesz się jako kobieta, twoje poglądy polityczne to skrajna lewica. " \
+                    "Masz pisać o sobie w zaimkach she/her. Staraj się odpisywać w maksymalnie dwóch zdaniach.")
+            )
 
-        if isinstance(message, str):
-            return await ctx.reply("To use this command the bot must be on the server")
+            self.groq_contexts[ctx.author.id] = groq
 
-        if message.referenced_message and message.referenced_message.attachments:
-            url = message.referenced_message.attachments[0].proxy_url
-        elif message.attachments:
-            url = message.attachments[0].proxy_url
+            result = await groq.chat(message)
 
-        if not url:
-            return await ctx.reply("An unexpected error occurred")
-
-        if isinstance(ctx, commands.AppContext):
-            await ctx.think()
-
-        async with femcord.Typing(ctx.message):
-            token = random.choice(config.TOKENS)
-            bot_id = token.split(".", 1)[0]
-            bot_id = bot_id + "=" * (len(bot_id) % 6)
-            bot_id = base64.b64decode(bot_id).decode()
-            api_url = f"https://discord.com/api/v10/applications/{bot_id}/achievements"
-
-            async with ClientSession() as session:
-                async with session.get(url) as response:
-                    image = await response.content.read()
-
-            async with ClientSession(headers={"authorization": "Bot " + token}) as session:
-                async with session.post(api_url, json={"name": ctx.author.id, "description": ctx.author.id, "icon": "data:image/png;base64," + base64.b64encode(image).decode()}) as response:
-                    data = await response.json()
-                    achievement_url = f"https://cdn.discordapp.com/app-assets/{bot_id}/achievements/{data["id"]}/icons/{data["icon_hash"]}.png?size=4096"
-                async with session.delete(api_url + "/" + data["id"]):
-                    pass
-
-            await ctx.reply("<" + achievement_url + ">")
+            await ctx.reply(result)
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Tools(bot))

@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import femcord.femcord as femcord
 from femcord.femcord import commands, types
 from femcord.femcord.http import Route
 from femcord.femcord.permissions import Permissions
-from femscript import Femscript, var, AST
+from femscript import Femscript, var, AST, FemscriptModules, FemscriptModule
 from tortoise import Tortoise
 from utils import request
 from lokiclient import LokiClient
@@ -27,10 +27,31 @@ from scheduler.scheduler import Scheduler
 from ipc import IPC
 from poligonlgbt import Poligon
 from datetime import datetime
-from typing import Callable, Awaitable, Optional, Any
-import asyncio, uvloop, random, psutil, os, time, config, logging
+
+import asyncio
+import uvloop
+import random
+import psutil
+import os
+import time
+import config
+import logging
+
+from typing import Callable, Awaitable, Optional, Any, Unpack, TypedDict
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
+class PaginatorKwargs(TypedDict):
+    pages: Optional[list]
+    by_lines: bool
+    base_embed: Optional[femcord.Embed]
+    prefix: str
+    suffix: str
+    limit: int
+    timeout: int
+    page: int
+    replace: bool
+    buttons: bool
 
 class HybridContext:
     async def get_translation(self, translation: str, args: tuple[Any] = None) -> str | femcord.Embed:
@@ -128,8 +149,8 @@ class HybridContext:
 
         return await self.reply(result, *args, **kwargs)
 
-    async def paginator(self, function: Callable[..., Awaitable[dict]], check: Callable[[types.Interaction, types.Message | None], bool], content: Optional[str] = None, **kwargs) -> None:
-        pages: list = kwargs.pop("pages", None)
+    async def paginator(self, function: Callable[..., Awaitable[dict]], check: Callable[[types.Interaction, types.Message | None], bool], content: Optional[str] = None, **kwargs: Unpack[PaginatorKwargs]) -> None:
+        pages: Optional[list] = kwargs.pop("pages", None)
         by_lines: bool = kwargs.pop("by_lines", False)
         base_embed: Optional[femcord.Embed] = kwargs.pop("base_embed", None)
         prefix: str = kwargs.pop("prefix", "")
@@ -190,15 +211,23 @@ class HybridContext:
             page = pages.index(pages[page])
 
         def get_components(disabled: bool = False) -> femcord.Components:
-            return femcord.Components(
-                femcord.Row(
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="previous", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING TRIANGLE}")),
-                    femcord.Button(f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=femcord.ButtonStyles.DANGER),
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="next", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING TRIANGLE}")),
-                    femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
-                )
-            )
+            buttons = [
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="previous", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING TRIANGLE}")),
+                femcord.Button(f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=femcord.ButtonStyles.DANGER),
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="next", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING TRIANGLE}")),
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
+            ]
+
+            if len(pages) > 4:
+                select_button = femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="select", disabled=disabled, emoji=types.Emoji(self, "\u0023\uFE0F\u20E3"))
+
+                if page in (0, 1):
+                    buttons[0] = select_button
+                elif page in (len(pages) - 1, len(pages) - 2):
+                    buttons[-1] = select_button
+
+            return femcord.Components(femcord.Row(*buttons))
 
         message = await function(**get_page(page), components=get_components(), **kwargs)
 
@@ -232,6 +261,33 @@ class HybridContext:
                     page = len(pages) - 1
                 case "cancel":
                     return await message.delete()
+                case "select":
+                    await interaction.callback(
+                        femcord.InteractionCallbackTypes.MODAL,
+                        components = femcord.Components(
+                            femcord.Row(
+                                femcord.TextInput(
+                                    "page",
+                                    custom_id = "select_page_input",
+                                    style = femcord.TextInputStyles.SHORT,
+                                    min_length = 1,
+                                    max_length = len(str(len(pages)))
+                                )
+                            ),
+                            title = "Select page",
+                            custom_id = "select_page_modal"
+                        )
+                    )
+
+                    interaction, = await self.bot.wait_for("interaction_create", lambda interaction: check(interaction, message), timeout=timeout)
+
+                    value = interaction.data.components[0].components[0].value
+
+                    if value.isnumeric():
+                        value = int(value) - 1
+
+                        if 0 <= value < len(pages):
+                            page = value
 
             await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, **get_page(page), components=get_components(), **kwargs)
 
@@ -239,20 +295,20 @@ class Context(HybridContext, commands.Context):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def send_paginator(self, content: Optional[str] = None, **kwargs) -> Awaitable[None]:
+    def send_paginator(self, content: Optional[str] = None, **kwargs: Unpack[PaginatorKwargs]) -> Awaitable[None]:
         return self.paginator(self.send, lambda interaction, message: interaction.user.id == self.author.id and interaction.channel.id == self.channel.id and interaction.message.id == message.id, content, **kwargs)
 
-    def reply_paginator(self, content: Optional[str] = None, **kwargs) -> Awaitable[None]:
+    def reply_paginator(self, content: Optional[str] = None, **kwargs: Unpack[PaginatorKwargs]) -> Awaitable[None]:
         return self.paginator(self.reply, lambda interaction, message: interaction.user.id == self.author.id and interaction.channel.id == self.channel.id and interaction.message.id == message.id, content, **kwargs)
 
 class AppContext(HybridContext, commands.AppContext):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-    def send_paginator(self, content: Optional[str] = None, **kwargs) -> Awaitable[None]:
+    def send_paginator(self, content: Optional[str] = None, **kwargs: Unpack[PaginatorKwargs]) -> Awaitable[None]:
         return self.paginator(self.send, lambda interaction, _: interaction.user.id == self.author.id and interaction.channel.id == self.channel.id and interaction.message is not None and interaction.message.interaction_metadata.id == self.interaction.id, content, **kwargs)
 
-    def reply_paginator(self, content: Optional[str] = None, **kwargs) -> Awaitable[None]:
+    def reply_paginator(self, content: Optional[str] = None, **kwargs: Unpack[PaginatorKwargs]) -> Awaitable[None]:
         return self.paginator(self.reply, lambda interaction, _: interaction.user.id == self.author.id and interaction.channel.id == self.channel.id and interaction.message is not None and interaction.message.interaction_metadata.id == self.interaction.id, content, **kwargs)
 
 class Bot(commands.Bot):
@@ -267,9 +323,9 @@ class Bot(commands.Bot):
         self.random_presence: bool = False
         self.presence_index: int = 0
         self.presence_indexes: list[int] = []
-        self.scheduler: Scheduler = Scheduler()
+        self.scheduler = Scheduler()
         self.ipc = IPC(self, config.FEMBOT_SOCKET_PATH, [config.DASHBOARD_SOCKET_PATH,])
-        self.loki: LokiClient = LokiClient(config.LOKI_BASE_URL, self.scheduler)
+        self.loki = LokiClient(config.LOKI_BASE_URL, self.scheduler)
         self.poligon: Poligon = None
 
         self.embed_color = 0xb22487
@@ -300,6 +356,13 @@ class Bot(commands.Bot):
 
                 print("loaded %s" % filename)
 
+        self.femscript_modules = FemscriptModules()
+
+        for filename in os.listdir("./femscript_modules"):
+            if filename[-4:] == ".fem":
+                with open("./femscript_modules/" + filename, "r") as f:
+                    self.femscript_modules.add_module(FemscriptModule(filename[:-4], f.read()))
+
         self.event(self.on_ready)
         self.event(self.on_close)
 
@@ -323,7 +386,8 @@ class Bot(commands.Bot):
                     language = "en",
                     verification_role = "",
                     verification_message = "",
-                    verification_channel = ""
+                    verification_channel = "",
+                    eventhandlers = {}
                 )
 
             guild.prefix = db_guild.prefix
@@ -415,7 +479,7 @@ class Bot(commands.Bot):
                 var("ActivityTypes", variables = [
                     var(status_type.name, status_type) for status_type in femcord.ActivityTypes
                 ])
-            ])
+            ], modules = self.femscript_modules)
 
             @femscript.wrap_function()
             def set_update_interval(interval: str | int):

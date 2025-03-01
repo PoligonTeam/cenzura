@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ limitations under the License.
 
 from tortoise.models import Model
 from tortoise.fields import Field, IntField, TextField, JSONField
-import json, config
+import json
 
 class TextArray(Field):
     SQL_TYPE = "text[]"
@@ -63,6 +63,7 @@ class Guilds(Model):
     verification_role = TextField()
     verification_message = TextField()
     verification_channel = TextField()
+    eventhandlers = JSONField()
 
 class Users(Model):
     id = IntField(pk=True)

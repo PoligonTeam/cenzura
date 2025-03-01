@@ -51,7 +51,7 @@ add_presence {
 add_presence {
     borrow(StatusTypes, ActivityTypes);
 
-    name = str(randint(1, 100, true));
+    name = str(random());
     status_type = &StatusTypes.ONLINE;
     activity_type = &ActivityTypes.PLAYING;
 };

@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -365,7 +365,7 @@ class Music(commands.Cog):
 
     #         return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
 
-    #     async with femcord.Typing(ctx.message):
+    #     async with femcord.Typing(ctx.channel):
     #         result = await run(
     #             lastfm.uiscript,
     #             modules = await get_modules(self.bot, ctx.guild, ctx=ctx, user=user),
@@ -393,7 +393,7 @@ class Music(commands.Cog):
 
             return await ctx.reply("This user doesn't have a linked lastfm account")
 
-        async with femcord.Typing(ctx.message):
+        async with femcord.Typing(ctx.channel):
             async with Client(LASTFM_API_KEY) as client:
                 try:
                     tracks = await client.recent_tracks(lastfm.username)
@@ -465,7 +465,7 @@ class Music(commands.Cog):
                     }
                 ]
 
-                femscript = Femscript(lastfm.script, variables=variables)
+                femscript = Femscript(lastfm.script, variables=variables, modules=self.bot.femscript_modules)
 
                 femscript.wrap_function(request)
                 femscript.wrap_function(femcord.Embed)
@@ -515,7 +515,7 @@ class Music(commands.Cog):
 
             return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
 
-        async with femcord.Typing(ctx.message):
+        async with femcord.Typing(ctx.channel):
             async with ClientSession() as session:
                 async with session.get(LASTFM_API_URL + f"?method=user.getInfo&user={lastfm.username}&api_key={LASTFM_API_KEY}&format=json") as response:
                     data = await response.json()
@@ -560,7 +560,7 @@ class Music(commands.Cog):
         lastfm_user = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == user.id][0]
         lastfm_scrobbles = []
 
-        async with femcord.Typing(ctx.message):
+        async with femcord.Typing(ctx.channel):
             async with Client(LASTFM_API_KEY) as client:
                 if isinstance(user_or_track, str):
                     try:
@@ -636,7 +636,7 @@ class Music(commands.Cog):
         lastfm_user = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == user.id][0]
         lastfm_scrobbles = []
 
-        async with femcord.Typing(ctx.message):
+        async with femcord.Typing(ctx.channel):
             async with Client(LASTFM_API_KEY) as client:
                 if isinstance(user_or_track, str):
                     try:
@@ -701,7 +701,7 @@ class Music(commands.Cog):
         if isinstance(ctx, commands.AppContext):
             await ctx.think()
 
-        async with femcord.Typing(ctx.message):
+        async with femcord.Typing(ctx.channel):
             artist = ""
 
             async with ClientSession() as session:

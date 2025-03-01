@@ -1,0 +1,18 @@
+discord = {
+    fn get_user(user_id) {
+        
+    }
+};
+
+# author = {
+#     borrow(__user);
+#
+#     id = &__user.id;
+#     username = &__user.username;
+#     avatar = &__user.avatar;
+#     bot = &__user.bot;
+#
+#     fn avatar_as(extension, size) {
+#         format("https://cdn.discordapp.com/avatars/{}/{}.{}?size={}", __user.id, __user.avatar, extension, size)
+#     }
+# };

@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -60,7 +60,8 @@ class Events(commands.Cog):
                 language = "en",
                 verification_role = "",
                 verification_message = "",
-                verification_channel = ""
+                verification_channel = "",
+                eventhandlers = {}
             )
 
         self.bot.loki.add_guild_log(guild)
@@ -88,7 +89,7 @@ class Events(commands.Cog):
                 for key, value in convert(user=member.user, guild=guild).items()
             ]
 
-            femscript = Femscript(guild.welcome_message, variables=variables)
+            femscript = Femscript(guild.welcome_message, variables=variables, modules=self.bot.femscript_modules)
 
             @femscript.wrap_function()
             def set_channel(channel_id: str) -> None:
@@ -132,7 +133,7 @@ class Events(commands.Cog):
                 for key, value in convert(user=user, guild=guild).items()
             ]
 
-            femscript = Femscript(guild.leave_message, variables=variables)
+            femscript = Femscript(guild.leave_message, variables=variables, modules=self.bot.femscript_modules)
 
             @femscript.wrap_function()
             def set_channel(channel_id: str) -> None:

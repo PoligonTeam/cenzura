@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,7 +15,8 @@ limitations under the License.
 """
 
 from femcord.femcord import types
-from femscript import FemscriptException
+from femcord.femcord.enums import ChannelTypes
+from femscript import Femscript, generate_tokens, parse_equation, FemscriptException, Token
 from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError
 from models import Artists, LastFM, Lyrics
 from config import LASTFM_API_URL, LASTFM_API_KEY
@@ -27,6 +28,7 @@ import config
 import random
 import json
 import re
+import operator
 
 class fg:
     black = "\u001b[30m"
@@ -170,7 +172,7 @@ def convert(**items):
             bot = user.bot
         ),
         types.Channel: (channel_convert := lambda channel: dict(
-            type = channel.type.name,
+            type = channel.type.name if channel.type else ChannelTypes.DM.name,
             id = channel.id,
             name = channel.name,
             topic = channel.topic,
@@ -370,9 +372,9 @@ token_specification = [
     ("KEYWORD",     r"\b(fn|import|return|if|else|and|or|borrow)\b"),
     ("FUNCTION",    r"\b[_a-zA-Z][\w]*(?:\.[_a-zA-Z][\w]*)*\b(?=\s*(\(|\{))"),
     ("IDENTIFIER",  r"\b[_a-zA-Z][\w]*\b"),
-    ("OPERATOR",    r"[=+*/-]"),
+    ("OPERATOR",    r"[%=+*/-]"),
     ("BRACKET",     r"[{}()\[\]]"),
-    ("PUNCTUATION", r"[.,&:;]"),
+    ("PUNCTUATION", r"[!.,&:;]"),
     ("NEWLINE",     r"\n"),
     ("SKIP",        r"[ \t]+")
 ]
@@ -413,3 +415,26 @@ def highlight(code: str) -> str:
             highlighted_code += value
 
     return highlighted_code
+
+def run_equation(tokens: list[Token]) -> float:
+    tokens = parse_equation(tokens)
+
+    stack = []
+
+    operators = {
+        "Plus": operator.add,
+        "Minus": operator.sub,
+        "Multiply": operator.mul,
+        "Divide": operator.truediv,
+        "Modulo": operator.mod
+    }
+
+    for token in tokens:
+        if token["type"] == "Int":
+            stack.append(token["number"])
+        elif token["type"] in operators:
+            stack.append(operators[token["type"]](stack.pop(-2), stack.pop()))
+        else:
+            stack.append(token)
+
+    return stack[0]

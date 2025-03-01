@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,8 +16,9 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands, types
+from femscript import FemscriptModule
 from datetime import datetime, timedelta
-import asyncio, time, ast, inspect, models
+import asyncio, time, ast, inspect, models, os
 
 from typing import Union, Optional, Any, TYPE_CHECKING
 
@@ -97,6 +98,16 @@ class Dev(commands.Cog):
             suffix = ""
 
         await ctx.reply_paginator(str(result), prefix=prefix, suffix=suffix)
+
+    @commands.command(aliases=["rfs"])
+    @commands.is_owner
+    async def reload_fs(self, ctx: "Context"):
+        for filename in os.listdir("./femscript_modules"):
+            if filename[-4:] == ".fem":
+                with open("./femscript_modules/" + filename, "r") as f:
+                    self.bot.femscript_modules.add_module(FemscriptModule(filename[:-4], f.read()))
+
+        await ctx.reply("ok")
 
     @commands.command(description="fembot is a bot, the bot is fembot")
     @commands.is_owner

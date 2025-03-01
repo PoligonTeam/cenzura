@@ -8,6 +8,4 @@ playwright
 psutil
 pyfiglet
 tortoise-orm[asyncpg]
-yt-dlp
-maturi
 pyjwt

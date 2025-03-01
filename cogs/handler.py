@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -84,7 +84,7 @@ class ErrorHandler(commands.Cog):
         elif isinstance(error, femcord.HTTPException):
             formatted_error = "".join(traceback.format_exception(type(error), error, error.__traceback__))
 
-            if "error" not in error.original_error:
+            if "errors" not in error.original_error:
                 return await ctx.reply_paginator(formatted_error, prefix="```py\n", suffix="```", page=-1)
 
             def walk(data, indent=0):

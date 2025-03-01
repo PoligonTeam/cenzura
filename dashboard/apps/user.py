@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import jwt, config
+import jwt
+import config
 
 from aiohttp import web
 
@@ -39,7 +40,7 @@ def logged_in(func: RouteFunction) -> RouteFunction:
             request["user_id"] = payload["user_id"]
         except jwt.ExpiredSignatureError:
             return web.json_response({"error": "Token has expired"}, status=401)
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
             return web.json_response({"error": "Invalid token"}, status=401)
 
         return func(request)
@@ -196,7 +197,7 @@ class User:
 
         endpoint = request.match_info.get("endpoint")
 
-        if not endpoint in endpoints:
+        if endpoint not in endpoints:
             return web.HTTPNotFound()
 
         data = await request.json()

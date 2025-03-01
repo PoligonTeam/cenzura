@@ -1,5 +1,5 @@
 """
-Copyright 2022-2024 PoligonTeam
+Copyright 2022-2025 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import asyncio, jwt, os, sys, importlib.util, logging, config
+import asyncio
+import jwt
+import os
+import sys
+import importlib.util
+import logging
+import config
+
+from scheduler.scheduler import Scheduler, TempDict
 
 from aiohttp import web, abc, ClientSession
 
@@ -33,12 +41,13 @@ EPOCH = 1626559200
 
 class Cache:
     def __init__(self) -> None:
+        self.scheduler = Scheduler()
         self.cogs: list[dict] = []
         self.default_prefix: str = None
         self.stats: dict = None
         self.bot: dict = None
         self.tokens: list[tuple[str, str]] = []
-        self.captcha: dict[str, dict] = {}
+        self.captcha: dict[str, dict] = TempDict(self.scheduler, "10m")
 
 class AccessLogger(abc.AbstractAccessLogger):
     def log(self, request: web.Request, response: web.Response, time: float) -> None:
@@ -87,9 +96,15 @@ class Server:
 
     @web.middleware
     async def middleware(self, request: web.Request, handler: web.RequestHandler) -> web.Response:
-        response: web.Response = await handler(request)
+        if request.method == "OPTIONS":
+            response = web.Response(status=200)
+        else:
+            response: web.Response = await handler(request)
 
         response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Length"
 
         return response
 
