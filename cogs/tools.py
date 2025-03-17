@@ -303,5 +303,78 @@ class Tools(commands.Cog):
 
             await ctx.reply(result)
 
+    @commands.hybrid_command(description="anime", aliases=["anilist"])
+    async def anime(self, ctx: Union["Context", "AppContext"], *, search: str):
+        query = """
+            query($search: String) {
+                Media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
+                    title {
+                        english
+                        native
+                        romaji
+                    }
+                    description
+                    episodes
+                    genres
+                    siteUrl
+                    isAdult
+                    format
+                    duration
+                    status
+                    coverImage {
+                        large
+                        color
+                    }
+                    bannerImage
+                    trailer {
+                        site
+                        id
+                    }
+                    characters(role: MAIN, perPage: 1) {
+                        nodes {
+                            image {
+                                large
+                            }
+                        }
+                    }
+                }
+            }
+        """
+
+        async with ClientSession() as session:
+            async with session.post("https://graphql.anilist.co", json={"query": query, "variables": {"search": search}}) as response:
+                data = await response.json()
+                data = data["data"]["Media"]
+
+        if data["isAdult"] and not ctx.channel.nsfw:
+            raise commands.NotNsfw
+
+        embed = femcord.Embed(description=data["description"].replace("<br>", "\n"), color=int(data["coverImage"]["color"][1:] if data["coverImage"]["color"] else "1", 16))
+
+        embed.set_author(name=data["title"]["english"] or data["title"]["romaji"] or data["title"]["native"], url=data["siteUrl"], icon_url=data["characters"]["nodes"][0]["image"]["large"])
+
+        embed.add_field(name="Episodes", value=str(data["episodes"]), inline=True)
+        embed.add_field(name="Duration", value=f"{data["duration"]}m", inline=True)
+        embed.add_field(name="Is adult", value=("no", "yes")[data["isAdult"]], inline=True)
+
+        embed.add_field(name="Format", value=data["format"], inline=True)
+        embed.add_field(name="Status", value=data["status"], inline=True)
+        embed.add_field(name="Genres", value=", ".join(data["genres"]), inline=True)
+
+        embed.set_thumbnail(url=data["coverImage"]["large"])
+        embed.set_image(url=data["bannerImage"])
+
+        components = femcord.Components(
+            femcord.Row(
+                femcord.Button(
+                    "watch trailer",
+                    style = femcord.ButtonStyles.LINK,
+                    url = "https://youtu.be/" + data["trailer"]["id"]
+                )
+            )
+        ) if data["trailer"] and data["trailer"]["site"] == "youtube" else None
+
+        await ctx.reply(embed=embed, components=components)
+
 def setup(bot: "Bot") -> None:
     bot.load_cog(Tools(bot))

@@ -131,7 +131,7 @@ class HybridContext:
 
         return await femscript.execute()
 
-    async def send_translation(self, translation: str, format_args: tuple[Any] = None, *args, **kwargs) -> types.Message:
+    async def send_translation(self, translation: str, format_args: tuple[Any, ...] = None, *args, **kwargs) -> types.Message:
         result = await self.get_translation(translation, format_args)
 
         if isinstance(result, femcord.Embed):
@@ -140,7 +140,7 @@ class HybridContext:
 
         return await self.send(result, *args, **kwargs)
 
-    async def reply_translation(self, translation: str, format_args: tuple[Any] = None, *args, **kwargs) -> types.Message:
+    async def reply_translation(self, translation: str, format_args: tuple[Any, ...] = None, *args, **kwargs) -> types.Message:
         result = await self.get_translation(translation, format_args)
 
         if isinstance(result, femcord.Embed):

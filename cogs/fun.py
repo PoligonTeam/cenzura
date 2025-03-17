@@ -27,9 +27,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from concurrent.futures import ThreadPoolExecutor
 from pyfiglet import Figlet
 from utils import *
+from stickers import Sticker
 import io, random, urllib.parse, json, re
 
-from typing import Union, TYPE_CHECKING
+from typing import Optional, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context, AppContext
@@ -839,6 +840,146 @@ class Fun(commands.Cog):
     @commands.command(description="Random nickname")
     async def nick(self, ctx: "Context"):
         await ctx.reply(get_random_username())
+
+    @commands.hybrid_command()
+    async def sticker(self, ctx: Union["Context", "AppContext"], *, text: str):
+        if len(text) > 20:
+            return await ctx.reply_translation("too_long", (len(text), 20))
+
+        characters = Sticker.get_characters()
+
+        is_app = isinstance(ctx, commands.AppContext)
+
+        def get_components(character_name: str) -> femcord.Components:
+            character, = [character for character in characters if character["name"] == character_name]
+
+            return femcord.Components(
+                *[
+                    femcord.Row(
+                        femcord.SelectMenu(
+                            custom_id = f"characters:{i}-{i+25}",
+                            placeholder = "select character" if i == 0 else "more characters",
+                            options = [
+                                femcord.Option(
+                                    character["name"],
+                                    character["name"],
+                                    default = character["name"] == character_name
+                                )
+                                for character in characters[i:i+25]
+                            ]
+                        )
+                    )
+                    for i in range(0, len(characters), 25)
+                ] + [
+                    femcord.Row(
+                        femcord.SelectMenu(
+                            custom_id = "image",
+                            placeholder = "select image",
+                            options = [
+                                femcord.Option(
+                                    str(index),
+                                    image
+                                )
+                                for index, image in enumerate(character["images"])
+                            ]
+                        )
+                    )
+                ]
+            )
+
+        kwargs = {"flags": [femcord.enums.MessageFlags.EPHEMERAL]} if is_app else {}
+
+        message = await ctx.reply(files=[("image.png", characters[0]["pregen_showcase"])], components=get_components(characters[0]["name"]), **kwargs)
+
+        obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
+
+        def check(interaction: femcord.types.Interaction, _: Optional[femcord.types.Message] = None) -> bool:
+            if is_app:
+                return interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message is not None and interaction.message.interaction_metadata.id == ctx.interaction.id
+            return interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id
+
+        while True:
+            interaction: femcord.types.Interaction
+
+            try:
+                interaction, = await self.bot.wait_for("interaction_create", check, timeout=60)
+            except TimeoutError:
+                return await obj.edit(components=[])
+
+            if interaction.data.custom_id.split(":")[0] == "characters":
+                character, = [character for character in characters if character["name"] == interaction.data.values[0]]
+                await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, files=[("image.png", character["pregen_showcase"])], components=get_components(character["name"]))
+            elif interaction.data.custom_id == "image":
+                image = interaction.data.values[0]
+                await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
+                break
+
+        sticker = Sticker(image)
+
+        sticker.set_text(text)
+
+        components = femcord.Components(
+            femcord.Row(
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_left", emoji=types.Emoji(self.bot, "\N{BLACK LEFT-POINTING TRIANGLE}")),
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_up", emoji=types.Emoji(self.bot, "\N{UP-POINTING SMALL RED TRIANGLE}")),
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_down", emoji=types.Emoji(self.bot, "\N{DOWN-POINTING SMALL RED TRIANGLE}")),
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_right", emoji=types.Emoji(self.bot, "\N{BLACK RIGHT-POINTING TRIANGLE}"))
+            ),
+            femcord.Row(
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="rotate_left", emoji=types.Emoji(self.bot, "\N{RIGHTWARDS ARROW WITH HOOK}")),
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="rotate_right", emoji=types.Emoji(self.bot, "\N{LEFTWARDS ARROW WITH HOOK}")),
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="decrease_size", emoji=types.Emoji(self.bot, "\N{HEAVY MINUS SIGN}")),
+                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="increase_size", emoji=types.Emoji(self.bot, "\N{HEAVY PLUS SIGN}"))
+            ),
+            *(
+                [
+                    femcord.Row(
+                        femcord.Button("show", style=femcord.ButtonStyles.SECONDARY, custom_id="show")
+                    )
+                ]
+                if is_app else
+                [
+
+                ]
+            )
+        )
+
+        obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
+
+        message = await obj.edit(components=components, files=[("sticker.gif", await sticker.generate())])
+
+        obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
+
+        while True:
+            interaction: femcord.types.Interaction
+
+            try:
+                interaction, = await self.bot.wait_for("interaction_create", check, timeout=60)
+            except TimeoutError:
+                return await obj.edit(components=[])
+
+            match interaction.data.custom_id:
+                case "move_left":
+                    sticker.move_text(-10, 0)
+                case "move_right":
+                    sticker.move_text(10, 0)
+                case "move_down":
+                    sticker.move_text(0, 10)
+                case "move_up":
+                    sticker.move_text(0, -10)
+                case "rotate_left":
+                    sticker.rotate_text(sticker._angle + 10)
+                case "rotate_right":
+                    sticker.rotate_text(sticker._angle - 10)
+                case "decrease_size":
+                    sticker.set_text_size(sticker._text_size - 10)
+                case "increase_size":
+                    sticker.set_text_size(sticker._text_size + 10)
+                case "show":
+                    await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
+                    return await ctx.reply(files=[("sticker.gif", await sticker.generate())])
+
+            await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, components=components, files=[("sticker.gif", await sticker.generate())])
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Fun(bot))

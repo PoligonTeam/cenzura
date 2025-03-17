@@ -25,6 +25,7 @@ class Renderer:
 
         self.image = Image.new("RGB", (1920, 1080), (32, 32, 32))
         self.draw = ImageDraw.Draw(self.image)
+        self.font = ImageFont.truetype("./assets/fonts/HKNova-Medium.ttf", 15)
 
         self.image_data = io.BytesIO()
 
@@ -33,8 +34,7 @@ class Renderer:
 
         for player in self.client.players + [self.client]:
             self.image.paste(Image.open(f"./korrumzthegame/assets/players/player{player.image_number}.png"), (player.x, player.y))
-            font = ImageFont.truetype("./assets/fonts/HKNova-Medium.ttf", 15)
-            self.draw.text((player.x, player.y - 25), player.username, (255, 255, 255), font=font)
+            self.draw.text((player.x, player.y - 25), player.username, (255, 255, 255), font=self.font)
 
         for bug in self.client.bugs:
             self.image.paste(Image.open(f"./korrumzthegame/assets/bugs/bug{bug.image_number}.png"), (bug.x, bug.y))

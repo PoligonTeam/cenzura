@@ -30,6 +30,8 @@ import json
 import re
 import operator
 
+from typing import Optional
+
 class fg:
     black = "\u001b[30m"
     red = "\u001b[31m"
@@ -332,10 +334,10 @@ def table(names, rows):
 
     return text
 
-async def request(method: str, url: str, *, headers: dict = None, cookies: dict = None, data: dict = None):
+async def request(method: str, url: str, *, headers: Optional[dict] = None, cookies: Optional[dict] = None, data: Optional[dict] = None):
     async with ClientSession(timeout=ClientTimeout(10)) as session:
         try:
-            async with session.request(method, url, headers=headers, cookies=cookies, json=data, proxy=config.PROXY) as response:
+            async with session.request(method, url, headers={"User-Agent": "femscript/1.0"} | (headers or {}), cookies=cookies, json=data, proxy=config.PROXY) as response:
                 length = response.content_length
 
                 if length is not None and length > 10 * 1024 * 1024:
