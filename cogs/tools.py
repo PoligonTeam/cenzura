@@ -174,7 +174,7 @@ class Tools(commands.Cog):
         if not isinstance(ctx, commands.AppContext) and not ctx.channel.nsfw:
             raise commands.NotNsfw
 
-        async with femcord.Typing(ctx.channel):
+        async with femcord.HybridTyping(ctx):
             result = URL_PATTERN.match(url)
 
             if result is None:
@@ -183,16 +183,13 @@ class Tools(commands.Cog):
             if result.group(1) is None:
                 url = "https://" + url
 
-            if isinstance(ctx, commands.AppContext):
-                await ctx.think()
-
             async with ApiClient(self.bot.local_api_base_url) as client:
                 try:
                     data = await client.screenshot(url, full_page)
                 except ApiError as e:
                     return await ctx.reply(e)
 
-            message = await ctx.reply(files=[("image.png", data.image)], components=femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl"))))
+            message = await ctx.reply(files=[("image.png", data.image)], components=femcord.Components(components=[femcord.ActionRow(components=[femcord.Button(label="curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl")])]))
 
         is_app = isinstance(ctx, commands.AppContext)
         obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
@@ -205,57 +202,68 @@ class Tools(commands.Cog):
         try:
             interaction, = await self.bot.wait_for("interaction_create", check, timeout=60)
         except TimeoutError:
-            components = femcord.Components(femcord.Row(femcord.Button("curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl", disabled=True)))
+            components = femcord.Components(
+                components = [
+                    femcord.ActionRow(
+                        components = [
+                            femcord.Button(
+                                label = "curl",
+                                style = femcord.ButtonStyles.SECONDARY,
+                                custom_id = "curl",
+                                disabled = True
+                            )
+                        ]
+                    )
+                ]
+            )
+
             return await obj.edit(components=components)
 
         await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
         await ctx.paginator(obj.edit, check, data.content, embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
 
-    @commands.hybrid_command(description="Downloads video via cobalt", aliases=["ytdl", "tiktok", "shorts"])
-    async def cobalt(self, ctx: Union["Context", "AppContext"], url: str, audio_only: bool | int = 0):
-        if isinstance(ctx, commands.AppContext):
-            await ctx.think()
+    # @commands.hybrid_command(description="Downloads video via cobalt", aliases=["ytdl", "tiktok", "shorts"])
+    # async def cobalt(self, ctx: Union["Context", "AppContext"], url: str, audio_only: bool | int = 0):
+    #     async with femcord.HybridTyping(ctx):
+    #         try:
+    #             async with Cobalt() as cobalt:
+    #                 instance = await cobalt.get_best_instance()
+    #                 cobalt.set_instance(instance)
 
-        async with femcord.Typing(ctx.channel):
-            try:
-                async with Cobalt() as cobalt:
-                    instance = await cobalt.get_best_instance()
-                    cobalt.set_instance(instance)
+    #                 download = await cobalt.download(url, {
+    #                     "isAudioOnly": bool(audio_only),
+    #                 })
 
-                    download = await cobalt.download(url, {
-                        "isAudioOnly": bool(audio_only),
-                    })
+    #                 match download.type:
+    #                     case "stream" | "audio":
+    #                         return await ctx.reply(files=[(file.file_name, file.file) for file in download.files])
+    #                     case "picker":
+    #                         files = download.files
+    #                         form = FormData()
+    #                         form.add_field("MAX_FILE_SIZE", "1073741824")
+    #                         form.add_field("target", "1")
+    #                         for index, file in enumerate(files):
+    #                             if not file.is_audio:
+    #                                 form.add_field("image[%s]" % index, file.file, filename=file.file_name)
+    #                         async with cobalt._session.post("https://en.bloggif.com/slide?id=" + "".join([random.choice(string.ascii_lowercase + string.digits) for _ in range(32)]), headers={"User-Agent": self.bot.user_agent}, data=form) as response:
+    #                             content = await response.text()
+    #                             soup = BeautifulSoup(content)
+    #                             gif = soup.select_one(".result-image > img").attrs["src"]
+    #                         for files in [files[i:i+10] for i in range(0, len(files), 10)]:
+    #                             async with femcord.Typing(ctx.channel):
+    #                                 await ctx.reply(files=[(file.file_name, file.file) for file in files if not file.is_audio])
+    #                         async with femcord.Typing(ctx.channel):
+    #                             async with ClientSession() as session:
+    #                                 async with session.get("https://en.bloggif.com/" + gif) as response:
+    #                                     if response.status == 200:
+    #                                         await ctx.reply(files=[("output.gif", await response.content.read())])
+    #                         async with femcord.Typing(ctx.channel):
+    #                             await ctx.reply(files=[(file.file_name, file.file) for file in files if file.is_audio])
+    #                         return
+    #         except asyncio.TimeoutError:
+    #             return await ctx.reply("Request timed out")
 
-                    match download.type:
-                        case "stream" | "audio":
-                            return await ctx.reply(files=[(file.file_name, file.file) for file in download.files])
-                        case "picker":
-                            files = download.files
-                            form = FormData()
-                            form.add_field("MAX_FILE_SIZE", "1073741824")
-                            form.add_field("target", "1")
-                            for index, file in enumerate(files):
-                                if not file.is_audio:
-                                    form.add_field("image[%s]" % index, file.file, filename=file.file_name)
-                            async with cobalt._session.post("https://en.bloggif.com/slide?id=" + "".join([random.choice(string.ascii_lowercase + string.digits) for _ in range(32)]), headers={"User-Agent": self.bot.user_agent}, data=form) as response:
-                                content = await response.text()
-                                soup = BeautifulSoup(content)
-                                gif = soup.select_one(".result-image > img").attrs["src"]
-                            for files in [files[i:i+10] for i in range(0, len(files), 10)]:
-                                async with femcord.Typing(ctx.channel):
-                                    await ctx.reply(files=[(file.file_name, file.file) for file in files if not file.is_audio])
-                            async with femcord.Typing(ctx.channel):
-                                async with ClientSession() as session:
-                                    async with session.get("https://en.bloggif.com/" + gif) as response:
-                                        if response.status == 200:
-                                            await ctx.reply(files=[("output.gif", await response.content.read())])
-                            async with femcord.Typing(ctx.channel):
-                                await ctx.reply(files=[(file.file_name, file.file) for file in files if file.is_audio])
-                            return
-            except asyncio.TimeoutError:
-                return await ctx.reply("Request timed out")
-
-            await ctx.reply("An unexpected error occurred")
+    #         await ctx.reply("An unexpected error occurred")
 
     # @commands.command(description="Nagrywa filmik ze strony", aliases=["recban", "record"])
     # async def rec(self, ctx: "Context", url):
@@ -365,13 +373,17 @@ class Tools(commands.Cog):
         embed.set_image(url=data["bannerImage"])
 
         components = femcord.Components(
-            femcord.Row(
-                femcord.Button(
-                    "watch trailer",
-                    style = femcord.ButtonStyles.LINK,
-                    url = "https://youtu.be/" + data["trailer"]["id"]
+            components = [
+                femcord.ActionRow(
+                    components = [
+                        femcord.Button(
+                            label = "watch trailer",
+                            style = femcord.ButtonStyles.LINK,
+                            url = "https://youtu.be/" + data["trailer"]["id"]
+                        )
+                    ]
                 )
-            )
+            ]
         ) if data["trailer"] and data["trailer"]["site"] == "youtube" else None
 
         await ctx.reply(embed=embed, components=components)

@@ -44,21 +44,29 @@ class Games(commands.Cog):
             avatar = random.randint(1, 20)
 
         components = femcord.Components(
-            femcord.Row(
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left up", emoji=Emoji(ctx.bot, "\N{NORTH WEST ARROW}")),
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="up", emoji=Emoji(ctx.bot, "\N{UPWARDS BLACK ARROW}")),
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right up", emoji=Emoji(ctx.bot, "\N{NORTH EAST ARROW}"))
-            ),
-            femcord.Row(
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left", emoji=Emoji(ctx.bot, "\N{LEFTWARDS BLACK ARROW}")),
-                femcord.Button(style=femcord.ButtonStyles.DANGER, custom_id="close", emoji=Emoji(ctx.bot, "\N{BLACK SQUARE FOR STOP}")),
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right", emoji=Emoji(ctx.bot, "\N{BLACK RIGHTWARDS ARROW}"))
-            ),
-            femcord.Row(
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left down", emoji=Emoji(ctx.bot, "\N{SOUTH WEST ARROW}")),
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="down", emoji=Emoji(ctx.bot, "\N{DOWNWARDS BLACK ARROW}")),
-                femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right down", emoji=Emoji(ctx.bot, "\N{SOUTH EAST ARROW}"))
-            )
+            components = [
+                femcord.ActionRow(
+                    components = [
+                        femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left up", emoji=Emoji(ctx.bot, "\N{NORTH WEST ARROW}")),
+                        femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="up", emoji=Emoji(ctx.bot, "\N{UPWARDS BLACK ARROW}")),
+                        femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right up", emoji=Emoji(ctx.bot, "\N{NORTH EAST ARROW}"))
+                    ]
+                ),
+                femcord.ActionRow(
+                    components = [
+                        femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left", emoji=Emoji(ctx.bot, "\N{LEFTWARDS BLACK ARROW}")),
+                        femcord.Button(style=femcord.ButtonStyles.DANGER, custom_id="close", emoji=Emoji(ctx.bot, "\N{BLACK SQUARE FOR STOP}")),
+                        femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right", emoji=Emoji(ctx.bot, "\N{BLACK RIGHTWARDS ARROW}"))
+                    ]
+                ),
+                femcord.ActionRow(
+                    components = [
+                        femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="left down", emoji=Emoji(ctx.bot, "\N{SOUTH WEST ARROW}")),
+                        femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="down", emoji=Emoji(ctx.bot, "\N{DOWNWARDS BLACK ARROW}")),
+                        femcord.Button(style=femcord.ButtonStyles.SECONDARY, custom_id="right down", emoji=Emoji(ctx.bot, "\N{SOUTH EAST ARROW}"))
+                    ]
+                )
+            ]
         )
 
         renderer = Renderer()
@@ -104,7 +112,7 @@ class Games(commands.Cog):
 
             if interaction.data.custom_id == "close":
                 await renderer.client.close()
-                return await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, "Thank you for playing", embed=femcord.Embed(), components=femcord.Components(), files=[], other={"attachments": []})
+                return await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, "Thank you for playing", embed=femcord.Embed(), components=[], files=[], other={"attachments": []})
 
             await renderer.client.move(interaction.data.custom_id)
 

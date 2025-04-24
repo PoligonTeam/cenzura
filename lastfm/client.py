@@ -15,10 +15,10 @@ limitations under the License.
 """
 
 import aiohttp, re, hashlib
-from typing import Optional, Type, Sequence
+from typing import Optional, Type, Sequence, Literal
 from types import TracebackType
 from urllib.parse import quote_plus
-from .models import RecentTracks, Track, Artist
+from .models import RecentTracks, Track, Artist, TopArtist
 from .exceptions import *
 
 IMAGE_REGEX = re.compile(r"<meta property=\"og:image\"[ ]+content=\"([\w/:.]+)\" data-replaceable-head-tag>")
@@ -122,6 +122,18 @@ class Client:
         })
 
         return RecentTracks.from_dict(response)
+
+    @check_api_key
+    async def top_artists(self, username: str, period: Literal["overall", "7day", "1month", "3month", "6month", "12month"] = "overall", limit: int = 1, **kwargs: dict) -> list[TopArtist]:
+        response = await self._request("GET", {
+            "method": "user.getTopArtists",
+            "user": username,
+            "period": period,
+            "limit": limit,
+            **kwargs
+        })
+
+        return [TopArtist.from_dict(artist) for artist in response["topartists"]["artist"]]
 
     @check_api_key
     async def track_info(self, artist: str, track: str, username: str = None, **kwargs: dict) -> Track:

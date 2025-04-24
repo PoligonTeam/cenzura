@@ -23,6 +23,7 @@ from models import LastFM
 from config import *
 from azuracast import NowPlaying
 from lastfm import Track, Artist, exceptions
+from groq import Groq
 import hashlib, datetime, asyncio, femlink, re, os
 
 from typing import Union, TYPE_CHECKING
@@ -380,9 +381,6 @@ class Music(commands.Cog):
 
     @commands.hybrid_command(description="lastfm - now playing", usage="[user]", aliases=["fmstats", "fm"])
     async def lastfm(self, ctx: Union["Context", "AppContext"], *, user: types.User = None):
-        if isinstance(ctx, commands.AppContext):
-            await ctx.think()
-
         user = user or ctx.author
 
         lastfm = self.lastfm_users.get(user.id)
@@ -393,7 +391,7 @@ class Music(commands.Cog):
 
             return await ctx.reply("This user doesn't have a linked lastfm account")
 
-        async with femcord.Typing(ctx.channel):
+        async with femcord.HybridTyping(ctx):
             async with Client(LASTFM_API_KEY) as client:
                 try:
                     tracks = await client.recent_tracks(lastfm.username)
@@ -696,12 +694,35 @@ class Music(commands.Cog):
 
         await ctx.reply(embed=embed)
 
+    @commands.hybrid_command(description="Judges your music taste")
+    async def judge(self, ctx: Union["Context", "AppContext"], user: types.User = None):
+        user = user or ctx.author
+
+        lastfm_user = self.lastfm_users.get(user.id)
+
+        if lastfm_user is None:
+            if ctx.author is user:
+                return await ctx.reply("You don't have a linked lastfm account, use `login` to link them")
+
+            return await ctx.reply("This user doesn't have a linked lastfm account")
+
+        async with femcord.HybridTyping(ctx):
+            async with Client(LASTFM_API_KEY) as client:
+                artists = await client.top_artists(lastfm_user.username, "7day", 3)
+
+                groq = Groq(GROQ_API_KEYS, "deepseek-r1-distill-llama-70b", "Generate a long-form, sarcastic, and humorous critique of someone's taste in a specific topic (e.g., music, movies, games, or fashion). " \
+                    "The tone should be playful, exaggerated, and packed with witty metaphors, absurd comparisons, and creative insults. " \
+                    "Avoid simple bullet points or structured lists—write in a flowing, rant-like format that builds on itself, " \
+                    "making each point more ridiculous and entertaining than the last. Keep it engaging, fun, and slightly unhinged, " \
+                    "while ensuring it remains lighthearted rather than mean-spirited. Maximum 800 characters. You can use some markdown too.")
+
+                result = await groq.chat("\n".join([f"{index}. {artist.name} - rank {artist.rank}" for index, artist in enumerate(artists)]))
+
+                await ctx.reply_paginator(result)
+
     @commands.hybrid_command(description="Pokazuje tekst piosenki", usage="[nazwa]")
     async def lyrics(self, ctx: Union["Context", "AppContext"], *, name = None):
-        if isinstance(ctx, commands.AppContext):
-            await ctx.think()
-
-        async with femcord.Typing(ctx.channel):
+        async with femcord.HybridTyping(ctx):
             artist = ""
 
             async with ClientSession() as session:

@@ -99,20 +99,40 @@ class Help(commands.Cog):
                     embed += selected_command.other["embed"]
 
             components = femcord.Components(
-                femcord.Row(
-                    femcord.SelectMenu(
-                        custom_id = "cog",
-                        placeholder = "",
-                        options = [femcord.Option(cog.name, cog.name, default=True if selected_cog == cog else False) for cog in self.bot.cogs if cog.commands and not cog.hidden]
+                components = [
+                    femcord.ActionRow(
+                        components = [
+                            femcord.StringSelect(
+                                custom_id = "cog",
+                                placeholder = "",
+                                options = [
+                                    femcord.StringSelectOption(
+                                        label = cog.name,
+                                        value = cog.name,
+                                        default=True if selected_cog == cog else False
+                                    )
+                                    for cog in self.bot.cogs if cog.commands and not cog.hidden
+                                ]
+                            )
+                        ]
+                    ),
+                    femcord.ActionRow(
+                        components = [
+                            femcord.StringSelect(
+                                custom_id = "command",
+                                placeholder = "Select command",
+                                options = [
+                                    femcord.StringSelectOption(
+                                        label = command.other.get("display_name", False) or command.name,
+                                        value = command.name,
+                                        default = True if selected_command == command else False
+                                    )
+                                    for command in selected_cog.commands if ((not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)) if not command.guild_id else command.guild_id == interaction.guild.id)
+                                ]
+                            )
+                        ]
                     )
-                ),
-                femcord.Row(
-                    femcord.SelectMenu(
-                        custom_id = "command",
-                        placeholder = "Select command",
-                        options = [femcord.Option(command.other.get("display_name", False) or command.name, command.name, default=True if selected_command == command else False) for command in selected_cog.commands if ((not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)) if not command.guild_id else command.guild_id == interaction.guild.id)]
-                    )
-                )
+                ]
             )
 
             await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, embed=embed, components=components)
@@ -161,28 +181,46 @@ class Help(commands.Cog):
             return await ctx.send(embed=embed)
 
         components = femcord.Components(
-            femcord.Row(
-                femcord.SelectMenu(
-                    custom_id = "cog",
-                    placeholder = "Select module",
-                    options = [femcord.Option(cog.name, cog.name) for cog in self.bot.cogs if cog.commands and not cog.hidden]
+            components = [
+                femcord.ActionRow(
+                    components = [
+                        femcord.StringSelect(
+                            custom_id = "cog",
+                            placeholder = "Select module",
+                            options = [
+                                femcord.StringSelectOption(
+                                    label = cog.name,
+                                    value = cog.name
+                                )
+                                for cog in self.bot.cogs if cog.commands and not cog.hidden
+                            ]
+                        )
+                    ]
                 )
+            ]
+        )
+
+        selected_cog = self.bot.get_cog(components[0]["components"][0]["options"][0]["value"])
+
+        components.add_component(
+            femcord.ActionRow(
+                components = [
+                    femcord.StringSelect(
+                        custom_id = "command",
+                        placeholder = "Select command",
+                        options = [
+                            femcord.StringSelectOption(
+                                label = command.other.get("display_name", False) or command.name,
+                                value = command.name
+                            )
+                            for command in selected_cog.commands if ((not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)) if not command.guild_id else command.guild_id == ctx.guild.id)
+                        ]
+                    )
+                ]
             )
         )
 
-        selected_cog = self.bot.get_cog(components.components[0]["components"][0]["options"][0]["value"])
-
-        components.add_row(
-            femcord.Row(
-                femcord.SelectMenu(
-                    custom_id = "command",
-                    placeholder = "Select command",
-                    options = [femcord.Option(command.other.get("display_name", False) or command.name, command.name) for command in selected_cog.commands if ((not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)) if not command.guild_id else command.guild_id == ctx.guild.id)]
-                )
-            )
-        )
-
-        components.components[0]["components"][0]["options"][0]["default"] = True
+        components[0]["components"][0]["options"][0]["default"] = True
 
         embed = femcord.Embed(title="Help:", color=self.bot.embed_color)
         embed.add_field(name=selected_cog.name + ":", value="> " + ", ".join("`" + (command.other.get("display_name", False) or command.name) + "`" for command in selected_cog.commands if ((not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)) if not command.guild_id else command.guild_id == ctx.guild.id)))

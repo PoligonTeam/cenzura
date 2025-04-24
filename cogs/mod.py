@@ -192,13 +192,17 @@ class Admin(commands.Cog):
             return await ctx.reply("This role doesn't exist")
 
         components = femcord.Components(
-            femcord.Row(
-                femcord.Button(
-                    await ctx.get_translation("captcha_button_text"),
-                    custom_id = "verification" + ctx.guild.id,
-                    style = femcord.ButtonStyles.SECONDARY
+            components = [
+                femcord.ActionRow(
+                    components = [
+                        femcord.Button(
+                            label = await ctx.get_translation("captcha_button_text"),
+                            custom_id = "verification" + ctx.guild.id,
+                            style = femcord.ButtonStyles.SECONDARY
+                        )
+                    ]
                 )
-            )
+            ]
         )
 
         message = await channel.send(**{"content" if not isinstance(result, femcord.Embed) else "embed": result}, components=components)

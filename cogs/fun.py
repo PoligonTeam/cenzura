@@ -16,6 +16,7 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands, types, InvalidArgument, HTTPException
+from femcord.femcord.commands import Min, Max
 from femcord.femcord.http import Route
 from femcord.femcord.permissions import Permissions
 from femcord.femcord.enums import Intents, ApplicationCommandTypes, PublicFlags
@@ -27,8 +28,9 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from concurrent.futures import ThreadPoolExecutor
 from pyfiglet import Figlet
 from utils import *
+from utils import _
 from stickers import Sticker
-import io, random, urllib.parse, json, re
+import io, random, urllib.parse, json, re, string
 
 from typing import Optional, Union, TYPE_CHECKING
 
@@ -38,9 +40,9 @@ if TYPE_CHECKING:
 class Fun(commands.Cog):
     def __init__(self, bot: "Bot") -> None:
         self.bot = bot
-        self.translations = self.bot.get_translations_for("fun")
         self.results = {}
         self.urls = {}
+        self.translations = bot.get_translations_for("fun")
 
     @commands.hybrid_command(description="User avatar", usage="[user]", aliases=["av"], type=ApplicationCommandTypes.USER)
     async def avatar(self, ctx: Union["Context", "AppContext"], user: types.User = None):
@@ -54,10 +56,7 @@ class Fun(commands.Cog):
 
     @commands.hybrid_command(description="Shows the percentage of love between users", usage="(user) [user]", aliases=["love"], type=ApplicationCommandTypes.USER)
     async def ship(self, ctx: Union["Context", "AppContext"], user: types.User, user2: types.User = None):
-        if isinstance(ctx, commands.AppContext):
-            await ctx.think()
-
-        async with femcord.Typing(ctx.channel):
+        async with femcord.HybridTyping(ctx):
             user2 = user2 or ctx.author
 
             user_avatar_response = await self.bot.http.session.get(user.avatar_as("png"))
@@ -89,7 +88,13 @@ class Fun(commands.Cog):
 
             await self.bot.loop.create_task(async_create_image())
 
-            await ctx.reply_translation("ship_return_text", (user.username, user2.username, user.username[:len(user.username) // 2].lower() + user2.username[len(user2.username) // 2:].lower(), get_int(user, user2)), files=[("ship.png", result_image.getvalue())])
+            await ctx.reply(_(
+                "**{}** + **{}** = **{}**\nThey love each other for **{}%**!",
+                user.username,
+                user2.username,
+                user.username[:len(user.username) // 2].lower() + user2.username[len(user2.username) // 2:].lower(),
+                get_int(user, user2)
+            ), files=[("ship.png", result_image.getvalue())])
 
     @commands.command(description="dog", aliases=["ars", "6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"])
     async def dog(self, ctx: "Context"):
@@ -160,7 +165,7 @@ class Fun(commands.Cog):
     @commands.command(description="Achievement Get!", usage="(text)")
     async def achievement(self, ctx: "Context", *, text: replace_chars):
         if len(text) > 23:
-            return await ctx.reply_translation("too_long", (len(text), 23))
+            return await ctx.reply(await _("Provided text is too long (`{}`/`{}`)", len(text), 23))
 
         image = await self.bot.http.session.get(f"https://minecraftskinstealer.com/achievement/{random.randint(1, 40)}/Achievement+Get%21/{text}")
 
@@ -169,7 +174,7 @@ class Fun(commands.Cog):
     @commands.command(description="Replaces text with garfield emojis", usage="(text)")
     async def garfield(self, ctx: "Context", *, text: replace_chars):
         if len(text) > 60:
-            return await ctx.reply_translation("too_long", (len(text), 60))
+            return await ctx.reply(await _("Provided text is too long (`{}`/`{}`)", len(text), 60))
 
         allowed_chars = [emoji.name.split("_")[1] for emoji in self.bot.gateway.emojis if emoji.name.startswith("garfield_")]
 
@@ -190,12 +195,12 @@ class Fun(commands.Cog):
         text = text.split(" | ")
 
         if 2 > len(text):
-            return await ctx.reply_translation("encode_hidden_missing")
+            return await ctx.reply(_("You did not provide the hidden text"))
 
         text[1] = text[1].replace(" ", "_")
 
         if len(text[0]) < 2:
-            return await ctx.reply_translation("too_short", (len(text[0]), 2))
+            return await ctx.reply(await _("Provided text is too short (`{}`/`{}`)", len(text[0]), 2))
 
         await ctx.reply(text[0][0] + encode_text(text[1]) + text[0][1:])
 
@@ -327,7 +332,7 @@ class Fun(commands.Cog):
 
         if isinstance(arg, str):
             if len(arg) > 105:
-                return await ctx.reply_translation("too_long", (len(arg), 105))
+                return await ctx.reply(await _("Provided text is too long (`{}`/`{}`)", len(arg), 105))
 
             if len(arg) > 15:
                 arg = "\n".join(arg[x:x+15] for x in range(0, len(arg), 15))
@@ -506,16 +511,16 @@ class Fun(commands.Cog):
             if member.hoisted_role is not None:
                 color = member.hoisted_role.color
 
-        embed = femcord.Embed(title=await ctx.get_translation("information_about", (user.global_name or user.username,)), color=color)
+        embed = femcord.Embed(title=await _("Information about {}:", user.global_name or user.username), color=color)
         embed.set_thumbnail(url=user.avatar_url)
 
         embed.add_field(name="ID:", value=user.id)
-        embed.add_field(name=await ctx.get_translation("ui_username"), value=user.username)
+        embed.add_field(name=_("Username:"), value=user.username)
         if member is not None:
             if member.nick is not None:
-                embed.add_field(name=await ctx.get_translation("ui_nickname"), value=member.nick)
+                embed.add_field(name=_("Nickname:"), value=member.nick)
             if member.roles[1:]:
-                embed.add_field(name=await ctx.get_translation("roles"), value=" ".join(types.m @ role for role in member.roles[1:]))
+                embed.add_field(name=_("Roles:"), value=" ".join(types.m @ role for role in member.roles[1:]))
             text = ""
             client_status = member.presence.client_status
             if client_status.desktop:
@@ -589,7 +594,19 @@ class Fun(commands.Cog):
         if member is not None:
             args.append(types.m @ user)
         if user.bot is True:
-            kwargs["components"] = femcord.Components(femcord.Row(femcord.Button(await ctx.get_translation("ui_add_bot"), url=link)))
+            kwargs["components"] = femcord.Components(
+                components = [
+                    femcord.ActionRow(
+                        components = [
+                            femcord.Button(
+                                label = await ctx.get_translation("ui_add_bot"),
+                                style = femcord.ButtonStyles.LINK,
+                                url = link
+                            )
+                        ]
+                    )
+                ]
+            )
 
         await ctx.reply(*args, embed=embed, **kwargs)
 
@@ -808,15 +825,23 @@ class Fun(commands.Cog):
 
         def get_components():
             return femcord.Components(
-                femcord.Row(
-                    femcord.SelectMenu(
-                        custom_id = "members",
-                        placeholder = "Choose a member",
-                        options = [
-                            femcord.Option(member.user.username, member.user.id) for member in members
+                components = [
+                    femcord.ActionRow(
+                        components = [
+                            femcord.StringSelect(
+                                custom_id = "members",
+                                placeholder = "Choose a member",
+                                options = [
+                                    femcord.StringSelectOption(
+                                        label = member.user.username,
+                                        value = member.user.id
+                                    )
+                                    for member in members
+                                ]
+                            )
                         ]
                     )
-                )
+                ]
             )
 
         message = await ctx.reply(embed=embed, components=get_components())
@@ -842,52 +867,56 @@ class Fun(commands.Cog):
         await ctx.reply(get_random_username())
 
     @commands.hybrid_command()
-    async def sticker(self, ctx: Union["Context", "AppContext"], *, text: str):
+    async def sticker(self, ctx: Union["Context", "AppContext"], *, text: Max[str, 20]):
+        is_app = isinstance(ctx, commands.AppContext)
+        kwargs = {"flags": [femcord.enums.MessageFlags.EPHEMERAL]} if is_app else {}
+
         if len(text) > 20:
-            return await ctx.reply_translation("too_long", (len(text), 20))
+            return await ctx.reply(await _("Provided text is too long (`{}`/`{}`)", len(text), 20))
 
         characters = Sticker.get_characters()
-
-        is_app = isinstance(ctx, commands.AppContext)
 
         def get_components(character_name: str) -> femcord.Components:
             character, = [character for character in characters if character["name"] == character_name]
 
             return femcord.Components(
-                *[
-                    femcord.Row(
-                        femcord.SelectMenu(
-                            custom_id = f"characters:{i}-{i+25}",
-                            placeholder = "select character" if i == 0 else "more characters",
-                            options = [
-                                femcord.Option(
-                                    character["name"],
-                                    character["name"],
-                                    default = character["name"] == character_name
-                                )
-                                for character in characters[i:i+25]
-                            ]
-                        )
+                components = [*[
+                    femcord.ActionRow(
+                        components = [
+                            femcord.StringSelect(
+                                custom_id = f"characters:{i}-{i+25}",
+                                placeholder = "more characters",
+                                options = [
+                                    femcord.StringSelectOption(
+                                        label = character["name"],
+                                        value = character["name"],
+                                        default = character["name"] == character_name
+                                    )
+                                    for character in characters[i:i+25]
+                                ]
+                            )
+                        ]
                     )
                     for i in range(0, len(characters), 25)
                 ] + [
-                    femcord.Row(
-                        femcord.SelectMenu(
-                            custom_id = "image",
-                            placeholder = "select image",
-                            options = [
-                                femcord.Option(
-                                    str(index),
-                                    image
-                                )
-                                for index, image in enumerate(character["images"])
-                            ]
-                        )
+                    femcord.ActionRow(
+                        components = [
+                            femcord.StringSelect(
+                                custom_id = f"image:{i}-{i+25}",
+                                placeholder = "select image" if i == 0 else "more images",
+                                options = [
+                                    femcord.StringSelectOption(
+                                        label = str(i + index),
+                                        value = image
+                                    )
+                                    for index, image in enumerate(character["images"][i:i+25])
+                                ]
+                            )
+                        ]
                     )
-                ]
+                    for i in range(0, len(character["images"]), 25)
+                ]]
             )
-
-        kwargs = {"flags": [femcord.enums.MessageFlags.EPHEMERAL]} if is_app else {}
 
         message = await ctx.reply(files=[("image.png", characters[0]["pregen_showcase"])], components=get_components(characters[0]["name"]), **kwargs)
 
@@ -909,7 +938,7 @@ class Fun(commands.Cog):
             if interaction.data.custom_id.split(":")[0] == "characters":
                 character, = [character for character in characters if character["name"] == interaction.data.values[0]]
                 await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, files=[("image.png", character["pregen_showcase"])], components=get_components(character["name"]))
-            elif interaction.data.custom_id == "image":
+            elif interaction.data.custom_id.split(":")[0] == "image":
                 image = interaction.data.values[0]
                 await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
                 break
@@ -919,30 +948,34 @@ class Fun(commands.Cog):
         sticker.set_text(text)
 
         components = femcord.Components(
-            femcord.Row(
-                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_left", emoji=types.Emoji(self.bot, "\N{BLACK LEFT-POINTING TRIANGLE}")),
-                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_up", emoji=types.Emoji(self.bot, "\N{UP-POINTING SMALL RED TRIANGLE}")),
-                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_down", emoji=types.Emoji(self.bot, "\N{DOWN-POINTING SMALL RED TRIANGLE}")),
-                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_right", emoji=types.Emoji(self.bot, "\N{BLACK RIGHT-POINTING TRIANGLE}"))
-            ),
-            femcord.Row(
-                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="rotate_left", emoji=types.Emoji(self.bot, "\N{RIGHTWARDS ARROW WITH HOOK}")),
-                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="rotate_right", emoji=types.Emoji(self.bot, "\N{LEFTWARDS ARROW WITH HOOK}")),
-                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="decrease_size", emoji=types.Emoji(self.bot, "\N{HEAVY MINUS SIGN}")),
-                femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="increase_size", emoji=types.Emoji(self.bot, "\N{HEAVY PLUS SIGN}"))
-            ),
-            *(
-                [
-                    femcord.Row(
-                        femcord.Button("show", style=femcord.ButtonStyles.SECONDARY, custom_id="show")
-                    )
-                ]
-                if is_app else
-                [
-
-                ]
-            )
+            components = [
+                femcord.ActionRow(
+                    components = [
+                        femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_left", emoji=types.Emoji(self.bot, "\N{BLACK LEFT-POINTING TRIANGLE}")),
+                        femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_up", emoji=types.Emoji(self.bot, "\N{UP-POINTING SMALL RED TRIANGLE}")),
+                        femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_down", emoji=types.Emoji(self.bot, "\N{DOWN-POINTING SMALL RED TRIANGLE}")),
+                        femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="move_right", emoji=types.Emoji(self.bot, "\N{BLACK RIGHT-POINTING TRIANGLE}"))
+                    ]
+                ),
+                femcord.ActionRow(
+                    components = [
+                        femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="rotate_left", emoji=types.Emoji(self.bot, "\N{RIGHTWARDS ARROW WITH HOOK}")),
+                        femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="rotate_right", emoji=types.Emoji(self.bot, "\N{LEFTWARDS ARROW WITH HOOK}")),
+                        femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="decrease_size", emoji=types.Emoji(self.bot, "\N{HEAVY MINUS SIGN}")),
+                        femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="increase_size", emoji=types.Emoji(self.bot, "\N{HEAVY PLUS SIGN}"))
+                    ]
+                )
+            ]
         )
+
+        if is_app:
+            components.add_component(
+                femcord.ActionRow(
+                    components = [
+                        femcord.Button(label="show", style=femcord.ButtonStyles.SECONDARY, custom_id="show")
+                    ]
+                )
+            )
 
         obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
 
@@ -980,6 +1013,47 @@ class Fun(commands.Cog):
                     return await ctx.reply(files=[("sticker.gif", await sticker.generate())])
 
             await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, components=components, files=[("sticker.gif", await sticker.generate())])
+
+    @commands.Listener
+    async def on_interaction_create(self, interaction: femcord.types.Interaction):
+        if interaction.data.custom_id == "accept":
+            await interaction.callback(femcord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, content="Did we get you? [Add fembot](https://discord.com/oauth2/authorize?client_id=705552952600952960) to your profile to fool others!", flags=[femcord.enums.MessageFlags.EPHEMERAL])
+
+    @commands.hybrid_command()
+    async def nitro(self, ctx: Union["Context", "AppContext"]):
+        code = "".join([random.choice(string.ascii_letters) for _ in range(16)])
+
+        components = femcord.Components(
+            components = [
+                femcord.TextDisplay(content=f"<https://discord.gift/{code}>"),
+                femcord.Container(
+                    components = [
+                        femcord.Section(
+                            components = [
+                                femcord.TextDisplay(content="# You've been gifted a subscription!"),
+                                femcord.TextDisplay(content=f"You've been gifted Nitro for **1 {"month" if random.random() < 0.9 else "year"}**!")
+                            ],
+                            accessory = femcord.Thumbnail(
+                                media = femcord.UnfurledMediaItem(
+                                    url = "https://cdn.poligon.lgbt/XKWFuQpaPi.png"
+                                )
+                            )
+                        ),
+                        femcord.ActionRow(
+                            components = [
+                                femcord.Button(
+                                    style = femcord.ButtonStyles.PRIMARY,
+                                    label = "Accept",
+                                    custom_id = "accept"
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+
+        await ctx.reply(components=components, flags=[femcord.enums.MessageFlags.IS_COMPONENTS_V2])
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Fun(bot))

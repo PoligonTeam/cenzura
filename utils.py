@@ -16,7 +16,7 @@ limitations under the License.
 
 from femcord.femcord import types
 from femcord.femcord.enums import ChannelTypes
-from femscript import Femscript, generate_tokens, parse_equation, FemscriptException, Token
+from femscript import Femscript, generate_tokens, parse_equation, format_string, FemscriptException, Token
 from aiohttp import ClientSession, ClientTimeout, ClientHttpProxyError
 from models import Artists, LastFM, Lyrics
 from config import LASTFM_API_URL, LASTFM_API_KEY
@@ -29,8 +29,9 @@ import random
 import json
 import re
 import operator
+import inspect
 
-from typing import Optional
+from typing import Any, Optional, Awaitable
 
 class fg:
     black = "\u001b[30m"
@@ -440,3 +441,38 @@ def run_equation(tokens: list[Token]) -> float:
             stack.append(token)
 
     return stack[0]
+
+def fn1va(text: str) -> int:
+    offset = 0x811c9dc5
+    prime = 0x1000193
+
+    for char in text.encode():
+        if char == b" ":
+            continue
+        offset ^= char
+        offset *= prime
+        offset &= 0xffffffff
+
+    return offset
+
+def _(*args: Any, **kwargs: Any) -> str | Awaitable:
+    last_frame = inspect.currentframe().f_back
+    _vars = last_frame.f_globals | last_frame.f_locals
+    if "self" in _vars:
+        bot = _vars["self"].bot
+    else:
+        bot = _vars["bot"]
+    ctx = _vars["ctx"]
+
+    if len(args) > 1 or kwargs:
+        return format_string(_(args[0]), *args[1:], **kwargs)
+
+    _hash = fn1va(args[0])
+
+    if ctx.guild.language not in bot.translations:
+        return args[0]
+
+    if _hash not in bot.translations[ctx.guild.language]:
+        return args[0]
+
+    return bot.translations[ctx.guild.language][_hash]

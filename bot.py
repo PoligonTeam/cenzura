@@ -214,7 +214,7 @@ class HybridContext:
             buttons = [
                 femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="first", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING DOUBLE TRIANGLE}")),
                 femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="previous", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK LEFT-POINTING TRIANGLE}")),
-                femcord.Button(f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=femcord.ButtonStyles.DANGER),
+                femcord.Button(label=f"{page + 1}/{len(pages)}", custom_id="cancel", disabled=disabled, style=femcord.ButtonStyles.DANGER),
                 femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="next", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING TRIANGLE}")),
                 femcord.Button(style=femcord.ButtonStyles.PRIMARY, custom_id="last", disabled=disabled, emoji=types.Emoji(self, "\N{BLACK RIGHT-POINTING DOUBLE TRIANGLE}"))
             ]
@@ -227,7 +227,7 @@ class HybridContext:
                 elif page in (len(pages) - 1, len(pages) - 2):
                     buttons[-1] = select_button
 
-            return femcord.Components(femcord.Row(*buttons))
+            return femcord.Components(components=[femcord.ActionRow(components=buttons)])
 
         message = await function(**get_page(page), components=get_components(), **kwargs)
 
@@ -265,17 +265,21 @@ class HybridContext:
                     await interaction.callback(
                         femcord.InteractionCallbackTypes.MODAL,
                         components = femcord.Components(
-                            femcord.Row(
-                                femcord.TextInput(
-                                    "page",
-                                    custom_id = "select_page_input",
-                                    style = femcord.TextInputStyles.SHORT,
-                                    min_length = 1,
-                                    max_length = len(str(len(pages)))
-                                )
-                            ),
                             title = "Select page",
-                            custom_id = "select_page_modal"
+                            custom_id = "select_page_modal",
+                            components = [
+                                femcord.ActionRow(
+                                    components = [
+                                        femcord.TextInput(
+                                            label = "page",
+                                            custom_id = "select_page_input",
+                                            style = femcord.TextInputStyles.SHORT,
+                                            min_length = 1,
+                                            max_length = len(str(len(pages)))
+                                        )
+                                    ]
+                                )
+                            ]
                         )
                     )
 
@@ -355,6 +359,25 @@ class Bot(commands.Bot):
                 self.load_extension("cogs.%s" % filename[:-3])
 
                 print("loaded %s" % filename)
+
+        self.translations = {}
+
+        for filename in os.listdir("./cogs/translations"):
+            if not filename.endswith(".toml"):
+                continue
+
+            with open("./cogs/translations/" + filename, "r") as f:
+                lang = ""
+
+                for line in f:
+                    if line[0] == "[":
+                        lang = line[1:-2]
+                        if lang not in self.translations:
+                            self.translations[lang] = {}
+                        continue
+                    if line[0] == "\"":
+                        key, value = line.split(" = ", 1)
+                        self.translations[lang][int(key[1:-1], 16)] = value[1:-2].replace("\\n", "\n")
 
         self.femscript_modules = FemscriptModules()
 

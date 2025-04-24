@@ -111,6 +111,16 @@ class Artist:
         return cls(**data)
 
 @dataclass
+class TopArtist(Artist):
+    playcount: str = None
+    rank: str = None
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        data["rank"] = data.pop("@attr")["rank"]
+        return cls(**data)
+
+@dataclass
 class TrackAlbum:
     name: str
     artist: str = None
