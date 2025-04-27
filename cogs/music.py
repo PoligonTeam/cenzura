@@ -16,7 +16,7 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands, types, HTTPException
-from femscript import Femscript
+from femscript import Femscript, var
 from utils import *
 from aiohttp import ClientSession
 from models import LastFM
@@ -62,12 +62,12 @@ class Music(commands.Cog):
 
     @commands.Listener
     async def on_ready(self) -> None:
-        self.client = await femlink.Client(self.bot.gateway.bot_user.id, LAVALINK_IP, LAVALINK_PORT, LAVALINK_PASSWORD)
-        print("created lavalink client")
-
         self.lastfm_users = {
             user.user_id: user for user in (await LastFM.all())
         }
+
+        self.client = await femlink.Client(self.bot.gateway.bot_user.id, LAVALINK_IP, LAVALINK_PORT, LAVALINK_PASSWORD)
+        print("created lavalink client")
 
     @commands.Listener
     async def on_voice_server_update(self, data: dict) -> None:
@@ -468,7 +468,54 @@ class Music(commands.Cog):
                 femscript.wrap_function(request)
                 femscript.wrap_function(femcord.Embed)
 
+                @femscript.wrap_function()
+                def Components() -> femcord.Components:
+                    femscript.is_components_v2 = True
+                    return femcord.Components()
+
+                femscript.add_variable(var("ButtonStyles", {
+                    "PRIMARY": femcord.ButtonStyles.PRIMARY,
+                    "SECONDARY": femcord.ButtonStyles.SECONDARY,
+                    "SUCCESS": femcord.ButtonStyles.SUCCESS,
+                    "DANGER": femcord.ButtonStyles.DANGER,
+                    "LINK": femcord.ButtonStyles.LINK
+                }))
+
+                femscript.add_variable(var("PaddingSizes", {
+                    "SMALL": femcord.PaddingSizes.SMALL,
+                    "LARGE": femcord.PaddingSizes.LARGE
+                }))
+
+                femscript.add_variable(var("SelectDefaultValueTypes", {
+                    "USER": femcord.SelectDefaultValueTypes.USER,
+                    "ROLE": femcord.SelectDefaultValueTypes.ROLE,
+                    "CHANNEL": femcord.SelectDefaultValueTypes.CHANNEL
+                }))
+
+                femscript.wrap_function(femcord.ActionRow)
+                femscript.wrap_function(femcord.Button)
+                femscript.wrap_function(femcord.StringSelectOption)
+                femscript.wrap_function(femcord.StringSelect)
+                femscript.wrap_function(femcord.TextInput)
+                femscript.wrap_function(femcord.SelectDefaultValue)
+                femscript.wrap_function(femcord.UserSelect)
+                femscript.wrap_function(femcord.RoleSelect)
+                femscript.wrap_function(femcord.MentionableSelect)
+                femscript.wrap_function(femcord.ChannelSelect)
+                femscript.wrap_function(femcord.Section)
+                femscript.wrap_function(femcord.TextDisplay)
+                femscript.wrap_function(femcord.UnfurledMediaItem)
+                femscript.wrap_function(femcord.MediaItem)
+                femscript.wrap_function(femcord.Thumbnail)
+                femscript.wrap_function(femcord.MediaGallery)
+                femscript.wrap_function(femcord.File)
+                femscript.wrap_function(femcord.Separator)
+                femscript.wrap_function(femcord.Container)
+
                 result = await femscript.execute(debug=ctx.author.id in self.bot.owners)
+
+                if hasattr(femscript, "is_components_v2"):
+                    return await ctx.reply(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
 
                 if isinstance(result, femcord.Embed):
                     return await ctx.reply(embed=result)
@@ -755,15 +802,56 @@ class Music(commands.Cog):
 
                 lyrics = await get_track_lyrics(artist, name, session)
 
-                if lyrics is None:
+                artist_image = await get_artist_image(lyrics.artist)
+
+                if lyrics is None or not lyrics.lyrics:
                     return await ctx.reply("Nie ma tekstu dla tej piosenki")
 
-                lyrics = f"# SOURCE: {lyrics.source}\n" \
-                         f"# ARTIST NAME: {lyrics.artist}\n" \
-                         f"# TRACK NAME: {lyrics.title}\n\n" \
-                       + lyrics.lyrics
+        length = []
+        x = lambda i: (length.append(len(i)), i)[-1]
 
-        await ctx.reply_paginator(lyrics, prefix="```md\n", suffix="```", buttons=True)
+        components = femcord.Components(
+            components = [
+                femcord.Container(
+                    components = [
+                        femcord.Section(
+                            components = [
+                                femcord.TextDisplay(
+                                    content = x(f"## Source: `{lyrics.source}`")
+                                ),
+                                femcord.TextDisplay(
+                                    content = x(f"## Artist name: `{lyrics.artist}`")
+                                ),
+                                femcord.TextDisplay(
+                                    content = x(f"## Track name: `{lyrics.title}`")
+                                )
+                            ],
+                            accessory = femcord.Thumbnail(
+                                media = femcord.UnfurledMediaItem(
+                                    url = artist_image
+                                )
+                            )
+                        )
+                    ]
+                ),
+                femcord.Container(
+                    components = [
+                        femcord.TextDisplay(
+                            content = lyrics.lyrics[:4000-sum(length)]
+                        )
+                    ]
+                )
+            ]
+        )
+
+        await ctx.reply(components=components, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+
+        #         lyrics = f"# SOURCE: {lyrics.source}\n" \
+        #                  f"# ARTIST NAME: {lyrics.artist}\n" \
+        #                  f"# TRACK NAME: {lyrics.title}\n\n" \
+        #                + lyrics.lyrics
+
+        # await ctx.reply_paginator(lyrics, prefix="```md\n", suffix="```", buttons=True)
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Music(bot))

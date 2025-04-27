@@ -16,7 +16,7 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands, types, HTTPException
-from femscript import Femscript
+from femscript import Femscript, var
 from utils import convert, highlight
 from models import Guilds
 import datetime, re
@@ -174,6 +174,50 @@ class Admin(commands.Cog):
 
         femscript.wrap_function(femcord.Embed)
 
+        @femscript.wrap_function()
+        def Components() -> femcord.Components:
+            femscript.is_components_v2 = True
+            return femcord.Components()
+
+        femscript.add_variable(var("ButtonStyles", {
+            "PRIMARY": femcord.ButtonStyles.PRIMARY,
+            "SECONDARY": femcord.ButtonStyles.SECONDARY,
+            "SUCCESS": femcord.ButtonStyles.SUCCESS,
+            "DANGER": femcord.ButtonStyles.DANGER,
+            "LINK": femcord.ButtonStyles.LINK
+        }))
+
+        femscript.add_variable(var("PaddingSizes", {
+            "SMALL": femcord.PaddingSizes.SMALL,
+            "LARGE": femcord.PaddingSizes.LARGE
+        }))
+
+        femscript.add_variable(var("SelectDefaultValueTypes", {
+            "USER": femcord.SelectDefaultValueTypes.USER,
+            "ROLE": femcord.SelectDefaultValueTypes.ROLE,
+            "CHANNEL": femcord.SelectDefaultValueTypes.CHANNEL
+        }))
+
+        femscript.wrap_function(femcord.ActionRow)
+        femscript.wrap_function(femcord.Button)
+        femscript.wrap_function(femcord.StringSelectOption)
+        femscript.wrap_function(femcord.StringSelect)
+        femscript.wrap_function(femcord.TextInput)
+        femscript.wrap_function(femcord.SelectDefaultValue)
+        femscript.wrap_function(femcord.UserSelect)
+        femscript.wrap_function(femcord.RoleSelect)
+        femscript.wrap_function(femcord.MentionableSelect)
+        femscript.wrap_function(femcord.ChannelSelect)
+        femscript.wrap_function(femcord.Section)
+        femscript.wrap_function(femcord.TextDisplay)
+        femscript.wrap_function(femcord.UnfurledMediaItem)
+        femscript.wrap_function(femcord.MediaItem)
+        femscript.wrap_function(femcord.Thumbnail)
+        femscript.wrap_function(femcord.MediaGallery)
+        femscript.wrap_function(femcord.File)
+        femscript.wrap_function(femcord.Separator)
+        femscript.wrap_function(femcord.Container)
+
         result = await femscript.execute()
 
         if not hasattr(femscript, "channel_id"):
@@ -191,21 +235,23 @@ class Admin(commands.Cog):
         if not role:
             return await ctx.reply("This role doesn't exist")
 
-        components = femcord.Components(
-            components = [
-                femcord.ActionRow(
-                    components = [
-                        femcord.Button(
-                            label = await ctx.get_translation("captcha_button_text"),
-                            custom_id = "verification" + ctx.guild.id,
-                            style = femcord.ButtonStyles.SECONDARY
-                        )
-                    ]
-                )
-            ]
-        )
-
-        message = await channel.send(**{"content" if not isinstance(result, femcord.Embed) else "embed": result}, components=components)
+        if hasattr(femscript, "is_components_v2"):
+            message = await channel.send(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+        else:
+            components = femcord.Components(
+                components = [
+                    femcord.ActionRow(
+                        components = [
+                            femcord.Button(
+                                label = await ctx.get_translation("captcha_button_text"),
+                                custom_id = "verification" + ctx.guild.id,
+                                style = femcord.ButtonStyles.SECONDARY
+                            )
+                        ]
+                    )
+                ]
+            )
+            message = await channel.send(**{"content" if not isinstance(result, femcord.Embed) else "embed": result}, components=components)
 
         await query.update(verification_role=role.id, verification_message=message.id, verification_channel=channel.id)
 

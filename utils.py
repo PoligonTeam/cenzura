@@ -132,19 +132,19 @@ async def get_track_lyrics(artist: str, title: str, session: ClientSession):
             except (TrackNotFound, LyricsNotFound):
                 pass
 
-            if track.lyrics is None:
-                async with GeniusClient(config.GENIUS, session) as genius:
-                    try:
-                        track = await genius.get_lyrics(name)
-                        source = "Genius"
-                    except (TrackNotFound, LyricsNotFound):
-                        return None
+        if track.lyrics is None:
+            async with GeniusClient(config.GENIUS, session) as genius:
+                try:
+                    track = await genius.get_lyrics(name)
+                    source = "Genius"
+                except (TrackNotFound, LyricsNotFound):
+                    return None
 
-            lyrics_db = await Lyrics.get_or_none(title__icontains=track.title)
+        lyrics_db = await Lyrics.get_or_none(title__icontains=track.title)
 
-            if lyrics_db is None:
-                lyrics_db = Lyrics(artist=track.artist, title=track.title, source=source, lyrics=track.lyrics)
-                await lyrics_db.save()
+        if lyrics_db is None:
+            lyrics_db = Lyrics(artist=track.artist, title=track.title, source=source, lyrics=track.lyrics)
+            await lyrics_db.save()
 
     return lyrics_db
 
@@ -469,10 +469,12 @@ def _(*args: Any, **kwargs: Any) -> str | Awaitable:
 
     _hash = fn1va(args[0])
 
-    if ctx.guild.language not in bot.translations:
+    language = ctx.guild.language if ctx.guild else "en"
+
+    if language not in bot.translations:
         return args[0]
 
-    if _hash not in bot.translations[ctx.guild.language]:
+    if _hash not in bot.translations[language]:
         return args[0]
 
-    return bot.translations[ctx.guild.language][_hash]
+    return bot.translations[language][_hash]

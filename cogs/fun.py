@@ -505,49 +505,55 @@ class Fun(commands.Cog):
         elif isinstance(user, types.User):
             member = None
 
-        color = self.bot.embed_color
+        raw_user = await self.bot.gateway.fetch_user(user.id)
+        user.banner = raw_user["banner"]
+        user.accent_color = raw_user["accent_color"]
+        user.banner_color = raw_user["banner_color"]
 
-        if member is not None:
-            if member.hoisted_role is not None:
-                color = member.hoisted_role.color
+        files = []
 
-        embed = femcord.Embed(title=await _("Information about {}:", user.global_name or user.username), color=color)
-        embed.set_thumbnail(url=user.avatar_url)
+        if user.banner:
+            banner_url = user.banner_url
+        else:
+            if user.banner_color:
+                color = int(user.banner_color[1:], 16)
+            else:
+                color = user.accent_color
 
-        embed.add_field(name="ID:", value=user.id)
-        embed.add_field(name=_("Username:"), value=user.username)
-        if member is not None:
-            if member.nick is not None:
-                embed.add_field(name=_("Nickname:"), value=member.nick)
-            if member.roles[1:]:
-                embed.add_field(name=_("Roles:"), value=" ".join(types.m @ role for role in member.roles[1:]))
-            text = ""
-            client_status = member.presence.client_status
-            if client_status.desktop:
-                desktop_status = client_status.desktop.name
-                text += str(self.bot.gateway.get_emoji(name=desktop_status))
-            if client_status.web:
-                web_status = client_status.web.name
-                text += str(self.bot.gateway.get_emoji(name=web_status))
-            if client_status.mobile:
-                mobile_status = client_status.mobile.name
-                text += str(self.bot.gateway.get_emoji(name="MOBILE" + mobile_status))
-            for activity in member.presence.activities:
-                if activity.type is femcord.ActivityTypes.CUSTOM:
-                    text += " "
-                    if activity.emoji and not activity.emoji.id:
-                        text += activity.emoji.name + " "
-                    if activity.state:
-                        text += activity.state
-                    break
-            if text:
-                embed.add_field(name="Status:", value=text)
-            embed.add_field(name=await ctx.get_translation("ui_date_joined"), value=f"{femcord.types.t @ member.joined_at} ({femcord.types.t['R'] @ member.joined_at})")
-        embed.add_field(name=await ctx.get_translation("date_created"), value=f"{femcord.types.t @ user.created_at} ({femcord.types.t['R'] @ user.created_at})")
+            data = io.BytesIO()
+
+            async def async_create_image() -> None:
+                await self.bot.loop.run_in_executor(ThreadPoolExecutor(), lambda:
+                    Image.new("RGB", (512, 180), ((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF)).save(data, "PNG"))
+
+            await self.bot.loop.create_task(async_create_image())
+
+            files.append(("banner.png", data.getvalue()))
+            banner_url = "attachment://banner.png"
+
+        components = femcord.Components()
+        container = femcord.Container()
+        components.add_component(container)
+
+        container.add_component(femcord.MediaGallery().add_item(femcord.MediaItem(media=femcord.UnfurledMediaItem(url=banner_url))))
+        section = femcord.Section().set_accessory(femcord.Thumbnail(media=femcord.UnfurledMediaItem(url=user.avatar_url)))
+        section.add_component(femcord.TextDisplay(content="# " + await _("Information about {}:", user.global_name or user.username)))
         if user.public_flags:
-            embed.add_field(name=await ctx.get_translation("ui_badges"), value=" ".join(str(self.bot.gateway.get_emoji(name=flag.name)) for flag in user.public_flags if flag is not PublicFlags.BOT_HTTP_INTERACTIONS))
-        embed.add_field(name=await ctx.get_translation("ui_avatar"), value=f"[link]({user.avatar_url})")
+            section.add_component(
+                femcord.TextDisplay(
+                    content = "### " + " ".join(str(self.bot.gateway.get_emoji(name=flag.name)) for flag in user.public_flags if flag is not PublicFlags.BOT_HTTP_INTERACTIONS)
+                )
+            )
+        container.add_component(section)
+
+        container.add_component(femcord.Separator())
+        container.add_component(femcord.TextDisplay(content=f"**ID:** {user.id}"))
+        container.add_component(femcord.TextDisplay(content=f"**{_("Username:")}** {user.username}"))
+        container.add_component(femcord.TextDisplay(content=f"**{_("Date created:")}** {femcord.types.t @ user.created_at} ({femcord.types.t['R'] @ user.created_at})"))
+
         if user.bot is True:
+            bot_container = femcord.Container()
+
             link = f"https://discord.com/oauth2/authorize?client_id={user.id}&permissions=0&scope=bot"
 
             try:
@@ -564,51 +570,115 @@ class Fun(commands.Cog):
             if data["flags"] & 1 << 18:
                 intents.append(Intents.GUILD_MESSAGES)
             if data["flags"] & 1 << 23:
-                embed.add_field(name=await ctx.get_translation("ui_badges"), value=str(self.bot.gateway.get_emoji(name="APPLICATION_COMMAND_BADGE")))
+                section.add_component(
+                    femcord.TextDisplay(
+                        content = "### " + str(self.bot.gateway.get_emoji(name="APPLICATION_COMMAND_BADGE"))
+                    )
+                )
 
             if data["description"]:
-                embed.description = data["description"]
+                bot_container.add_component(femcord.TextDisplay(content=data["description"]))
+                bot_container.add_component(femcord.Separator())
             if "guild_id" in data:
                 try:
                     guild_data = await self.bot.http.request(Route("GET", "guilds", data["guild_id"], "widget.json"))
 
                     if "code" not in guild_data:
-                        embed.add_field(name=await ctx.get_translation("ui_guild"), value=f"{guild_data['name']} ({guild_data['id']})")
+                        bot_container.add_component(femcord.TextDisplay(content=f"**{_("Guild:")}** {guild_data['name']} ({guild_data['id']})"))
                 except femcord.errors.HTTPException:
                     pass
             if "terms_of_service_url" in data:
-                embed.add_field(name="ToS:", value=data["terms_of_service_url"])
+                bot_container.add_component(femcord.TextDisplay(content=f"**ToS:** {data["terms_of_service_url"]}"))
             if "privacy_policy_url" in data:
-                embed.add_field(name=await ctx.get_translation("ui_privacy_policy"), value=data["privacy_policy_url"])
+                bot_container.add_component(femcord.TextDisplay(content=f"**{_("Privacy policy:")}** {data["privacy_policy_url"]}"))
             if "tags" in data:
-                embed.add_field(name=await ctx.get_translation("ui_tags"), value=", ".join(data["tags"]))
+                bot_container.add_component(femcord.TextDisplay(content=f"**{_("Tags:")}** " + ", ".join(data["tags"])))
             if intents:
-                embed.add_field(name=await ctx.get_translation("ui_intents"), value=", ".join([intent.name for intent in intents]))
+                bot_container.add_component(femcord.TextDisplay(content=f"**{_("Intents:")}** " + ", ".join([intent.name for intent in intents])))
             if "install_params" in data:
-                embed.add_field(name=await ctx.get_translation("ui_permissions"), value=", ".join([permission.name for permission in Permissions.from_int(int(data["install_params"]["permissions"])).permissions]))
+                bot_container.add_component(femcord.TextDisplay(content=f"**{_("Permissions:")}** " + ", ".join([permission.name for permission in Permissions.from_int(int(data["install_params"]["permissions"])).permissions])))
                 link = f"https://discord.com/oauth2/authorize?client_id={user.id}&permissions={data['install_params']['permissions']}&scope={'%20'.join(data['install_params']['scopes'])}"
 
-        args = []
-        kwargs = {}
-
-        if member is not None:
-            args.append(types.m @ user)
-        if user.bot is True:
-            kwargs["components"] = femcord.Components(
-                components = [
-                    femcord.ActionRow(
-                        components = [
-                            femcord.Button(
-                                label = await ctx.get_translation("ui_add_bot"),
-                                style = femcord.ButtonStyles.LINK,
-                                url = link
-                            )
-                        ]
-                    )
-                ]
+            bot_container.add_component(
+                femcord.ActionRow(
+                    components = [
+                        femcord.Button(
+                            label = _("Add bot"),
+                            style = femcord.ButtonStyles.LINK,
+                            url = link
+                        )
+                    ]
+                )
             )
 
-        await ctx.reply(*args, embed=embed, **kwargs)
+            components.add_component(bot_container)
+
+        if member is not None:
+            container.add_component(femcord.Separator())
+            if member.nick is not None:
+                container.add_component(femcord.TextDisplay(content=f"**{_("Nickname:")}** {member.nick}"))
+            if member.roles[1:]:
+                container.add_component(femcord.TextDisplay(content=f"**{_("Roles:")}** " + " ".join(types.m @ role for role in member.roles[1:])))
+            container.add_component(femcord.TextDisplay(content=f"**{_("Date joined:")}** {femcord.types.t @ member.joined_at} ({femcord.types.t['R'] @ member.joined_at})"))
+
+            custom_status = ""
+            client_status = member.presence.client_status
+            if client_status.desktop:
+                desktop_status = client_status.desktop.name
+                custom_status += str(self.bot.gateway.get_emoji(name=desktop_status))
+            if client_status.web:
+                web_status = client_status.web.name
+                custom_status += str(self.bot.gateway.get_emoji(name=web_status))
+            if client_status.mobile:
+                mobile_status = client_status.mobile.name
+                custom_status += str(self.bot.gateway.get_emoji(name="MOBILE" + mobile_status))
+            for activity in member.presence.activities:
+                if activity.type is femcord.ActivityTypes.CUSTOM:
+                    if activity.emoji and not activity.emoji.id:
+                        custom_status += activity.emoji.name + " "
+                    if activity.state:
+                        custom_status += activity.state
+                else:
+                    activity_container = femcord.Container()
+                    asset = (activity.assets.large_image or activity.assets.small_image) if activity.assets else None
+                    if activity.name == "Spotify":
+                        asset = "https://i.scdn.co/image/" + asset.split(":")[1]
+                    if asset:
+                        activity_section = femcord.Section()
+                        activity_section.set_accessory(
+                            femcord.Thumbnail(
+                                media = femcord.UnfurledMediaItem(
+                                    url = (femcord.types.user.CDN_URL + f"/app-assets/{activity.application_id}/{asset}.png") if activity.name != "Spotify" else asset
+                                )
+                            )
+                        )
+                    else:
+                        activity_section = activity_container # type: ignore
+                    activity_section.add_component(
+                        femcord.TextDisplay(
+                            content = f"# {activity.type.name[0].upper()}{activity.type.name[1:].lower()} {"to " if activity.type is femcord.ActivityTypes.LISTENING else ""}{activity.name}"
+                        )
+                    )
+                    if activity.details:
+                        activity_section.add_component(
+                            femcord.TextDisplay(
+                                content = f"### {activity.details}"
+                            )
+                        )
+                    if activity.name == "Spotify":
+                        activity_section.add_component(
+                            femcord.TextDisplay(
+                                content = f"### {activity.state}"
+                            )
+                        )
+                    if asset:
+                        activity_container.add_component(activity_section)
+                    components.add_component(activity_container)
+
+            if custom_status:
+                section.add_component(femcord.TextDisplay(content=custom_status))
+
+        await ctx.reply(components=components, files=files, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
 
     @commands.command(description="Shows information about the guild", aliases=["si"])
     async def serverinfo(self, ctx: "Context"):
@@ -1053,7 +1123,7 @@ class Fun(commands.Cog):
             ]
         )
 
-        await ctx.reply(components=components, flags=[femcord.enums.MessageFlags.IS_COMPONENTS_V2])
+        await ctx.reply(components=components, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Fun(bot))

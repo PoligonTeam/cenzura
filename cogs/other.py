@@ -150,10 +150,57 @@ class Other(commands.Cog):
         femscript.wrap_function(request)
         femscript.wrap_function(femcord.Embed)
 
+        @femscript.wrap_function()
+        def Components() -> femcord.Components:
+            femscript.is_components_v2 = True
+            return femcord.Components()
+
+        femscript.add_variable(var("ButtonStyles", {
+            "PRIMARY": femcord.ButtonStyles.PRIMARY,
+            "SECONDARY": femcord.ButtonStyles.SECONDARY,
+            "SUCCESS": femcord.ButtonStyles.SUCCESS,
+            "DANGER": femcord.ButtonStyles.DANGER,
+            "LINK": femcord.ButtonStyles.LINK
+        }))
+
+        femscript.add_variable(var("PaddingSizes", {
+            "SMALL": femcord.PaddingSizes.SMALL,
+            "LARGE": femcord.PaddingSizes.LARGE
+        }))
+
+        femscript.add_variable(var("SelectDefaultValueTypes", {
+            "USER": femcord.SelectDefaultValueTypes.USER,
+            "ROLE": femcord.SelectDefaultValueTypes.ROLE,
+            "CHANNEL": femcord.SelectDefaultValueTypes.CHANNEL
+        }))
+
+        femscript.wrap_function(femcord.ActionRow)
+        femscript.wrap_function(femcord.Button)
+        femscript.wrap_function(femcord.StringSelectOption)
+        femscript.wrap_function(femcord.StringSelect)
+        femscript.wrap_function(femcord.TextInput)
+        femscript.wrap_function(femcord.SelectDefaultValue)
+        femscript.wrap_function(femcord.UserSelect)
+        femscript.wrap_function(femcord.RoleSelect)
+        femscript.wrap_function(femcord.MentionableSelect)
+        femscript.wrap_function(femcord.ChannelSelect)
+        femscript.wrap_function(femcord.Section)
+        femscript.wrap_function(femcord.TextDisplay)
+        femscript.wrap_function(femcord.UnfurledMediaItem)
+        femscript.wrap_function(femcord.MediaItem)
+        femscript.wrap_function(femcord.Thumbnail)
+        femscript.wrap_function(femcord.MediaGallery)
+        femscript.wrap_function(femcord.File)
+        femscript.wrap_function(femcord.Separator)
+        femscript.wrap_function(femcord.Container)
+
         result = await femscript.execute(debug=ctx.author.id in self.bot.owners)
 
         if ctx.guild:
             await guild.update(database=database)
+
+        if hasattr(femscript, "is_components_v2"):
+            return await ctx.reply(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
 
         if isinstance(result, femcord.Embed):
             to_check = ("image", "thumbnail", "author", "footer")
@@ -348,11 +395,58 @@ class Other(commands.Cog):
                 femscript.wrap_function(request)
                 femscript.wrap_function(femcord.Embed)
 
+                @femscript.wrap_function()
+                def Components() -> femcord.Components:
+                    femscript.is_components_v2 = True
+                    return femcord.Components()
+
+                femscript.add_variable(var("ButtonStyles", {
+                    "PRIMARY": femcord.ButtonStyles.PRIMARY,
+                    "SECONDARY": femcord.ButtonStyles.SECONDARY,
+                    "SUCCESS": femcord.ButtonStyles.SUCCESS,
+                    "DANGER": femcord.ButtonStyles.DANGER,
+                    "LINK": femcord.ButtonStyles.LINK
+                }))
+
+                femscript.add_variable(var("PaddingSizes", {
+                    "SMALL": femcord.PaddingSizes.SMALL,
+                    "LARGE": femcord.PaddingSizes.LARGE
+                }))
+
+                femscript.add_variable(var("SelectDefaultValueTypes", {
+                    "USER": femcord.SelectDefaultValueTypes.USER,
+                    "ROLE": femcord.SelectDefaultValueTypes.ROLE,
+                    "CHANNEL": femcord.SelectDefaultValueTypes.CHANNEL
+                }))
+
+                femscript.wrap_function(femcord.ActionRow)
+                femscript.wrap_function(femcord.Button)
+                femscript.wrap_function(femcord.StringSelectOption)
+                femscript.wrap_function(femcord.StringSelect)
+                femscript.wrap_function(femcord.TextInput)
+                femscript.wrap_function(femcord.SelectDefaultValue)
+                femscript.wrap_function(femcord.UserSelect)
+                femscript.wrap_function(femcord.RoleSelect)
+                femscript.wrap_function(femcord.MentionableSelect)
+                femscript.wrap_function(femcord.ChannelSelect)
+                femscript.wrap_function(femcord.Section)
+                femscript.wrap_function(femcord.TextDisplay)
+                femscript.wrap_function(femcord.UnfurledMediaItem)
+                femscript.wrap_function(femcord.MediaItem)
+                femscript.wrap_function(femcord.Thumbnail)
+                femscript.wrap_function(femcord.MediaGallery)
+                femscript.wrap_function(femcord.File)
+                femscript.wrap_function(femcord.Separator)
+                femscript.wrap_function(femcord.Container)
+
                 femscript.wrap_function(lambda *_, **__: None, func_name="command")
 
                 result = await femscript.execute()
 
                 await guild.update(database=database)
+
+                if hasattr(femscript, "is_components_v2"):
+                    return await ctx.reply(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
 
                 if isinstance(result, femcord.Embed):
                     to_check = ("image", "thumbnail", "author", "footer")
