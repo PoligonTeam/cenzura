@@ -82,7 +82,7 @@ class Artist:
     stats: ArtistStats = None
     image: list[TrackImage] = None
     tags: list[TrackTag] = None
-    bio: str = None
+    bio: ArtistBio = None
 
     @classmethod
     def from_dict(cls, data: dict | str):
@@ -174,7 +174,7 @@ class Track:
     streamable: str
     listeners: str
     playcount: str
-    duration: str
+    duration: int
     album: TrackAlbum = None
     scrobbles: str = None
     mbid: str = None
@@ -208,7 +208,7 @@ class Track:
         data["title"] = data.pop("name")
         data["listeners"] = data.get("listeners")
         data["playcount"] = data.get("playcount")
-        data["duration"] = data.get("duration")
+        data["duration"] = int(data.get("duration", 0))
         data["artist"] = Artist.from_dict(data["artist"])
 
         data.pop("@attr", None)

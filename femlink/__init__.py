@@ -16,3 +16,4 @@ limitations under the License.
 
 from .client import Client, Player
 from .models import *
+from .enums import *

@@ -23,25 +23,27 @@ from typing import TypedDict, Literal, Optional
 THINK_REGEX = re.compile(r"(<think>)?(.|\n)*<\/think>\n")
 
 Model = Literal[
-    "distil-whisper-large-v3-en",
-    "gemma2-9b-it",
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "llama-guard-3-8b",
-    "llama3-70b-8192",
-    "llama3-8b-8192",
-    "mixtral-8x7b-32768",
-    "whisper-large-v3",
-    "whisper-large-v3-turbo",
-    "qwen-2.5-32b",
-    "deepseek-r1-distill-qwen-32b",
-    "deepseek-r1-distill-llama-70b-specdec",
+    "allam-2-7b",
     "deepseek-r1-distill-llama-70b",
-    "llama-3.3-70b-specdec",
-    "llama-3.2-1b-preview",
-    "llama-3.2-3b-preview",
-    "llama-3.2-11b-vision-preview",
-    "llama-3.2-90b-vision-preview"
+    "gemma2-9b-it",
+    "groq/compound",
+    "groq/compound-mini",
+    "llama-3.1-8b-instant",
+    "llama-3.3-70b-versatile",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "meta-llama/llama-guard-4-12b",
+    "meta-llama/llama-prompt-guard-2-22m",
+    "meta-llama/llama-prompt-guard-2-86m",
+    "moonshotai/kimi-k2-instruct-",
+    "moonshotai/kimi-k2-instruct-0905",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "playai-tts",
+    "playai-tts-arabic",
+    "qwen/qwen3-32b",
+    "whisper-large-v3",
+    "whisper-large-v3-turbo"
 ]
 
 class Message(TypedDict):
@@ -51,6 +53,11 @@ class Message(TypedDict):
 class ChatData(TypedDict):
     model: Model
     messages: list[Message]
+
+class RateLimitError(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
 
 class Groq:
     URL = "https://api.groq.com/openai/v1"
@@ -101,6 +108,9 @@ class Groq:
     async def chat(self, content: str) -> str:
         async with self.session.post(Groq.URL + "/chat/completions", headers=self.headers, json=self.get_message(content)) as response:
             data = await response.json()
+
+            if "error" in data:
+                raise RateLimitError(data["error"]["message"])
 
             self.messages.extend([choice["message"] for choice in data["choices"]])
 

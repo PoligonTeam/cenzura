@@ -15,7 +15,7 @@ limitations under the License.
 """
 
 from tortoise.models import Model
-from tortoise.fields import Field, IntField, TextField, JSONField
+from tortoise.fields import Field, IntField, TextField, JSONField, BooleanField, DatetimeField
 import json
 
 class TextArray(Field):
@@ -64,6 +64,7 @@ class Guilds(Model):
     verification_message = TextField()
     verification_channel = TextField()
     eventhandlers = JSONField()
+    interaction_callbacks = JSONField()
 
 class Users(Model):
     id = IntField(pk=True)
@@ -89,3 +90,15 @@ class Lyrics(Model):
     title = TextField()
     source = TextField()
     lyrics = TextField()
+
+class Giveaways(Model):
+    id = IntField(pk=True)
+    message_id = TextField()
+    channel_id = TextField()
+    guild_id = TextField()
+    prize = TextField()
+    host_id = TextField()
+    winner_count = IntField()
+    end_time = DatetimeField()
+    participants = TextArray()
+    ended = BooleanField(default=False)

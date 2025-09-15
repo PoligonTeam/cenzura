@@ -37,21 +37,21 @@ import time
 import config
 import logging
 
-from typing import Callable, Awaitable, Optional, Any, Unpack, TypedDict
+from typing import Callable, Awaitable, Optional, Any, Unpack, TypedDict, NotRequired
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 class PaginatorKwargs(TypedDict):
-    pages: Optional[list]
-    by_lines: bool
-    base_embed: Optional[femcord.Embed]
-    prefix: str
-    suffix: str
-    limit: int
-    timeout: int
-    page: int
-    replace: bool
-    buttons: bool
+    pages: NotRequired[list]
+    by_lines: NotRequired[bool]
+    base_embed: NotRequired[femcord.Embed]
+    prefix: NotRequired[str]
+    suffix: NotRequired[str]
+    limit: NotRequired[int]
+    timeout: NotRequired[int]
+    page: NotRequired[int]
+    replace: NotRequired[bool]
+    buttons: NotRequired[bool]
 
 class HybridContext:
     async def get_translation(self, translation: str, args: tuple[Any] = None) -> str | femcord.Embed:
@@ -354,13 +354,16 @@ class Bot(commands.Bot):
             created_at = datetime.now()
         )
 
+        self.translations = {}
+        self.femscript_modules = FemscriptModules()
+
+        self.loop.create_task(self.async_init())
+
         for filename in os.listdir("./cogs"):
             if filename[-3:] == ".py":
                 self.load_extension("cogs.%s" % filename[:-3])
 
                 print("loaded %s" % filename)
-
-        self.translations = {}
 
         for filename in os.listdir("./cogs/translations"):
             if not filename.endswith(".toml"):
@@ -379,19 +382,16 @@ class Bot(commands.Bot):
                         key, value = line.split(" = ", 1)
                         self.translations[lang][int(key[1:-1], 16)] = value[1:-2].replace("\\n", "\n")
 
-        self.femscript_modules = FemscriptModules()
-
         for filename in os.listdir("./femscript_modules"):
             if filename[-4:] == ".fem":
                 with open("./femscript_modules/" + filename, "r") as f:
                     self.femscript_modules.add_module(FemscriptModule(filename[:-4], f.read()))
 
+        self.event(self.on_reconnect)
         self.event(self.on_ready)
         self.event(self.on_close)
 
-        self.loop.run_until_complete(self.async_init())
-
-    async def on_ready(self) -> None:
+    async def on_reconnect(self) -> None:
         for guild in self.gateway.guilds:
             db_guild = await Guilds.filter(guild_id=guild.id).first()
 
@@ -410,7 +410,8 @@ class Bot(commands.Bot):
                     verification_role = "",
                     verification_message = "",
                     verification_channel = "",
-                    eventhandlers = {}
+                    eventhandlers = {},
+                    interaction_callbacks = {}
                 )
 
             guild.prefix = db_guild.prefix
@@ -418,10 +419,17 @@ class Bot(commands.Bot):
             guild.welcome_message = db_guild.welcome_message
             guild.leave_message = db_guild.leave_message
             guild.autorole = db_guild.autorole
+            guild.interaction_callbacks = db_guild.interaction_callbacks
+
+    async def on_ready(self) -> None:
+        await self.on_reconnect()
 
         await self.scheduler.create_schedule(self.update_presences, "10m", name="update_presences")()
         await self.scheduler.create_schedule(self.update_user_install_count, "1h", name="update_user_install_count")()
 
+        self.scheduler.create_schedule(self.loki.send, "5m", name="loki")
+
+        self.add_entry_point(name="korrumz the game")
         await self.register_app_commands()
 
         print("registered application commands")

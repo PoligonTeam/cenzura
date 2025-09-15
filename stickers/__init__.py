@@ -18,10 +18,9 @@ from PIL import Image, ImageDraw, ImageFont
 from concurrent.futures import ThreadPoolExecutor
 import os
 import io
-import math
 import asyncio
 
-from typing import TypedDict
+from typing import TypedDict, Callable
 
 class Character(TypedDict):
     name: str
@@ -54,6 +53,7 @@ class Sticker:
             self.color = r, g, b
 
         self._data = io.BytesIO()
+        self._image: Image
 
         self._pos: tuple[int, int] = 0, 0
         self._angle = 0
@@ -101,14 +101,26 @@ class Sticker:
 
         image.save(self._data, format="PNG")
 
-    async def render(self) -> None:
-        await self.loop.run_in_executor(ThreadPoolExecutor(), self._generate)
+        self._image = image
 
-    async def generate(self) -> bytes:
-        await self.loop.create_task(self.render())
+    def _generate_thumbnail(self) -> None:
+        self._image.thumbnail((320, 320), Image.LANCZOS)
+        self._image.save(self._data, format="PNG")
+
+    async def run_sync(self, func: Callable[[], None]) -> None:
+        await self.loop.run_in_executor(ThreadPoolExecutor(), func)
+
+    async def _async_generate(self, func: Callable[[], None]) -> bytes:
+        await self.loop.create_task(self.run_sync(func))
         data = self._data.getvalue()
         self._data = io.BytesIO()
         return data
+
+    async def generate(self) -> bytes:
+        return await self._async_generate(self._generate)
+
+    async def get_thumbnail(self) -> bytes:
+        return await self._async_generate(self._generate_thumbnail)
 
     @staticmethod
     def get_characters() -> list[Character]:

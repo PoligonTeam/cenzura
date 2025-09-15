@@ -19,25 +19,25 @@ from femcord.femcord import commands
 from femcord.femcord.commands import Context
 from femcord.femcord.types import Guild, Member, User, Message, Interaction
 from femcord.femcord.enums import MessageFlags
-from femcord.femcord.commands import Context
 from femcord.femcord.http import Route, HTTPException
-from femscript import Femscript, var
-from utils import *
+from femscript import Femscript, var # type: ignore
 from models import Guilds
+import utils
 import hashlib, config
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bot import Bot, Context
+    from bot import Bot, Context, AppContext
 
 class Events(commands.Cog):
     def __init__(self, bot: "Bot") -> None:
         self.bot = bot
 
-        @bot.before_call
-        async def before_call(ctx: Context) -> None:
-            print(f"{ctx.author.username}: {ctx.message.content}")
+        @bot.before_call # type: ignore
+        async def before_call(ctx: "Context | AppContext") -> None:
+            if ctx.message is not None:
+                print(f"{ctx.author.username}: {ctx.message.content}")
 
             if ctx.error is None:
                 self.bot.loki.add_command_log(ctx)
@@ -61,7 +61,8 @@ class Events(commands.Cog):
                 verification_role = "",
                 verification_message = "",
                 verification_channel = "",
-                eventhandlers = {}
+                eventhandlers = {},
+                interaction_callbacks = {}
             )
 
         self.bot.loki.add_guild_log(guild)
@@ -72,13 +73,16 @@ class Events(commands.Cog):
         self.bot.loki.add_guild_log(guild, leave=True)
 
     @commands.Listener
-    async def on_guild_member_add(self, guild: Guild, member: Member):
+    async def on_guild_member_add(self, guild: Guild, member: Member) -> None:
         if not hasattr(guild, "welcome_message") or not hasattr(guild, "autorole"):
             db_guild = await Guilds.filter(guild_id=guild.id).first()
 
+            guild.prefix = db_guild.prefix
             guild.welcome_message = db_guild.welcome_message
             guild.leave_message = db_guild.leave_message
             guild.autorole = db_guild.autorole
+            guild.language = db_guild.language
+            guild.interaction_callbacks = db_guild.interaction_callbacks
 
         if guild.welcome_message:
             variables = [
@@ -86,7 +90,7 @@ class Events(commands.Cog):
                     "name": key,
                     "value": Femscript.to_fs(value)
                 }
-                for key, value in convert(user=member.user, guild=guild).items()
+                for key, value in utils.convert(user=member.user, guild=guild).items()
             ]
 
             femscript = Femscript(guild.welcome_message, variables=variables, modules=self.bot.femscript_modules)
@@ -99,54 +103,11 @@ class Events(commands.Cog):
             async def set_nick(nick: str) -> None:
                 await member.modify(nick=nick)
 
-            femscript.wrap_function(get_random_username, func_name="random_nick")
+            femscript.wrap_function(utils.get_random_username, func_name="random_nick")
 
-            femscript.wrap_function(request)
-            femscript.wrap_function(femcord.Embed)
+            femscript.wrap_function(utils.request)
 
-            @femscript.wrap_function()
-            def Components() -> femcord.Components:
-                femscript.is_components_v2 = True
-                return femcord.Components()
-
-            femscript.add_variable(var("ButtonStyles", {
-                "PRIMARY": femcord.ButtonStyles.PRIMARY,
-                "SECONDARY": femcord.ButtonStyles.SECONDARY,
-                "SUCCESS": femcord.ButtonStyles.SUCCESS,
-                "DANGER": femcord.ButtonStyles.DANGER,
-                "LINK": femcord.ButtonStyles.LINK
-            }))
-
-            femscript.add_variable(var("PaddingSizes", {
-                "SMALL": femcord.PaddingSizes.SMALL,
-                "LARGE": femcord.PaddingSizes.LARGE
-            }))
-
-            femscript.add_variable(var("SelectDefaultValueTypes", {
-                "USER": femcord.SelectDefaultValueTypes.USER,
-                "ROLE": femcord.SelectDefaultValueTypes.ROLE,
-                "CHANNEL": femcord.SelectDefaultValueTypes.CHANNEL
-            }))
-
-            femscript.wrap_function(femcord.ActionRow)
-            femscript.wrap_function(femcord.Button)
-            femscript.wrap_function(femcord.StringSelectOption)
-            femscript.wrap_function(femcord.StringSelect)
-            femscript.wrap_function(femcord.TextInput)
-            femscript.wrap_function(femcord.SelectDefaultValue)
-            femscript.wrap_function(femcord.UserSelect)
-            femscript.wrap_function(femcord.RoleSelect)
-            femscript.wrap_function(femcord.MentionableSelect)
-            femscript.wrap_function(femcord.ChannelSelect)
-            femscript.wrap_function(femcord.Section)
-            femscript.wrap_function(femcord.TextDisplay)
-            femscript.wrap_function(femcord.UnfurledMediaItem)
-            femscript.wrap_function(femcord.MediaItem)
-            femscript.wrap_function(femcord.Thumbnail)
-            femscript.wrap_function(femcord.MediaGallery)
-            femscript.wrap_function(femcord.File)
-            femscript.wrap_function(femcord.Separator)
-            femscript.wrap_function(femcord.Container)
+            utils.wrap_builtins(femscript)
 
             result = await femscript.execute()
 
@@ -155,20 +116,26 @@ class Events(commands.Cog):
 
                 if channel is not None:
                     if hasattr(femscript, "is_components_v2"):
-                        return await channel.send(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
-                    await channel.send(**{"content" if not isinstance(result, femcord.Embed) else "embed": result})
+                        await channel.send(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+                    elif isinstance(result, femcord.Embed):
+                        await channel.send(embed=result)
+                    else:
+                        await channel.send(content=str(result))
 
         if guild.autorole:
             await member.add_role(guild.get_role(guild.autorole))
 
     @commands.Listener
-    async def on_guild_member_remove(self, guild: Guild, user: User):
+    async def on_guild_member_remove(self, guild: Guild, user: User) -> None:
         if not hasattr(guild, "leave_message"):
             db_guild = await Guilds.filter(guild_id=guild.id).first()
 
+            guild.prefix = db_guild.prefix
             guild.welcome_message = db_guild.welcome_message
             guild.leave_message = db_guild.leave_message
             guild.autorole = db_guild.autorole
+            guild.language = db_guild.language
+            guild.interaction_callbacks = db_guild.interaction_callbacks
 
         if guild.leave_message:
             variables = [
@@ -176,7 +143,7 @@ class Events(commands.Cog):
                     "name": key,
                     "value": Femscript.to_fs(value)
                 }
-                for key, value in convert(user=user, guild=guild).items()
+                for key, value in utils.convert(user=user, guild=guild).items()
             ]
 
             femscript = Femscript(guild.leave_message, variables=variables, modules=self.bot.femscript_modules)
@@ -185,52 +152,7 @@ class Events(commands.Cog):
             def set_channel(channel_id: str) -> None:
                 femscript.channel_id = channel_id
 
-            femscript.wrap_function(request)
-            femscript.wrap_function(femcord.Embed)
-
-            @femscript.wrap_function()
-            def Components() -> femcord.Components:
-                femscript.is_components_v2 = True
-                return femcord.Components()
-
-            femscript.add_variable(var("ButtonStyles", {
-                "PRIMARY": femcord.ButtonStyles.PRIMARY,
-                "SECONDARY": femcord.ButtonStyles.SECONDARY,
-                "SUCCESS": femcord.ButtonStyles.SUCCESS,
-                "DANGER": femcord.ButtonStyles.DANGER,
-                "LINK": femcord.ButtonStyles.LINK
-            }))
-
-            femscript.add_variable(var("PaddingSizes", {
-                "SMALL": femcord.PaddingSizes.SMALL,
-                "LARGE": femcord.PaddingSizes.LARGE
-            }))
-
-            femscript.add_variable(var("SelectDefaultValueTypes", {
-                "USER": femcord.SelectDefaultValueTypes.USER,
-                "ROLE": femcord.SelectDefaultValueTypes.ROLE,
-                "CHANNEL": femcord.SelectDefaultValueTypes.CHANNEL
-            }))
-
-            femscript.wrap_function(femcord.ActionRow)
-            femscript.wrap_function(femcord.Button)
-            femscript.wrap_function(femcord.StringSelectOption)
-            femscript.wrap_function(femcord.StringSelect)
-            femscript.wrap_function(femcord.TextInput)
-            femscript.wrap_function(femcord.SelectDefaultValue)
-            femscript.wrap_function(femcord.UserSelect)
-            femscript.wrap_function(femcord.RoleSelect)
-            femscript.wrap_function(femcord.MentionableSelect)
-            femscript.wrap_function(femcord.ChannelSelect)
-            femscript.wrap_function(femcord.Section)
-            femscript.wrap_function(femcord.TextDisplay)
-            femscript.wrap_function(femcord.UnfurledMediaItem)
-            femscript.wrap_function(femcord.MediaItem)
-            femscript.wrap_function(femcord.Thumbnail)
-            femscript.wrap_function(femcord.MediaGallery)
-            femscript.wrap_function(femcord.File)
-            femscript.wrap_function(femcord.Separator)
-            femscript.wrap_function(femcord.Container)
+            femscript.wrap_function(utils.request)
 
             result = await femscript.execute()
 
@@ -239,17 +161,21 @@ class Events(commands.Cog):
 
                 if channel is not None:
                     if hasattr(femscript, "is_components_v2"):
-                        return await channel.send(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
-                    await channel.send(**{"content" if not isinstance(result, femcord.Embed) else "embed": result})
+                        await channel.send(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+                    elif isinstance(result, femcord.Embed):
+                        await channel.send(embed=result)
+                    else:
+                        await channel.send(content=str(result))
 
     @commands.Listener
-    async def on_message_create(self, message: Message):
+    async def on_message_create(self, message: Message) -> None:
         if message.author.bot or not message.guild:
             return
 
         if message.guild.me and message.guild.me.user in message.mentions and not message.message_reference and len(message.content.split()) == 1:
             if message.content in (await self.bot.get_prefix(self.bot, message))[:4]:
-                return await message.reply(f"Prefix on this server is `{(await self.bot.get_prefix(self.bot, message))[-1]}`")
+                await message.reply(f"Prefix on this server is `{(await self.bot.get_prefix(self.bot, message))[-1]}`")
+                return
 
     @commands.Listener
     async def on_interaction_create(self, interaction: Interaction):
@@ -259,6 +185,9 @@ class Events(commands.Cog):
         if interaction.data.custom_id == "verification" + interaction.guild.id:
             query = Guilds.filter(guild_id=interaction.guild.id)
             guild_db = await query.first()
+
+            if not guild_db or not guild_db.verification_message or not guild_db.verification_channel or not guild_db.verification_role:
+                return
 
             if guild_db.verification_message == interaction.message.id and guild_db.verification_channel == interaction.channel.id:
                 await self.bot.ipc.emit("new_captcha", {

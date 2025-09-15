@@ -128,7 +128,7 @@ class Help(commands.Cog):
                                         default = True if selected_command == command else False
                                     )
                                     for command in selected_cog.commands if ((not (command.hidden and command.enabled or command.type == commands.CommandTypes.SUBCOMMAND)) if not command.guild_id else command.guild_id == interaction.guild.id)
-                                ]
+                                ][:25] # TODO: implement proper pagination for command selection, discord limit for select options is 25
                             )
                         ]
                     )

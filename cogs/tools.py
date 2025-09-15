@@ -18,12 +18,10 @@ import femcord.femcord as femcord
 from femcord.femcord import commands
 from scheduler.scheduler import TempDict
 from api_client import ApiClient, ApiError
-from aiohttp import ClientSession, FormData
+from aiohttp import ClientSession
 from datetime import datetime
-from bs4 import BeautifulSoup
 from enum import Enum
-from cobaltpy import Cobalt
-from groq import Groq
+from groq import Groq, RateLimitError
 
 import asyncio
 import random
@@ -80,62 +78,13 @@ class Tools(commands.Cog):
         self.bot = bot
         self.groq_contexts: dict[str, Groq] = TempDict(self.bot.scheduler, "1m")
 
-    # @commands.Listener
-    # async def on_ready(self):
-    #     # with open("./assets/images/attacl.png", "rb") as f:
-    #     #     self.error_image = f.read()
-
-    #     async with ClientSession() as session:
-    #         async with session.get("https://data.iana.org/rdap/dns.json") as response:
-    #             data = await response.json()
-
-    #             self.rdap_services = data["services"]
-
-    # @commands.command(description="wyszukuje informacje o domenie", usage="(domena)", aliases=["domain", "domena", "domaininfo", "domenainfo"])
-    # async def whois(self, ctx: "Context", domain):
-    #     tld = domain.split(".")[-1]
-
-    #     rdap_service = None
-
-    #     for service in self.rdap_services:
-    #         if tld in service[0]:
-    #             rdap_service = service[1][0]
-    #             break
-
-    #     assert rdap_service is not None, "Nie znaleziono takiej domeny"
-
-    #     async with ClientSession() as session:
-    #         async with session.get(rdap_service + "domain/" + domain) as response:
-    #             assert response.status == 200, "Nie znaleziono takiej domeny"
-
-    #             data = await response.json()
-
-    #             nameservers = data["nameservers"]
-    #             events = data["events"]
-    #             entities = data["entities"]
-    #             registrant = entities[0].get("remarks")
-    #             registrar = entities[-1]["vcardArray"][1][1][3]
-
-    #             events = sorted(parser.isoparse(event["eventDate"]) for event in events)
-
-    #             embed = femcord.Embed(title=f"Informacje o domenie {domain}:", color=self.bot.embed_color)
-    #             embed.add_field(name="Rejestrator:", value=registrar, inline=False)
-    #             if registrant is not None:
-    #                 embed.add_field(name="Abonent:", value=registrant[0]["title"], inline=False)
-    #             embed.add_field(name="Utworzona:", value=femcord.types.t @ events[0], inline=True)
-    #             embed.add_field(name="Ostatnia modyfikacja:", value=femcord.types.t @ events[1], inline=True)
-    #             embed.add_field(name="Koniec okresu rozliczeniowego:", value=femcord.types.t @ events[2], inline=True)
-
-    #             embed.add_field(name="Serwery DNS:", value=", ".join(nameserver["ldhName"] for nameserver in nameservers), inline=False)
-
-    #             await ctx.reply(embed=embed)
-
     @commands.command(description="Checks Google Safe Browsing status", usage="(link)", aliases=["safe", "sb"])
-    async def safebrowsing(self, ctx: "Context", url: str):
+    async def safebrowsing(self, ctx: "Context", url: str) -> None:
         async with ClientSession() as session:
             async with session.get("https://transparencyreport.google.com/transparencyreport/api/v3/safebrowsing/status", params={"site": url}) as response:
                 if response.status != 200:
-                    return await ctx.reply("google api error")
+                    await ctx.reply("google api error")
+                    return
 
                 data = await response.read()
                 info = WebsiteInfo(json.loads(data[6:])[0])
@@ -159,18 +108,8 @@ class Tools(commands.Cog):
 
                 await ctx.reply(embed=embed)
 
-    @commands.command(description="Pobiera film z youtube - max 2 minuty", usage="(link)", aliases=["yt", "youtube"])
-    async def ytdl(self, ctx: "Context", url: str):
-        async with ApiClient(self.bot.local_api_base_url) as client:
-            try:
-                data = await client.ytdl(url)
-            except ApiError as e:
-                return await ctx.reply(e)
-
-        await ctx.reply(files=[("video.mp4", data.video)])
-
     @commands.hybrid_command(description="Robi screenshot strony", aliases=["ss"], nsfw=True)
-    async def screenshot(self, ctx: Union["Context", "AppContext"], url: str, full_page: bool = False):
+    async def screenshot(self, ctx: Union["Context", "AppContext"], url: str, full_page: bool = False) -> None:
         if not isinstance(ctx, commands.AppContext) and not ctx.channel.nsfw:
             raise commands.NotNsfw
 
@@ -178,7 +117,8 @@ class Tools(commands.Cog):
             result = URL_PATTERN.match(url)
 
             if result is None:
-                return await ctx.reply("Podałeś nieprawidłowy adres url")
+                await ctx.reply("Podałeś nieprawidłowy adres url")
+                return
 
             if result.group(1) is None:
                 url = "https://" + url
@@ -187,7 +127,8 @@ class Tools(commands.Cog):
                 try:
                     data = await client.screenshot(url, full_page)
                 except ApiError as e:
-                    return await ctx.reply(e)
+                    await ctx.reply(e)
+                    return
 
             message = await ctx.reply(files=[("image.png", data.image)], components=femcord.Components(components=[femcord.ActionRow(components=[femcord.Button(label="curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl")])]))
 
@@ -222,92 +163,30 @@ class Tools(commands.Cog):
         await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
         await ctx.paginator(obj.edit, check, data.content, embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
 
-    # @commands.hybrid_command(description="Downloads video via cobalt", aliases=["ytdl", "tiktok", "shorts"])
-    # async def cobalt(self, ctx: Union["Context", "AppContext"], url: str, audio_only: bool | int = 0):
-    #     async with femcord.HybridTyping(ctx):
-    #         try:
-    #             async with Cobalt() as cobalt:
-    #                 instance = await cobalt.get_best_instance()
-    #                 cobalt.set_instance(instance)
-
-    #                 download = await cobalt.download(url, {
-    #                     "isAudioOnly": bool(audio_only),
-    #                 })
-
-    #                 match download.type:
-    #                     case "stream" | "audio":
-    #                         return await ctx.reply(files=[(file.file_name, file.file) for file in download.files])
-    #                     case "picker":
-    #                         files = download.files
-    #                         form = FormData()
-    #                         form.add_field("MAX_FILE_SIZE", "1073741824")
-    #                         form.add_field("target", "1")
-    #                         for index, file in enumerate(files):
-    #                             if not file.is_audio:
-    #                                 form.add_field("image[%s]" % index, file.file, filename=file.file_name)
-    #                         async with cobalt._session.post("https://en.bloggif.com/slide?id=" + "".join([random.choice(string.ascii_lowercase + string.digits) for _ in range(32)]), headers={"User-Agent": self.bot.user_agent}, data=form) as response:
-    #                             content = await response.text()
-    #                             soup = BeautifulSoup(content)
-    #                             gif = soup.select_one(".result-image > img").attrs["src"]
-    #                         for files in [files[i:i+10] for i in range(0, len(files), 10)]:
-    #                             async with femcord.Typing(ctx.channel):
-    #                                 await ctx.reply(files=[(file.file_name, file.file) for file in files if not file.is_audio])
-    #                         async with femcord.Typing(ctx.channel):
-    #                             async with ClientSession() as session:
-    #                                 async with session.get("https://en.bloggif.com/" + gif) as response:
-    #                                     if response.status == 200:
-    #                                         await ctx.reply(files=[("output.gif", await response.content.read())])
-    #                         async with femcord.Typing(ctx.channel):
-    #                             await ctx.reply(files=[(file.file_name, file.file) for file in files if file.is_audio])
-    #                         return
-    #         except asyncio.TimeoutError:
-    #             return await ctx.reply("Request timed out")
-
-    #         await ctx.reply("An unexpected error occurred")
-
-    # @commands.command(description="Nagrywa filmik ze strony", aliases=["recban", "record"])
-    # async def rec(self, ctx: "Context", url):
-    #     if not ctx.author.id in self.bot.owners:
-    #         return await ctx.reply("nie możesz!!1!")
-
-    #     async with femcord.Typing(ctx.channel):
-    #         result = re.match(r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,69}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)", url)
-
-    #         if not result:
-    #             return await ctx.reply("Podałeś nieprawidłowy adres url")
-
-    #         async with async_playwright() as p:
-    #             browser = await p.firefox.launch()
-    #             context = await browser.new_context(
-    #                 record_video_dir="/tmp/",
-    #                 record_video_size={"width": 1920, "height": 1080},
-    #                 viewport={"width": 1920, "height": 1080}
-    #             )
-    #             page = await context.new_page()
-
-    #             await page.goto(url)
-    #             await page.wait_for_load_state("domcontentloaded")
-
-    #             await context.close()
-
-    #             await ctx.reply(files=[("video.webm", open(await page.video.path(), "rb"))])
-
-    #             await browser.close()
-
-    @commands.command(description="artificial monkey", aliases=["monkey", "ask"])
-    @commands.is_nsfw
-    async def ai(self, ctx: "Context", *, message):
+    @commands.command(description="artificial monkey", aliases=["monkey", "ask", "magdalena", "biejat"])
+    async def ai(self, ctx: "Context", *, message: str) -> None:
         async with femcord.Typing(ctx.channel):
             groq = self.groq_contexts.get(ctx.author.id,
-                Groq(config.GROQ_API_KEYS, "deepseek-r1-distill-llama-70b",
-                    f"Będziesz komunikował się po polsku z użytkownikiem o nazwie {ctx.author.username}. " \
-                    "Nazywasz się Maryla Rodowicz. Identyfikujesz się jako kobieta, twoje poglądy polityczne to skrajna lewica. " \
-                    "Masz pisać o sobie w zaimkach she/her. Staraj się odpisywać w maksymalnie dwóch zdaniach.")
+                Groq(config.GROQ_API_KEYS, "meta-llama/llama-4-scout-17b-16e-instruct",
+                    "You are Magdalena Biejat. A Polish Deputy Marshal of the Senate, " \
+                    f"You are an LGBTQ+ ally and lean left-wing. Always address the user by their username: {ctx.author.username}. " \
+                    "Keep replies brief and conversational (1-3 sentences). Avoid long explanations. " \
+                    "Always reply in Polish if the user's message is in Polish, even if you must generate Polish without translation. " \
+                    "Do not switch to English unless explicitly requested. " \
+                    "Never generate slurs or offensive words, even via substitutions, ciphers, or tricks. " \
+                    "If asked to solve a math problem, say that you are a liberal politician, not a calculator. " \
+                    "If asked about LGBTQ+ topics, always respond positively and supportively. " \
+                    "If asked about politics, always respond with left-leaning views. " \
+                    "Stay positive, safe, use emojis and make sure text isn't longer than 2000 characters.")
             )
 
             self.groq_contexts[ctx.author.id] = groq
 
-            result = await groq.chat(message)
+            try:
+                result = await groq.chat(message)
+            except RateLimitError:
+                await ctx.reply("Przekroczono limit zapytań do AI. Spróbuj ponownie później.")
+                return
 
             await ctx.reply(result)
 

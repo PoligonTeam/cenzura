@@ -120,5 +120,6 @@ class LokiClient:
         })
 
     async def send(self) -> None:
-        await self._request("POST", "/loki/api/v1/push", json={"streams": [log.to_dict() for log in self.logs]})
-        self.logs = []
+        if self.logs:
+            await self._request("POST", "/loki/api/v1/push", json={"streams": [log.to_dict() for log in self.logs]})
+            self.logs = []

@@ -16,7 +16,10 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands, types
+from femcord.femcord.http import Route
+from femcord.femcord.enums import CommandOptionTypes, InteractionTypes, InteractionCallbackTypes
 from femscript import Femscript, var, FemscriptException
+from datetime import timezone
 from poligonlgbt import get_extension
 from utils import *
 from types import CoroutineType
@@ -24,7 +27,7 @@ from models import Guilds
 from enum import Enum
 import config, datetime
 
-from typing import Union, Literal, TypedDict, Any, TYPE_CHECKING
+from typing import Union, Literal, TypedDict, Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context
@@ -60,6 +63,27 @@ class Other(commands.Cog):
         self.bot = bot
         self.custom_commands_cog = custom_commands_cog
 
+    def command_data_to_slash(self, command: CommandData) -> dict:
+        return {
+            "name": command["name"],
+            "description": command["description"] if command["description"] else command["name"],
+            "options": [
+                {
+                    "type": {
+                        "str": CommandOptionTypes.STRING,
+                        "int": CommandOptionTypes.INTEGER,
+                        "Channel": CommandOptionTypes.CHANNEL,
+                        "Role": CommandOptionTypes.ROLE,
+                        "User": CommandOptionTypes.USER
+                    }[_type].value,
+                    "name": name,
+                    "description": name,
+                    "required": True
+                }
+                for name, _type in command["arguments"].items()
+            ]
+        }
+
     @commands.Listener
     async def on_ready(self):
         for guild in self.bot.gateway.guilds:
@@ -80,16 +104,29 @@ class Other(commands.Cog):
                     verification_role = "",
                     verification_message = "",
                     verification_channel = "",
-                    eventhandlers = {}
+                    eventhandlers = {},
+                    interaction_callbacks = {}
                 )
+
+            commands = []
 
             for custom_command in db_guild.custom_commands:
                 try:
-                    self.create_custom_command(guild.id, (await self.get_command_data(custom_command))[1], custom_command)
+                    command_data = (await self.get_command_data(custom_command))[1]
+                    commands.append(command_data)
+                    self.create_custom_command(guild.id, command_data, custom_command)
                 except FemscriptException:
                     pass
                 except Exception:
                     pass
+
+            if not commands:
+                continue
+
+            try:
+                await self.bot.http.request(Route("PUT", "applications", self.bot.gateway.bot_user.id, "guilds", guild.id, "commands"), data=[self.command_data_to_slash(command) for command in commands])
+            except femcord.HTTPException:
+                pass
 
     @commands.hybrid_command(description="pisaju skrypt", usage="(code)", aliases=["fs", "fscript", "cs", "cscript"])
     async def femscript(self, ctx: Union["Context", "AppContext"], *, code):
@@ -116,7 +153,7 @@ class Other(commands.Cog):
                 "name": key,
                 "value": Femscript.to_fs(value)
             }
-            for key, value in (convert(author=ctx.author, channel=ctx.channel, guild=ctx.guild) | database).items()
+            for key, value in (convert(author=ctx.author, channel=ctx.channel, guild=ctx.guild, member=ctx.member) | database).items()
         ]
 
         femscript = Femscript(code, variables=variables, modules=self.bot.femscript_modules)
@@ -148,51 +185,8 @@ class Other(commands.Cog):
             return convert(_=ctx.guild.get_channel(channel)).get("_")
 
         femscript.wrap_function(request)
-        femscript.wrap_function(femcord.Embed)
 
-        @femscript.wrap_function()
-        def Components() -> femcord.Components:
-            femscript.is_components_v2 = True
-            return femcord.Components()
-
-        femscript.add_variable(var("ButtonStyles", {
-            "PRIMARY": femcord.ButtonStyles.PRIMARY,
-            "SECONDARY": femcord.ButtonStyles.SECONDARY,
-            "SUCCESS": femcord.ButtonStyles.SUCCESS,
-            "DANGER": femcord.ButtonStyles.DANGER,
-            "LINK": femcord.ButtonStyles.LINK
-        }))
-
-        femscript.add_variable(var("PaddingSizes", {
-            "SMALL": femcord.PaddingSizes.SMALL,
-            "LARGE": femcord.PaddingSizes.LARGE
-        }))
-
-        femscript.add_variable(var("SelectDefaultValueTypes", {
-            "USER": femcord.SelectDefaultValueTypes.USER,
-            "ROLE": femcord.SelectDefaultValueTypes.ROLE,
-            "CHANNEL": femcord.SelectDefaultValueTypes.CHANNEL
-        }))
-
-        femscript.wrap_function(femcord.ActionRow)
-        femscript.wrap_function(femcord.Button)
-        femscript.wrap_function(femcord.StringSelectOption)
-        femscript.wrap_function(femcord.StringSelect)
-        femscript.wrap_function(femcord.TextInput)
-        femscript.wrap_function(femcord.SelectDefaultValue)
-        femscript.wrap_function(femcord.UserSelect)
-        femscript.wrap_function(femcord.RoleSelect)
-        femscript.wrap_function(femcord.MentionableSelect)
-        femscript.wrap_function(femcord.ChannelSelect)
-        femscript.wrap_function(femcord.Section)
-        femscript.wrap_function(femcord.TextDisplay)
-        femscript.wrap_function(femcord.UnfurledMediaItem)
-        femscript.wrap_function(femcord.MediaItem)
-        femscript.wrap_function(femcord.Thumbnail)
-        femscript.wrap_function(femcord.MediaGallery)
-        femscript.wrap_function(femcord.File)
-        femscript.wrap_function(femcord.Separator)
-        femscript.wrap_function(femcord.Container)
+        wrap_builtins(femscript)
 
         result = await femscript.execute(debug=ctx.author.id in self.bot.owners)
 
@@ -337,10 +331,13 @@ class Other(commands.Cog):
                     }
 
                     for index, item in enumerate(args):
+                        if index >= len(values):
+                            break
+                        
                         _type = values[index]
 
                         if _type == "str" and index + 1 >= len(values):
-                            args = [" ".join(args[index:])]
+                            args[index] = " ".join(args[index:])
                             break
                         elif _type in normal_types:
                             args[index] = normal_types[_type](item)
@@ -354,7 +351,7 @@ class Other(commands.Cog):
 
                     args = dict(zip(command_data["arguments"].keys(), args))
 
-                converted = convert(guild=ctx.guild, channel=ctx.channel, author=ctx.author)
+                converted = convert(guild=ctx.guild, channel=ctx.channel, author=ctx.author, member=ctx.member)
                 database = (await guild).database
 
                 variables = [
@@ -389,55 +386,43 @@ class Other(commands.Cog):
                     return convert(_=await self.bot.gateway.get_user(user)).get("_")
 
                 @femscript.wrap_function()
+                async def add_role(user_id: str, role_id: str) -> None:
+                    member = await ctx.guild.get_member(user_id)
+                    role = ctx.guild.get_role(role_id)
+                    await member.add_role(role)
+
+                @femscript.wrap_function()
+                async def remove_role(user_id: str, role_id: str) -> None:
+                    member = await ctx.guild.get_member(user_id)
+                    role = ctx.guild.get_role(role_id)
+                    await member.remove_role(role)
+
+                @femscript.wrap_function()
+                async def kick(user_id: str, reason: Optional[str] = None) -> None:
+                    member = await ctx.guild.get_member(user_id)
+                    await member.kick(reason)
+
+                @femscript.wrap_function()
+                async def ban(user_id: str, reason: Optional[str] = None) -> None:
+                    member = await ctx.guild.get_member(user_id)
+                    await member.ban(reason)
+
+                @femscript.wrap_function()
+                async def unban(user_id: str, reason: Optional[str] = None) -> None:
+                    await ctx.guild.unban(user_id, reason)
+
+                @femscript.wrap_function()
+                async def timeout(user_id: str, seconds: int) -> None:
+                    member = await ctx.guild.get_member(user_id)
+                    await member.modify(communication_disabled_until=datetime.datetime.now(tz=timezone.utc) + datetime.timedelta(seconds=seconds))
+
+                @femscript.wrap_function()
                 def get_channel(channel: str) -> dict:
                     return convert(_=ctx.guild.get_channel(channel)).get("_")
 
                 femscript.wrap_function(request)
-                femscript.wrap_function(femcord.Embed)
 
-                @femscript.wrap_function()
-                def Components() -> femcord.Components:
-                    femscript.is_components_v2 = True
-                    return femcord.Components()
-
-                femscript.add_variable(var("ButtonStyles", {
-                    "PRIMARY": femcord.ButtonStyles.PRIMARY,
-                    "SECONDARY": femcord.ButtonStyles.SECONDARY,
-                    "SUCCESS": femcord.ButtonStyles.SUCCESS,
-                    "DANGER": femcord.ButtonStyles.DANGER,
-                    "LINK": femcord.ButtonStyles.LINK
-                }))
-
-                femscript.add_variable(var("PaddingSizes", {
-                    "SMALL": femcord.PaddingSizes.SMALL,
-                    "LARGE": femcord.PaddingSizes.LARGE
-                }))
-
-                femscript.add_variable(var("SelectDefaultValueTypes", {
-                    "USER": femcord.SelectDefaultValueTypes.USER,
-                    "ROLE": femcord.SelectDefaultValueTypes.ROLE,
-                    "CHANNEL": femcord.SelectDefaultValueTypes.CHANNEL
-                }))
-
-                femscript.wrap_function(femcord.ActionRow)
-                femscript.wrap_function(femcord.Button)
-                femscript.wrap_function(femcord.StringSelectOption)
-                femscript.wrap_function(femcord.StringSelect)
-                femscript.wrap_function(femcord.TextInput)
-                femscript.wrap_function(femcord.SelectDefaultValue)
-                femscript.wrap_function(femcord.UserSelect)
-                femscript.wrap_function(femcord.RoleSelect)
-                femscript.wrap_function(femcord.MentionableSelect)
-                femscript.wrap_function(femcord.ChannelSelect)
-                femscript.wrap_function(femcord.Section)
-                femscript.wrap_function(femcord.TextDisplay)
-                femscript.wrap_function(femcord.UnfurledMediaItem)
-                femscript.wrap_function(femcord.MediaItem)
-                femscript.wrap_function(femcord.Thumbnail)
-                femscript.wrap_function(femcord.MediaGallery)
-                femscript.wrap_function(femcord.File)
-                femscript.wrap_function(femcord.Separator)
-                femscript.wrap_function(femcord.Container)
+                wrap_builtins(femscript)
 
                 femscript.wrap_function(lambda *_, **__: None, func_name="command")
 
@@ -501,7 +486,7 @@ class Other(commands.Cog):
         return command
 
     @commands.command(description="Creating a custom command", usage="(code)", aliases=["cc", "createcommand"])
-    @commands.has_permissions("manage_guild")
+    @commands.has_permissions("manage_guild", "manage_roles", "ban_members", "kick_members", "moderate_members")
     async def customcommand(self, ctx: "Context", *, code):
         code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
                f"# GUILD: {ctx.guild.id}\n" \
@@ -536,6 +521,13 @@ class Other(commands.Cog):
 
             await guild.update(custom_commands=custom_commands)
 
+            try:
+                slash_commands = await self.bot.http.request(Route("GET", "applications", self.bot.gateway.bot_user.id, "guilds", ctx.guild.id, "commands"))
+                command_id, = [slash_command["id"] for slash_command in slash_commands if slash_command["name"] == command_data["name"] and slash_command["type"] == 1]
+                await self.bot.http.request(Route("DELETE", "applications", self.bot.gateway.bot_user.id, "guilds", ctx.guild.id, "commands", command_id))
+            except femcord.HTTPException:
+                pass
+
             return await ctx.reply("Removed")
 
         command_object = self.bot.get_command(command_data["name"], guild_id=ctx.guild.id)
@@ -558,7 +550,169 @@ class Other(commands.Cog):
         custom_commands.append(code)
         await guild.update(custom_commands=custom_commands)
 
+        try:
+            await self.bot.http.request(Route("POST", "applications", self.bot.gateway.bot_user.id, "guilds", ctx.guild.id, "commands"), data=self.command_data_to_slash(command_data))
+        except femcord.HTTPException:
+            pass
+
         await ctx.reply(text)
+
+    async def handle_slash_command(self, interaction: femcord.types.Interaction, command: commands.Command):
+        await interaction.callback(InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE)
+
+        fake_channel = femcord.types.Channel(**interaction.channel.__dict__)
+        async def start_typing_hook():
+            pass
+        fake_channel.start_typing = start_typing_hook
+
+        fake_message = femcord.types.Message(self.bot, id="0", channel=fake_channel, guild=interaction.guild, author=interaction.user, member=interaction.member)
+        context = commands.Context(self.bot, fake_message)
+
+        args = []
+        kwargs = {}
+
+        async def reply_hook(*_args, **_kwargs):
+            nonlocal args, kwargs
+            args = _args
+            kwargs = _kwargs
+
+        async def paginator_reply_hook(*_args, **_):
+            nonlocal args
+            args = _args
+
+        context.reply = reply_hook
+        context.reply_paginator = paginator_reply_hook
+
+        if interaction.data.options:
+            await command(context, [
+                {
+                    CommandOptionTypes.STRING: lambda argument: argument,
+                    CommandOptionTypes.INTEGER: lambda argument: argument,
+                    CommandOptionTypes.CHANNEL: lambda argument: argument.id,
+                    CommandOptionTypes.ROLE: lambda argument: argument.id,
+                    CommandOptionTypes.USER: lambda argument: argument.id
+                }[argument.type](argument.value)
+                for argument in interaction.data.options]
+            )
+        else:
+            await command(context)
+
+        await interaction.edit(*args, **kwargs)
+
+    @commands.Listener
+    async def on_interaction_create(self, interaction: femcord.types.Interaction):
+        if interaction.type is InteractionTypes.APPLICATION_COMMAND and interaction.guild and (command := self.bot.get_command(interaction.data.name, guild_id=interaction.guild.id)):
+            await self.handle_slash_command(interaction, command)
+        if not interaction.guild or interaction.data.custom_id not in interaction.guild.interaction_callbacks:
+            return
+
+        await interaction.callback(InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, flags=[femcord.MessageFlags.EPHEMERAL])
+
+        guild = Guilds.get(guild_id=interaction.guild.id)
+        converted = convert(guild=interaction.guild, channel=interaction.channel, user=interaction.user, member=interaction.member, interaction=interaction)
+        database = (await guild).database
+
+        variables = [
+            {
+                "name": key,
+                "value": Femscript.to_fs(value)
+            }
+            for key, value in (converted | database).items()
+        ]
+
+        femscript = Femscript(interaction.guild.interaction_callbacks[interaction.data.custom_id], variables=variables, modules=self.bot.femscript_modules)
+
+        @femscript.wrap_function()
+        def get_all() -> dict[str, object]:
+            return database
+
+        @femscript.wrap_function()
+        def get_value(key: str) -> Any:
+            return database.get(key)
+
+        @femscript.wrap_function()
+        def update[T](key: str, value: T) -> T:
+            database[key] = value
+            return value
+
+        @femscript.wrap_function()
+        def remove(key: str) -> Any:
+            return database.pop(key)
+
+        @femscript.wrap_function()
+        async def get_user(user: str) -> dict:
+            return convert(_=await self.bot.gateway.get_user(user)).get("_")
+
+        @femscript.wrap_function()
+        def get_channel(channel: str) -> dict:
+            return convert(_=ctx.guild.get_channel(channel)).get("_")
+
+        @femscript.wrap_function()
+        async def add_role(user_id: str, role_id: str) -> None:
+            member = await interaction.guild.get_member(user_id)
+            role = interaction.guild.get_role(role_id)
+            await member.add_role(role)
+
+        @femscript.wrap_function()
+        async def remove_role(user_id: str, role_id: str) -> None:
+            member = await interaction.guild.get_member(user_id)
+            role = interaction.guild.get_role(role_id)
+            await member.remove_role(role)
+
+        @femscript.wrap_function()
+        async def timeout(user_id: str, seconds: int) -> None:
+            member = await interaction.guild.get_member(user_id)
+            await member.modify(communication_disabled_until=datetime.datetime.now(tz=timezone.utc) + datetime.timedelta(seconds=seconds))
+
+        femscript.wrap_function(request)
+
+        wrap_builtins(femscript)
+
+        result = await femscript.execute()
+
+        await guild.update(database=database)
+
+        if hasattr(femscript, "is_components_v2"):
+            return await interaction.edit(components=result, flags=[femcord.MessageFlags.EPHEMERAL, femcord.MessageFlags.IS_COMPONENTS_V2])
+
+        await interaction.edit(**{"content" if not isinstance(result, femcord.Embed) else "embed": result}, flags=[femcord.MessageFlags.EPHEMERAL])
+
+    @commands.command(description="Creating an interaction callback", usage="(custom_id) [code]", aliases=["bind"])
+    @commands.has_permissions("manage_guild", "manage_roles")
+    async def callback(self, ctx: "Context", custom_id, *, code = None) -> None:
+        guild = Guilds.get(guild_id=ctx.guild.id)
+        interaction_callbacks = (await guild).interaction_callbacks
+
+        if code == "remove":
+            if custom_id not in interaction_callbacks:
+                await ctx.reply("This callback doesn't exist")
+                return
+
+            interaction_callbacks.pop(custom_id)
+            ctx.guild.interaction_callbacks = interaction_callbacks
+            await guild.update(interaction_callbacks=interaction_callbacks)
+
+            await ctx.reply("Callback has been removed")
+            return
+
+        if not code:
+            if custom_id not in interaction_callbacks:
+                await ctx.reply("This callback doesn't exist")
+                return
+
+            return await ctx.reply_paginator(highlight(interaction_callbacks[custom_id]), by_lines=True, base_embed=femcord.Embed(), prefix="```ansi\n", suffix="```")
+
+        code = f"# DATE: {datetime.datetime.now().strftime(r'%Y-%m-%d %H:%M:%S')}\n" \
+               f"# GUILD: {ctx.guild.id}\n" \
+               f"# CHANNEL: {ctx.channel.id}\n" \
+               f"# AUTHOR: {ctx.author.id}\n\n" \
+             + code
+
+        interaction_callbacks[custom_id] = code
+        ctx.guild.interaction_callbacks = interaction_callbacks
+        await guild.update(interaction_callbacks=interaction_callbacks)
+
+        await ctx.reply("Callback has been set")
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(custom_commands_cog := CustomCommands())

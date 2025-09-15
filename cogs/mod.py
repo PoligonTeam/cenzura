@@ -16,9 +16,10 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands, types, HTTPException
-from femscript import Femscript, var
-from utils import convert, highlight
+from femscript import Femscript
+from utils import highlight
 from models import Guilds
+from utils import wrap_builtins
 import datetime, re
 
 from typing import TYPE_CHECKING
@@ -67,7 +68,7 @@ class Admin(commands.Cog):
             if ctx.guild.me.roles[-1].position <= member.roles[-1].position:
                 return await ctx.reply("Bot nie może zbanować tego użytkownika")
 
-            await member.ban(reason)
+            await member.ban(reason, 3600)
 
             await ctx.reply(f"Zbanowano `{member.user}` z powodu `{reason}`")
 
@@ -146,9 +147,12 @@ class Admin(commands.Cog):
 
     @set.command(description="Verification", usage="[code]", aliases=["verification"])
     @commands.has_permissions("manage_guild")
-    async def captcha(self, ctx: "Context", *, code):
+    async def captcha(self, ctx: "Context", *, code = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
-        guild_db = await query.first()
+
+        if code is None:
+            await query.update(verification_role="", verification_message="", verification_channel="")
+            return await ctx.reply("Disabled")
 
         if (match := re.match(r"(?:<#)?(\d+)>? (?:<@&)?(\d+)>? ([\s\S]+)", code)) is not None:
             channel_id = match.group(1)
@@ -172,51 +176,11 @@ class Admin(commands.Cog):
         def set_role(role_id: str) -> None:
             femscript.role_id = role_id
 
-        femscript.wrap_function(femcord.Embed)
+        wrap_builtins(femscript)
 
         @femscript.wrap_function()
-        def Components() -> femcord.Components:
-            femscript.is_components_v2 = True
-            return femcord.Components()
-
-        femscript.add_variable(var("ButtonStyles", {
-            "PRIMARY": femcord.ButtonStyles.PRIMARY,
-            "SECONDARY": femcord.ButtonStyles.SECONDARY,
-            "SUCCESS": femcord.ButtonStyles.SUCCESS,
-            "DANGER": femcord.ButtonStyles.DANGER,
-            "LINK": femcord.ButtonStyles.LINK
-        }))
-
-        femscript.add_variable(var("PaddingSizes", {
-            "SMALL": femcord.PaddingSizes.SMALL,
-            "LARGE": femcord.PaddingSizes.LARGE
-        }))
-
-        femscript.add_variable(var("SelectDefaultValueTypes", {
-            "USER": femcord.SelectDefaultValueTypes.USER,
-            "ROLE": femcord.SelectDefaultValueTypes.ROLE,
-            "CHANNEL": femcord.SelectDefaultValueTypes.CHANNEL
-        }))
-
-        femscript.wrap_function(femcord.ActionRow)
-        femscript.wrap_function(femcord.Button)
-        femscript.wrap_function(femcord.StringSelectOption)
-        femscript.wrap_function(femcord.StringSelect)
-        femscript.wrap_function(femcord.TextInput)
-        femscript.wrap_function(femcord.SelectDefaultValue)
-        femscript.wrap_function(femcord.UserSelect)
-        femscript.wrap_function(femcord.RoleSelect)
-        femscript.wrap_function(femcord.MentionableSelect)
-        femscript.wrap_function(femcord.ChannelSelect)
-        femscript.wrap_function(femcord.Section)
-        femscript.wrap_function(femcord.TextDisplay)
-        femscript.wrap_function(femcord.UnfurledMediaItem)
-        femscript.wrap_function(femcord.MediaItem)
-        femscript.wrap_function(femcord.Thumbnail)
-        femscript.wrap_function(femcord.MediaGallery)
-        femscript.wrap_function(femcord.File)
-        femscript.wrap_function(femcord.Separator)
-        femscript.wrap_function(femcord.Container)
+        def VerifyButton(**kwargs) -> femcord.Button:
+            return femcord.Button(**kwargs, custom_id="verification" + ctx.guild.id)
 
         result = await femscript.execute()
 

@@ -16,12 +16,12 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands, types, InvalidArgument, HTTPException
-from femcord.femcord.commands import Min, Max
+from femcord.femcord.commands import Max
 from femcord.femcord.http import Route
 from femcord.femcord.permissions import Permissions
 from femcord.femcord.enums import Intents, ApplicationCommandTypes, PublicFlags
 from femcord.femcord.utils import get_index
-from aiohttp import ClientSession
+from aiohttp import ClientSession, FormData
 from bs4 import BeautifulSoup, ResultSet
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -30,7 +30,12 @@ from pyfiglet import Figlet
 from utils import *
 from utils import _
 from stickers import Sticker
-import io, random, urllib.parse, json, re, string
+import io
+import random
+import urllib.parse
+import json
+import re
+import string
 
 from typing import Optional, Union, TYPE_CHECKING
 
@@ -70,16 +75,16 @@ class Fun(commands.Cog):
             def create_image() -> None:
                 nonlocal user2_avatar, user2_avatar, result_image
 
-                ship_image = Image.open("./assets/images/ship.jpg").convert("RGBA")
+                ship_image = Image.open("./assets/images/ship2.jpg").convert("RGBA")
 
                 user_image = Image.open(user_avatar).convert("RGBA")
                 user2_image = Image.open(user2_avatar).convert("RGBA")
 
-                user_image = ImageOps.fit(user_image, (300, 300))
-                user2_image = ImageOps.fit(user2_image, (300, 300))
+                user_image = ImageOps.fit(user_image, (250, 250))
+                user2_image = ImageOps.fit(user2_image, (250, 250))
 
-                ship_image.paste(user_image, (360, 250), user_image)
-                ship_image.paste(user2_image, (890, 180), user2_image)
+                ship_image.paste(user_image, (440, 80), user_image)
+                ship_image.paste(user2_image, (700, 250), user2_image)
 
                 ship_image.save(result_image, "PNG")
 
@@ -88,7 +93,7 @@ class Fun(commands.Cog):
 
             await self.bot.loop.create_task(async_create_image())
 
-            await ctx.reply(_(
+            await ctx.reply(await _(
                 "**{}** + **{}** = **{}**\nThey love each other for **{}%**!",
                 user.username,
                 user2.username,
@@ -153,17 +158,154 @@ class Fun(commands.Cog):
 
         await ctx.reply("```" + figlet + "```")
 
-    @commands.command(description="gay", usage="[user]")
-    async def howgay(self, ctx: "Context", user: types.User = None):
-        user = user or ctx.author
+    @commands.hybrid_command(description="Orientation quiz", aliases=["howgay", "quiz"])
+    async def orientation(self, ctx: Union["Context", "AppContext"]):
+        is_app = isinstance(ctx, commands.AppContext)
 
-        y = get_int(user)
-        x = get_int(user, self.bot.gateway.bot_user)
+        components = femcord.Components(
+            components = [
+                femcord.TextDisplay(
+                    content = "I identify as a:"
+                ),
+                femcord.ActionRow(
+                    components = [
+                        femcord.Button(
+                            label = "Man",
+                            style = femcord.ButtonStyles.PRIMARY,
+                            custom_id = "0"
+                        ),
+                        femcord.Button(
+                            label = "Woman",
+                            style = femcord.ButtonStyles.PRIMARY,
+                            custom_id = "1"
+                        )
+                    ]
+                )
+            ]
+        )
 
-        await ctx.reply("https://charts.idrlabs.com/graphic/sexual-orientation?p=%d,%d&l=PL" % (y, x))
+        timed_out_components = femcord.Components(
+            components = [
+                femcord.TextDisplay(
+                    content = "Timed out"
+                )
+            ]
+        )
+
+        message = await ctx.reply(components=components, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+
+        obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
+
+        def check(interaction: femcord.types.Interaction, _: Optional[femcord.types.Message] = None) -> bool:
+            if is_app:
+                return interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message is not None and interaction.message.interaction_metadata.id == ctx.interaction.id
+            return interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id
+
+        try:
+            interaction: types.Interaction
+            interaction, = await self.bot.wait_for("interaction_create", check, timeout=60)
+        except TimeoutError:
+            return await obj.edit(components=timed_out_components)
+
+        questions = [
+            ("Found a man attractive.", 1),
+            ("Fantasized about non-sexual petting and/or bodily closeness with a man.", 1),
+            ("Fantasized about sexual intercourse with a man.", 1),
+            ("Entertained the fantasy of being in a long-term romantic relationship with a man.", 1),
+            ("Found myself wanting to have real-life sexual intercourse with a man.", 1),
+            ("Wanted to touch a man intimately and/or be naked in the company of a man.", 1),
+            ("Found myself sexually aroused by a man.", 1),
+            ("Found a woman attractive.", 0),
+            ("Fantasized about non-sexual petting and/or bodily closeness with a woman.", 0),
+            ("Fantasized about sexual intercourse with a woman.", 0),
+            ("Entertained the fantasy of being in a long-term romantic relationship with a woman.", 0),
+            ("Found myself wanting to have real-life sexual intercourse with a woman.", 0),
+            ("Wanted to touch a woman intimately and/or be naked in the company of a woman.", 0),
+            ("Found myself sexually aroused by a woman.", 0)
+        ]
+
+        gender = int(interaction.data.custom_id)
+
+        max_points = 100 / len(questions)
+
+        _map = {
+            0: -max_points,
+            1: -max_points/2,
+            2: 0,
+            3: max_points/2,
+            4: max_points
+        }
+
+        point = [50, 50]
+
+        action_row = femcord.ActionRow(components = [
+            femcord.Button(label="No", style=femcord.ButtonStyles.DANGER, custom_id="0"),
+            femcord.Button(label="Probably not", style=femcord.ButtonStyles.DANGER, custom_id="1"),
+            femcord.Button(label="Idk", style=femcord.ButtonStyles.SECONDARY, custom_id="2"),
+            femcord.Button(label="Probably yes", style=femcord.ButtonStyles.SUCCESS, custom_id="3"),
+            femcord.Button(label="Yes", style=femcord.ButtonStyles.SUCCESS, custom_id="4")
+        ])
+
+        for index, (question, for_gender) in enumerate(questions, 1):
+            components = femcord.Components()
+            components.add_component(femcord.TextDisplay(content=f"({index}/{len(questions)}) " + question))
+            components.add_component(action_row)
+
+            await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, components=components)
+
+            try:
+                interaction, = await self.bot.wait_for("interaction_create", check, timeout=60)
+            except TimeoutError:
+                return await obj.edit(components=timed_out_components)
+
+            axis = for_gender == gender
+            value = _map[int(interaction.data.custom_id)]
+            point[axis] += value
+
+        y, x = round(point[0], 1), round(point[1], 1)
+
+        if not y % 1:
+            y = int(y)
+        if not x % 1:
+            x = int(x)
+
+        text = f"Your sexual orientation is {x}% heterosexual, {y}% homosexual, which places you in "
+
+        if y == 50 or x == 50:
+            text += "between quadrants."
+        else:
+            if x > 50 and y > 50:
+                quadrant = "bisexual"
+            elif x < 50 and y < 50:
+                quadrant = "asexual"
+            elif x < 50 and y > 50:
+                quadrant = "homosexual"
+            elif x > 50 and y < 50:
+                quadrant = "heterosexual"
+
+            text += f"the {quadrant} quadrant."
+
+        components = femcord.Components(
+            components = [
+                femcord.TextDisplay(
+                    content = text
+                ),
+                femcord.MediaGallery(
+                    items = [
+                        femcord.MediaItem(
+                            media = femcord.UnfurledMediaItem(
+                                url = f"https://www.idrlabs.com/graphic/sexual-orientation?p={y},{x}"
+                            )
+                        )
+                    ]
+                )
+            ]
+        )
+
+        await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, components=components)
 
     @commands.command(description="Achievement Get!", usage="(text)")
-    async def achievement(self, ctx: "Context", *, text: replace_chars):
+    async def achievement(self, ctx: "Context", *, text: replace_chars) -> None:
         if len(text) > 23:
             return await ctx.reply(await _("Provided text is too long (`{}`/`{}`)", len(text), 23))
 
@@ -215,105 +357,121 @@ class Fun(commands.Cog):
 
         await ctx.reply(decode_text(new_text))
 
-    # @commands.Listener
-    # async def on_interaction_create(self, interaction):
-    #     if ("calc", interaction.member.user.id, interaction.channel.id, interaction.message.id) in self.interactions:
-    #         if not interaction.message.id in self.results:
-    #             self.results[interaction.message.id] = ["", 0]
+    @commands.Listener
+    async def on_interaction_create(self, interaction: femcord.types.Interaction) -> None:
+        if interaction.data.custom_id == "accept":
+            await interaction.callback(femcord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, content="Did we get you? [Add fembot](https://discord.com/oauth2/authorize?client_id=705552952600952960) to your profile to fool others!", flags=[femcord.enums.MessageFlags.EPHEMERAL])
+            return
 
-    #         if self.results[interaction.message.id][0] == "KABOOM!":
-    #             self.results[interaction.message.id][0] = ""
+        # if ("calc", interaction.member.user.id, interaction.channel.id, interaction.message.id) in self.interactions:
+        #     if not interaction.message.id in self.results:
+        #         self.results[interaction.message.id] = ["", 0]
 
-    #         match interaction.data.custom_id:
-    #             case "leftbracket":
-    #                 self.results[interaction.message.id][0] += "("
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "rightbracket":
-    #                 self.results[interaction.message.id][0] += ")"
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "power":
-    #                 self.results[interaction.message.id][0] += "**"
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "modulo":
-    #                 self.results[interaction.message.id][0] += "%"
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "backspace":
-    #                 self.results[interaction.message.id][0] = self.results[interaction.message.id][0][:-1]
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "clear":
-    #                 self.results[interaction.message.id][0] = ""
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "divide":
-    #                 self.results[interaction.message.id][0] += "/"
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "multiply":
-    #                 self.results[interaction.message.id][0] += "*"
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "minus":
-    #                 self.results[interaction.message.id][0] += "-"
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "dot":
-    #                 self.results[interaction.message.id][0] += "."
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "equal":
-    #                 if len(self.results[interaction.message.id][0]) <= 50:
-    #                     try:
-    #                         self.results[interaction.message.id][0] += "=" + str(round(eval(self.results[interaction.message.id][0]), 2))
-    #                     except:
-    #                         self.results[interaction.message.id][0] = "KABOOM!" if self.results[interaction.message.id][0] == "/0" else ""
-    #                     self.results[interaction.message.id][1] = 0
-    #             case "add":
-    #                 self.results[interaction.message.id][0] += "+"
-    #                 self.results[interaction.message.id][1] = 0
-    #             case "0":
-    #                 if not self.results[interaction.message.id][0] == "0" and not len(self.results[interaction.message.id][0]) == 1:
-    #                     self.results[interaction.message.id][0] += "0"
-    #                     self.results[interaction.message.id][1] = 0
-    #             case _:
-    #                 if self.results[interaction.message.id][1] <= 5:
-    #                     self.results[interaction.message.id][0] += interaction.data.custom_id
-    #                     self.results[interaction.message.id][1] += 1
+        #     if self.results[interaction.message.id][0] == "KABOOM!":
+        #         self.results[interaction.message.id][0] = ""
 
-    #         await interaction.callback(lib.InteractionCallbackTypes.UPDATE_MESSAGE, "```" + (self.results[interaction.message.id][0] if self.results[interaction.message.id][0] else "0") + "```")
+        #     match interaction.data.custom_id:
+        #         case "leftbracket":
+        #             self.results[interaction.message.id][0] += "("
+        #             self.results[interaction.message.id][1] = 0
+        #         case "rightbracket":
+        #             self.results[interaction.message.id][0] += ")"
+        #             self.results[interaction.message.id][1] = 0
+        #         case "power":
+        #             self.results[interaction.message.id][0] += "**"
+        #             self.results[interaction.message.id][1] = 0
+        #         case "modulo":
+        #             self.results[interaction.message.id][0] += "%"
+        #             self.results[interaction.message.id][1] = 0
+        #         case "backspace":
+        #             self.results[interaction.message.id][0] = self.results[interaction.message.id][0][:-1]
+        #             self.results[interaction.message.id][1] = 0
+        #         case "clear":
+        #             self.results[interaction.message.id][0] = ""
+        #             self.results[interaction.message.id][1] = 0
+        #         case "divide":
+        #             self.results[interaction.message.id][0] += "/"
+        #             self.results[interaction.message.id][1] = 0
+        #         case "multiply":
+        #             self.results[interaction.message.id][0] += "*"
+        #             self.results[interaction.message.id][1] = 0
+        #         case "minus":
+        #             self.results[interaction.message.id][0] += "-"
+        #             self.results[interaction.message.id][1] = 0
+        #         case "dot":
+        #             self.results[interaction.message.id][0] += "."
+        #             self.results[interaction.message.id][1] = 0
+        #         case "equal":
+        #             if len(self.results[interaction.message.id][0]) <= 50:
+        #                 try:
+        #                     self.results[interaction.message.id][0] += "=" + str(round(eval(self.results[interaction.message.id][0]), 2))
+        #                 except:
+        #                     self.results[interaction.message.id][0] = "KABOOM!" if self.results[interaction.message.id][0] == "/0" else ""
+        #                 self.results[interaction.message.id][1] = 0
+        #         case "add":
+        #             self.results[interaction.message.id][0] += "+"
+        #             self.results[interaction.message.id][1] = 0
+        #         case "0":
+        #             if not self.results[interaction.message.id][0] == "0" and not len(self.results[interaction.message.id][0]) == 1:
+        #                 self.results[interaction.message.id][0] += "0"
+        #                 self.results[interaction.message.id][1] = 0
+        #         case _:
+        #             if self.results[interaction.message.id][1] <= 5:
+        #                 self.results[interaction.message.id][0] += interaction.data.custom_id
+        #                 self.results[interaction.message.id][1] += 1
 
-    #         if "=" in self.results[interaction.message.id][0]:
-    #             self.results[interaction.message.id][0] = ""
+        #     await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, "```" + (self.results[interaction.message.id][0] if self.results[interaction.message.id][0] else "0") + "```")
 
-    # @commands.command(description="liczydło", aliases=["kalkulator", "calculator"], enabled=False)
+        #     if "=" in self.results[interaction.message.id][0]:
+        #         self.results[interaction.message.id][0] = ""
+
+    # @commands.command(description="liczydło", aliases=["kalkulator", "calculator"])
     # async def calc(self, ctx: "Context"):
-    #     components = lib.Components(
-    #         lib.Row(
-    #             lib.Button("x\u02b8", style=lib.ButtonStyles.SECONDARY, custom_id="power"),
-    #             lib.Button("%", style=lib.ButtonStyles.SECONDARY, custom_id="modulo"),
-    #             lib.Button("<-", style=lib.ButtonStyles.SECONDARY, custom_id="backspace"),
-    #             lib.Button("C", style=lib.ButtonStyles.DANGER, custom_id="clear")
-    #         ),
-    #         lib.Row(
-    #             lib.Button("7", style=lib.ButtonStyles.SECONDARY, custom_id="7"),
-    #             lib.Button("8", style=lib.ButtonStyles.SECONDARY, custom_id="8"),
-    #             lib.Button("9", style=lib.ButtonStyles.SECONDARY, custom_id="9"),
-    #             lib.Button("/", style=lib.ButtonStyles.SECONDARY, custom_id="divide"),
-    #             lib.Button("(", style=lib.ButtonStyles.SECONDARY, custom_id="leftbracket")
-    #         ),
-    #         lib.Row(
-    #             lib.Button("4", style=lib.ButtonStyles.SECONDARY, custom_id="4"),
-    #             lib.Button("5", style=lib.ButtonStyles.SECONDARY, custom_id="5"),
-    #             lib.Button("6", style=lib.ButtonStyles.SECONDARY, custom_id="6"),
-    #             lib.Button("*", style=lib.ButtonStyles.SECONDARY, custom_id="multiply"),
-    #             lib.Button(")", style=lib.ButtonStyles.SECONDARY, custom_id="rightbracket")
-    #         ),
-    #         lib.Row(
-    #             lib.Button("1", style=lib.ButtonStyles.SECONDARY, custom_id="1"),
-    #             lib.Button("2", style=lib.ButtonStyles.SECONDARY, custom_id="2"),
-    #             lib.Button("3", style=lib.ButtonStyles.SECONDARY, custom_id="3"),
-    #             lib.Button("-", style=lib.ButtonStyles.SECONDARY, custom_id="minus")
-    #         ),
-    #         lib.Row(
-    #             lib.Button("0", style=lib.ButtonStyles.SECONDARY, custom_id="0"),
-    #             lib.Button(".", style=lib.ButtonStyles.SECONDARY, custom_id="dot"),
-    #             lib.Button("=", style=lib.ButtonStyles.PRIMARY, custom_id="equal"),
-    #             lib.Button("+", style=lib.ButtonStyles.SECONDARY, custom_id="add")
-    #         )
+    #     components = femcord.Components(
+    #         components = [
+    #             femcord.ActionRow(
+    #                 components = [
+    #                     femcord.Button(label="x\u02b8", style=femcord.ButtonStyles.SECONDARY, custom_id="power"),
+    #                     femcord.Button(label="%", style=femcord.ButtonStyles.SECONDARY, custom_id="modulo"),
+    #                     femcord.Button(label="<-", style=femcord.ButtonStyles.SECONDARY, custom_id="backspace"),
+    #                     femcord.Button(label="C", style=femcord.ButtonStyles.DANGER, custom_id="clear")
+    #                 ]
+    #             ),
+    #             femcord.ActionRow(
+    #                 components = [
+    #                     femcord.Button(label="7", style=femcord.ButtonStyles.SECONDARY, custom_id="7"),
+    #                     femcord.Button(label="8", style=femcord.ButtonStyles.SECONDARY, custom_id="8"),
+    #                     femcord.Button(label="9", style=femcord.ButtonStyles.SECONDARY, custom_id="9"),
+    #                     femcord.Button(label="/", style=femcord.ButtonStyles.SECONDARY, custom_id="divide"),
+    #                     femcord.Button(label="(", style=femcord.ButtonStyles.SECONDARY, custom_id="leftbracket")
+    #                 ]
+    #             ),
+    #             femcord.ActionRow(
+    #                 components = [
+    #                     femcord.Button(label="4", style=femcord.ButtonStyles.SECONDARY, custom_id="4"),
+    #                     femcord.Button(label="5", style=femcord.ButtonStyles.SECONDARY, custom_id="5"),
+    #                     femcord.Button(label="6", style=femcord.ButtonStyles.SECONDARY, custom_id="6"),
+    #                     femcord.Button(label="*", style=femcord.ButtonStyles.SECONDARY, custom_id="multiply"),
+    #                     femcord.Button(label=")", style=femcord.ButtonStyles.SECONDARY, custom_id="rightbracket")
+    #                 ]
+    #             ),
+    #             femcord.ActionRow(
+    #                 components = [
+    #                     femcord.Button(label="1", style=femcord.ButtonStyles.SECONDARY, custom_id="1"),
+    #                     femcord.Button(label="2", style=femcord.ButtonStyles.SECONDARY, custom_id="2"),
+    #                     femcord.Button(label="3", style=femcord.ButtonStyles.SECONDARY, custom_id="3"),
+    #                     femcord.Button(label="-", style=femcord.ButtonStyles.SECONDARY, custom_id="minus")
+    #                 ]
+    #             ),
+    #             femcord.ActionRow(
+    #                 components = [
+    #                     femcord.Button(label="0", style=femcord.ButtonStyles.SECONDARY, custom_id="0"),
+    #                     femcord.Button(label=".", style=femcord.ButtonStyles.SECONDARY, custom_id="dot"),
+    #                     femcord.Button(label="=", style=femcord.ButtonStyles.PRIMARY, custom_id="equal"),
+    #                     femcord.Button(label="+", style=femcord.ButtonStyles.SECONDARY, custom_id="add")
+    #                 ]
+    #             )
+    #         ]
     #     )
 
     #     message = await ctx.reply("```0```", components=components)
@@ -518,7 +676,7 @@ class Fun(commands.Cog):
             if user.banner_color:
                 color = int(user.banner_color[1:], 16)
             else:
-                color = user.accent_color
+                color = user.accent_color or 0
 
             data = io.BytesIO()
 
@@ -535,13 +693,30 @@ class Fun(commands.Cog):
         container = femcord.Container()
         components.add_component(container)
 
+        text = []
+
+        if user.public_flags:
+            text.append(" ".join(str(self.bot.gateway.get_emoji(name=flag.name)) for flag in user.public_flags if flag is not PublicFlags.BOT_HTTP_INTERACTIONS))
+        if user.primary_guild and user.primary_guild.identity_guild_id is not None:
+            primary_guild = f"`{user.primary_guild.tag}`"
+
+            if user.primary_guild.badge:
+                if user.primary_guild.badge not in [emoji.name for emoji in self.bot.gateway.emojis]:
+                    async with self.bot.http.session.get(user.primary_guild.badge_url) as response:
+                        await self.bot.gateway.create_application_emoji(user.primary_guild.badge, await response.read())
+
+                emoji = self.bot.gateway.get_emoji(name=user.primary_guild.badge)
+                primary_guild = f"{emoji} " + primary_guild
+
+            text.append(primary_guild)
+
         container.add_component(femcord.MediaGallery().add_item(femcord.MediaItem(media=femcord.UnfurledMediaItem(url=banner_url))))
         section = femcord.Section().set_accessory(femcord.Thumbnail(media=femcord.UnfurledMediaItem(url=user.avatar_url)))
         section.add_component(femcord.TextDisplay(content="# " + await _("Information about {}:", user.global_name or user.username)))
-        if user.public_flags:
+        if text:
             section.add_component(
                 femcord.TextDisplay(
-                    content = "### " + " ".join(str(self.bot.gateway.get_emoji(name=flag.name)) for flag in user.public_flags if flag is not PublicFlags.BOT_HTTP_INTERACTIONS)
+                    content = "### " + " **|** ".join(text)
                 )
             )
         container.add_component(section)
@@ -551,8 +726,16 @@ class Fun(commands.Cog):
         container.add_component(femcord.TextDisplay(content=f"**{_("Username:")}** {user.username}"))
         container.add_component(femcord.TextDisplay(content=f"**{_("Date created:")}** {femcord.types.t @ user.created_at} ({femcord.types.t['R'] @ user.created_at})"))
 
+        if member is not None:
+            container.add_component(femcord.Separator())
+            if member.nick is not None:
+                container.add_component(femcord.TextDisplay(content=f"**{_("Nickname:")}** {member.nick}"))
+            if member.roles[1:]:
+                container.add_component(femcord.TextDisplay(content=f"**{_("Roles:")}** " + " ".join(types.m @ role for role in sorted(member.roles[1:], key=lambda role: role.position, reverse=True))))
+            container.add_component(femcord.TextDisplay(content=f"**{_("Date joined:")}** {femcord.types.t @ member.joined_at} ({femcord.types.t['R'] @ member.joined_at})"))
+
         if user.bot is True:
-            bot_container = femcord.Container()
+            container.add_component(femcord.Separator())
 
             link = f"https://discord.com/oauth2/authorize?client_id={user.id}&permissions=0&scope=bot"
 
@@ -577,29 +760,30 @@ class Fun(commands.Cog):
                 )
 
             if data["description"]:
-                bot_container.add_component(femcord.TextDisplay(content=data["description"]))
-                bot_container.add_component(femcord.Separator())
+                container.add_component(femcord.TextDisplay(content=data["description"]))
+                container.add_component(femcord.Separator())
             if "guild_id" in data:
                 try:
                     guild_data = await self.bot.http.request(Route("GET", "guilds", data["guild_id"], "widget.json"))
 
                     if "code" not in guild_data:
-                        bot_container.add_component(femcord.TextDisplay(content=f"**{_("Guild:")}** {guild_data['name']} ({guild_data['id']})"))
+                        container.add_component(femcord.TextDisplay(content=f"**{_("Guild:")}** {guild_data['name']} ({guild_data['id']})"))
                 except femcord.errors.HTTPException:
                     pass
             if "terms_of_service_url" in data:
-                bot_container.add_component(femcord.TextDisplay(content=f"**ToS:** {data["terms_of_service_url"]}"))
+                container.add_component(femcord.TextDisplay(content=f"**ToS:** {data["terms_of_service_url"]}"))
             if "privacy_policy_url" in data:
-                bot_container.add_component(femcord.TextDisplay(content=f"**{_("Privacy policy:")}** {data["privacy_policy_url"]}"))
+                container.add_component(femcord.TextDisplay(content=f"**{_("Privacy policy:")}** {data["privacy_policy_url"]}"))
             if "tags" in data:
-                bot_container.add_component(femcord.TextDisplay(content=f"**{_("Tags:")}** " + ", ".join(data["tags"])))
+                container.add_component(femcord.TextDisplay(content=f"**{_("Tags:")}** " + ", ".join(data["tags"])))
             if intents:
-                bot_container.add_component(femcord.TextDisplay(content=f"**{_("Intents:")}** " + ", ".join([intent.name for intent in intents])))
+                container.add_component(femcord.TextDisplay(content=f"**{_("Intents:")}** " + ", ".join([intent.name for intent in intents])))
             if "install_params" in data:
-                bot_container.add_component(femcord.TextDisplay(content=f"**{_("Permissions:")}** " + ", ".join([permission.name for permission in Permissions.from_int(int(data["install_params"]["permissions"])).permissions])))
+                if data["install_params"]["permissions"] != "0":
+                    container.add_component(femcord.TextDisplay(content=f"**{_("Permissions:")}** " + ", ".join([permission.name for permission in Permissions.from_int(int(data["install_params"]["permissions"])).permissions])))
                 link = f"https://discord.com/oauth2/authorize?client_id={user.id}&permissions={data['install_params']['permissions']}&scope={'%20'.join(data['install_params']['scopes'])}"
 
-            bot_container.add_component(
+            container.add_component(
                 femcord.ActionRow(
                     components = [
                         femcord.Button(
@@ -611,16 +795,7 @@ class Fun(commands.Cog):
                 )
             )
 
-            components.add_component(bot_container)
-
         if member is not None:
-            container.add_component(femcord.Separator())
-            if member.nick is not None:
-                container.add_component(femcord.TextDisplay(content=f"**{_("Nickname:")}** {member.nick}"))
-            if member.roles[1:]:
-                container.add_component(femcord.TextDisplay(content=f"**{_("Roles:")}** " + " ".join(types.m @ role for role in member.roles[1:])))
-            container.add_component(femcord.TextDisplay(content=f"**{_("Date joined:")}** {femcord.types.t @ member.joined_at} ({femcord.types.t['R'] @ member.joined_at})"))
-
             custom_status = ""
             client_status = member.presence.client_status
             if client_status.desktop:
@@ -639,7 +814,7 @@ class Fun(commands.Cog):
                     if activity.state:
                         custom_status += activity.state
                 else:
-                    activity_container = femcord.Container()
+                    container.add_component(femcord.Separator())
                     asset = (activity.assets.large_image or activity.assets.small_image) if activity.assets else None
                     if activity.name == "Spotify":
                         asset = "https://i.scdn.co/image/" + asset.split(":")[1]
@@ -653,7 +828,7 @@ class Fun(commands.Cog):
                             )
                         )
                     else:
-                        activity_section = activity_container # type: ignore
+                        activity_section = container # type: ignore
                     activity_section.add_component(
                         femcord.TextDisplay(
                             content = f"# {activity.type.name[0].upper()}{activity.type.name[1:].lower()} {"to " if activity.type is femcord.ActivityTypes.LISTENING else ""}{activity.name}"
@@ -672,18 +847,19 @@ class Fun(commands.Cog):
                             )
                         )
                     if asset:
-                        activity_container.add_component(activity_section)
-                    components.add_component(activity_container)
+                        container.add_component(activity_section)
 
             if custom_status:
                 section.add_component(femcord.TextDisplay(content=custom_status))
 
         await ctx.reply(components=components, files=files, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
 
-    @commands.command(description="Shows information about the guild", aliases=["si"])
-    async def serverinfo(self, ctx: "Context"):
-        embed = femcord.Embed(title=await ctx.get_translation("information_about", (ctx.guild.name,)), color=self.bot.embed_color)
-        embed.set_thumbnail(url=ctx.guild.icon_url)
+    @commands.command(description="Shows information about the guild", usage="[guild_id]", aliases=["si"])
+    async def serverinfo(self, ctx: "Context", guild = None):
+        guild = self.bot.gateway.get_guild(guild) or ctx.guild
+
+        embed = femcord.Embed(title=await ctx.get_translation("information_about", (guild.name,)), color=self.bot.embed_color)
+        embed.set_thumbnail(url=guild.icon_url)
 
         statuses = {
             femcord.StatusTypes.ONLINE: 0,
@@ -692,27 +868,27 @@ class Fun(commands.Cog):
             femcord.StatusTypes.OFFLINE: 0
         }
 
-        for member in ctx.guild.members:
+        for member in guild.members:
             statuses[member.presence.status] += 1
 
-        embed.add_field(name=await ctx.get_translation("si_owner"), value=types.m @ ctx.guild.owner)
-        embed.add_field(name="ID:", value=ctx.guild.id)
+        embed.add_field(name=await ctx.get_translation("si_owner"), value=types.m @ guild.owner)
+        embed.add_field(name="ID:", value=guild.id)
         embed.add_field(name=await ctx.get_translation("si_users"), value=" ".join(f"{value}{self.bot.gateway.get_emoji(name=key.name)}" for key, value in statuses.items()), inline=True)
-        embed.add_field(name=await ctx.get_translation("si_channels"), value=len(ctx.guild.channels), inline=True)
-        embed.add_field(name=await ctx.get_translation("roles"), value=len(ctx.guild.roles), inline=True)
-        embed.add_field(name=await ctx.get_translation("si_emojis"), value=len(ctx.guild.emojis), inline=True)
-        embed.add_field(name=await ctx.get_translation("si_stickers"), value=len(ctx.guild.stickers), inline=True)
+        embed.add_field(name=await ctx.get_translation("si_channels"), value=len(guild.channels), inline=True)
+        embed.add_field(name=await ctx.get_translation("roles"), value=len(guild.roles), inline=True)
+        embed.add_field(name=await ctx.get_translation("si_emojis"), value=len(guild.emojis), inline=True)
+        embed.add_field(name=await ctx.get_translation("si_stickers"), value=len(guild.stickers), inline=True)
         embed.add_blank_field()
-        embed.add_field(name=await ctx.get_translation("date_created"), value=f"{femcord.types.t @ ctx.guild.created_at} ({femcord.types.t['R'] @ ctx.guild.created_at})")
-        embed.add_field(name=await ctx.get_translation("si_boosts"), value=ctx.guild.premium_subscription_count, inline=True)
-        embed.add_field(name=await ctx.get_translation("si_level"), value=ctx.guild.premium_tier, inline=True)
+        embed.add_field(name=await ctx.get_translation("date_created"), value=f"{femcord.types.t @ guild.created_at} ({femcord.types.t['R'] @ guild.created_at})")
+        embed.add_field(name=await ctx.get_translation("si_boosts"), value=guild.premium_subscription_count, inline=True)
+        embed.add_field(name=await ctx.get_translation("si_level"), value=guild.premium_tier, inline=True)
         embed.add_blank_field()
-        if ctx.guild.vanity_url is not None:
-            embed.add_field(name=await ctx.get_translation("si_custom_url"), value="discord.gg/" + ctx.guild.vanity_url, inline=ctx.guild.banner is None)
-        embed.add_field(name=await ctx.get_translation("si_icon"), value=f"[link]({ctx.guild.icon_url})", inline=True)
-        if ctx.guild.banner is not None:
-            embed.add_field(name=await ctx.get_translation("si_banner"), value=f"[link]({ctx.guild.banner_url})", inline=True)
-            embed.set_image(url=ctx.guild.banner_url)
+        if guild.vanity_url is not None:
+            embed.add_field(name=await ctx.get_translation("si_custom_url"), value="discord.gg/" + guild.vanity_url, inline=guild.banner is None)
+        embed.add_field(name=await ctx.get_translation("si_icon"), value=f"[link]({guild.icon_url})", inline=True)
+        if guild.banner is not None:
+            embed.add_field(name=await ctx.get_translation("si_banner"), value=f"[link]({guild.banner_url})", inline=True)
+            embed.set_image(url=guild.banner_url)
             embed.add_blank_field()
 
         await ctx.reply(embed=embed)
@@ -1038,14 +1214,15 @@ class Fun(commands.Cog):
             ]
         )
 
+        action_row = femcord.ActionRow()
+
         if is_app:
-            components.add_component(
-                femcord.ActionRow(
-                    components = [
-                        femcord.Button(label="show", style=femcord.ButtonStyles.SECONDARY, custom_id="show")
-                    ]
-                )
-            )
+            action_row.add_component(femcord.Button(label="show", style=femcord.ButtonStyles.SUCCESS, custom_id="show"))
+        if ctx.guild and ctx.member.permissions.has(femcord.enums.Permissions.MANAGE_GUILD_EXPRESSIONS):
+            action_row.add_component(femcord.Button(label="add sticker", style=femcord.ButtonStyles.SUCCESS, custom_id="add_sticker"))
+
+        if action_row["components"]:
+            components.add_component(action_row)
 
         obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
 
@@ -1081,13 +1258,21 @@ class Fun(commands.Cog):
                 case "show":
                     await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
                     return await ctx.reply(files=[("sticker.gif", await sticker.generate())])
+                case "add_sticker":
+                    data = FormData()
+
+                    if len(text) < 3:
+                        text += ";" * (3 - len(text))
+
+                    data.add_field("name", text)
+                    data.add_field("tags", text)
+                    data.add_field("file", await sticker.get_thumbnail(), content_type="image/png", filename=text)
+
+                    await self.bot.http.request(Route("POST", "guilds", ctx.guild.id, "stickers"), data=data)
+
+                    return await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, "Sticker added", components=[], files=[], other={"attachments": []})
 
             await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, components=components, files=[("sticker.gif", await sticker.generate())])
-
-    @commands.Listener
-    async def on_interaction_create(self, interaction: femcord.types.Interaction):
-        if interaction.data.custom_id == "accept":
-            await interaction.callback(femcord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, content="Did we get you? [Add fembot](https://discord.com/oauth2/authorize?client_id=705552952600952960) to your profile to fool others!", flags=[femcord.enums.MessageFlags.EPHEMERAL])
 
     @commands.hybrid_command()
     async def nitro(self, ctx: Union["Context", "AppContext"]):
@@ -1124,6 +1309,22 @@ class Fun(commands.Cog):
         )
 
         await ctx.reply(components=components, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+
+    @commands.command()
+    async def cowsay(self, ctx: "Context", *, text: Max[str, 1000]):
+        if len(text) > 1000:
+            return await ctx.reply(await _("Provided text is too long (`{}`/`{}`)", len(text), 1000))
+
+        cow = f""" {"_" * (len(text) + 2)}
+< {text} >
+ {"-" * (len(text) + 2)}
+        \\   ^__^
+         \\  (oo)\\_______
+            (__)\\       )\\/\\
+                ||----w |
+                ||     ||"""
+
+        await ctx.reply("```" + cow + "```")
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Fun(bot))

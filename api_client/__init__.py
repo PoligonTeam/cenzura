@@ -78,6 +78,14 @@ class YoutubeResponse:
     def from_dict(cls, data: YoutubeResponseDict) -> "YoutubeResponse":
         return cls(io.BytesIO(base64.b64decode(data["video"])), YoutubeInfo(**data["info"]))
 
+class LyricsResponse(TypedDict):
+    status: int
+    lyrics: str
+    artist: str
+    title: str
+    source: str
+    cached: bool
+
 class ApiError(Exception):
     def __init__(self, message: str, url: str):
         super().__init__(message)
@@ -94,7 +102,7 @@ class ApiClient:
     async def __aexit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]) -> None:
         await self.session.close()
 
-    async def _post(self, url: str, **kwargs) -> ScreenshotResponseDict | YoutubeResponseDict:
+    async def _post(self, url: str, **kwargs) -> dict:
         try:
             async with self.session.post(url, **kwargs) as response:
                 if response.status not in (200, 400, 401):
@@ -121,3 +129,7 @@ class ApiClient:
     async def ytdl(self, url: str) -> YoutubeResponse:
         data = await self._post("/ytdl", json={"url": url})
         return YoutubeResponse.from_dict(data)
+
+    async def lyrics(self, name: str) -> LyricsResponse:
+        data: LyricsResponse = await self._post("/lyrics", json={"name": name}) # type: ignore
+        return data

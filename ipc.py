@@ -16,7 +16,7 @@ limitations under the License.
 
 from femipc.femipc import Client, listener
 
-from femcord.femcord import Embed
+from femcord import femcord
 
 from femcord.femcord.http import HTTPException
 
@@ -28,7 +28,7 @@ import hashlib
 import config
 import aiohttp
 
-from typing import TypedDict, TYPE_CHECKING
+from typing import TypedDict, NotRequired, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .bot import Bot
@@ -38,6 +38,7 @@ class UserDict(TypedDict):
     id: str
     username: str
     avatar: str
+    global_name: NotRequired[str]
 
 class ChannelDict(TypedDict):
     id: str
@@ -53,6 +54,12 @@ class GuildDict(TypedDict):
     icon: str
     channels: list[ChannelDict]
     roles: list[RoleDict]
+
+class Event(TypedDict):
+    integration_type: int
+    user: UserDict
+    scopes: list[str]
+    guild: NotRequired[GuildDict]
 
 class IPC(Client):
     def __init__(self, bot: "Bot", path: str, peers: list[str]) -> None:
@@ -211,3 +218,48 @@ class IPC(Client):
         guild_db["guild"] = self.guild_to_dict(guild)
 
         return guild_db
+
+    @listener("webhook_event")
+    async def webhook_event(self, event: Event) -> None:
+        channel = self.bot.gateway.get_channel("1369001448372699167")
+
+        components = femcord.Components()
+        container = femcord.Container(accent_color=0x4ac926)
+
+        text = f"# {event["user"]["global_name"] or event["user"]["username"]} ({event["user"]["id"]})"
+
+        if event["integration_type"] == 1:
+            text += " dodał bota do swojego konta"
+        elif event["integration_type"] == 0:
+            text += " dodał bota na serwer"
+
+        container.add_component(femcord.Section(
+            components = [
+                femcord.TextDisplay(
+                    content = text
+                )
+            ],
+            accessory = femcord.Thumbnail(
+                media = femcord.UnfurledMediaItem(
+                    url = f"https://cdn.discordapp.com/avatars/{event["user"]["id"]}/{event["user"]["avatar"]}.png"
+                )
+            )
+        ))
+
+        if event["integration_type"] == 0:
+            container.add_component(femcord.Section(
+                components = [
+                    femcord.TextDisplay(
+                        content = f"# {event["guild"]["name"]}"
+                    )
+                ],
+                accessory = femcord.Thumbnail(
+                    media = femcord.UnfurledMediaItem(
+                        url = f"https://cdn.discordapp.com/icons/{event["guild"]["id"]}/{event["guild"]["icon"]}.png"
+                    )
+                )
+            ))
+
+        components.add_component(container)
+
+        await channel.send(components=components, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])

@@ -34,10 +34,12 @@ class ErrorHandler(commands.Cog):
     @commands.Listener
     async def on_error(self, ctx: Union["Context", "AppContext"], error: Exception) -> None:
         if isinstance(error, commands.CommandNotFound):
-            return await ctx.reply("Command not found")
+            await ctx.reply("Command not found")
+            return
 
         elif isinstance(error, commands.CommandDisabled):
-            return await ctx.reply("This command is disabled")
+            await ctx.reply("This command is disabled")
+            return
 
         elif isinstance(error, (commands.MissingArgument, commands.InvalidArgumentType)):
             command_arguments = [arg.name for arg in error.command_arguments]
@@ -45,7 +47,7 @@ class ErrorHandler(commands.Cog):
 
             required_argument = usage.split(" ")[command_arguments.index(error.argument)]
             usage = usage.replace(required_argument, required_argument := (fg.red + required_argument[0] + fg.reset + required_argument[1:-1] + fg.red + required_argument[-1] + fg.reset))
-            usage = " ".join(ctx.message.content.split(" ")[:-(len(ctx.arguments) if ctx.arguments else -1626559200)]) + " " + usage
+            usage = " ".join(ctx.message.content.split(" ")[:-(len(ctx.arguments) if ctx.arguments else -1)]) + " " + usage
 
             if isinstance(error, commands.MissingArgument):
                 text = "You did not provide this argument"
@@ -70,16 +72,20 @@ class ErrorHandler(commands.Cog):
 
             result = f"```ansi\n{usage}\n{' ' * usage.index(required_argument)}{fg.red + '^' * (len(required_argument) - (len(fg.blue) * 2 + len(fg.reset) * 2)) + fg.white}\n\n{fg.blue + text}```"
 
-            return await ctx.send(result)
+            await ctx.reply(result)
+            return
 
         elif isinstance(error, commands.NotOwner):
-            return await ctx.reply("You are not the owner of this bot")
+            await ctx.reply("You are not the owner of this bot")
+            return
 
         elif isinstance(error, commands.NotNsfw):
-            return await ctx.reply("This channel is not nsfw")
+            await ctx.reply("This channel is not nsfw")
+            return
 
         elif isinstance(error, commands.NoPermission):
-            return await ctx.reply("You do not have permission to use this command")
+            await ctx.reply("You do not have permission to use this command")
+            return
 
         elif isinstance(error, femcord.HTTPException):
             formatted_error = "".join(traceback.format_exception(type(error), error, error.__traceback__))
@@ -109,7 +115,8 @@ class ErrorHandler(commands.Cog):
             return await ctx.reply_paginator(pages=[f"```py\n{formatted_error}```", f"```ansi\n{walk(error.original_error["errors"])}```"], replace=False)
 
         elif isinstance(error, AssertionError):
-            return await ctx.reply(error)
+            await ctx.reply(error)
+            return
 
         formatted_error = "".join(traceback.format_exception(type(error), error, error.__traceback__))
 

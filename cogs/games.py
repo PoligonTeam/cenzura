@@ -32,7 +32,7 @@ class Games(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(description="https://korrumzthegame.wtf", usage="[name] [avatar-number_1-20]", aliases=["ktg"])
-    async def korrumzthegame(self, ctx: Union["Context", "AppContext"], username: int | str = None, avatar: int = None):
+    async def korrumzthegame(self, ctx: Union["Context", "AppContext"], username: int | str = None, avatar: int = None) -> None:
         if isinstance(username, int) and avatar is None:
             avatar = username
             username = None
@@ -108,7 +108,8 @@ class Games(commands.Cog):
                 interaction, = await self.bot.wait_for("interaction_create", check, timeout=60)
             except TimeoutError:
                 await renderer.client.close()
-                return await obj.edit("Session expired", embeds=[], components=[], files=[], other={"attachments": []})
+                await obj.edit("Session expired", embeds=[], components=[], files=[], other={"attachments": []})
+                return
 
             if interaction.data.custom_id == "close":
                 await renderer.client.close()

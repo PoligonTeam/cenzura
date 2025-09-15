@@ -28,6 +28,9 @@ from aiohttp import web, abc, ClientSession
 
 from datetime import datetime, timedelta, UTC
 
+from nacl.signing import VerifyKey
+from nacl.exceptions import BadSignatureError
+
 from .ipc import IPC
 
 logging.basicConfig(level=logging.DEBUG)
@@ -38,6 +41,9 @@ FRONTEND_URL = "https://cenzura.poligon.lgbt"
 API_URL = "https://cenzura-api.poligon.lgbt"
 DISCORD_API = "https://discord.com/api/v10"
 EPOCH = 1626559200
+
+PUBLIC_KEY = "234531ebcd68b50ec442212248b412b8c9fa3f0d6b1d0ee4ad29da05ac693cad"
+verify_key = VerifyKey(bytes.fromhex(PUBLIC_KEY))
 
 class Cache:
     def __init__(self) -> None:
@@ -163,3 +169,24 @@ class Server:
         token = jwt.encode({"user_id": user["id"], "exp": datetime.now(UTC) + timedelta(days=7)}, config.JWT_SECRET, "HS256")
 
         return web.json_response({"token": token})
+
+    @router.post("/webhook")
+    async def webhook(request: web.Request) -> web.Response:
+        try:
+            signature = request.headers["X-Signature-Ed25519"]
+            timestamp = request.headers["X-Signature-Timestamp"]
+
+            verify_key.verify(f"{timestamp}{(await request.read()).decode()}".encode(), bytes.fromhex(signature))
+        except BadSignatureError:
+            return web.HTTPUnauthorized()
+
+        data = await request.json()
+
+        if "event" not in data or "type" not in data["event"]:
+            print("Invalid webhook data:", data)
+            return web.HTTPBadRequest()
+
+        if data["event"]["type"] == "APPLICATION_AUTHORIZED" and "integration_type" in data["event"]["data"]:
+            await request.app.ipc.emit("webhook_event", data["event"]["data"])
+
+        return web.HTTPNoContent()

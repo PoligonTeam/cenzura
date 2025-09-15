@@ -15,35 +15,19 @@ limitations under the License.
 """
 
 import asyncio, aiohttp, json
-from enum import Enum
+from typing import Optional, Any
 from .models import *
+from .enums import *
 
-class Opcodes(Enum):
-    READY = "ready"
-    PLAY = "play"
-    STOP = "stop"
-    PAUSE = "pause"
-    SEEK = "seek"
-    VOLUME = "volume"
-    FILTERS = "filters"
-    DESTROY = "destroy"
-    VOICE_UPDATE = "voiceUpdate"
-    PLAYER_UPDATE = "playerUpdate"
-    STATS = "stats"
-    EVENT = "event"
-
-class Events(Enum):
-    TRACK_START = "TrackStartEvent"
-    TRACK_END = "TrackEndEvent"
-    TRACK_EXCEPTION = "TrackExceptionEvent"
-    TRACK_STUCK = "TrackStuckEvent"
-    WEBSOCKET_CLOSED = "WebSocketClosedEvent"
+MISSING: Any = object()
 
 class Player:
-    def __init__(self, client: "Client", guild_id: str) -> None:
+    def __init__(self, client: "Client", guild_id: str, user_data: dict = {}) -> None:
         self.client = client
         self.guild_id = guild_id
-        self.track: Track = None
+        self.user_data: dict[str, Any] = user_data
+        self.channel_id: str | None = None
+        self.track: Track | None = None
         self.queue: list[Track] = []
         self.position: int = 0
         self.paused: bool = False
@@ -51,55 +35,71 @@ class Player:
         self.loop: bool = False
         self.filters: dict = {}
 
-    def play(self, track: Track) -> None:
+    async def play(self, track: Track) -> None:
         self.track = track
-        return self.client.send(Opcodes.PLAY, guildId=self.guild_id, track=track.encoded)
+        return await self.client.update_player(self.guild_id, encoded_track=track.encoded)
 
     def add(self, track: Track) -> None:
         self.queue.append(track)
 
-    def skip(self) -> None:
+    def add_playlist(self, tracks: list[Track]) -> None:
+        for track in tracks:
+            self.queue.append(track)
+
+    async def skip(self) -> None:
+        await self.on_skip(self)
+
         if len(self.queue) > 0:
-            return self.play(self.queue.pop(0))
+            return await self.play(self.queue.pop(0))
 
-        return self.stop()
+        return await self.stop()
 
-    def stop(self) -> None:
+    async def stop(self) -> None:
+        await self.client.update_player(self.guild_id, encoded_track=None)
         self.track = None
-        return self.client.send(Opcodes.STOP, guildId=self.guild_id)
 
-    def pause(self) -> None:
+    async def pause(self) -> None:
         self.paused = True
-        return self.client.send(Opcodes.PAUSE, guildId=self.guild_id, pause=self.paused)
+        await self.client.update_player(self.guild_id, paused=True)
 
-    def resume(self) -> None:
+    async def resume(self) -> None:
         self.paused = False
-        return self.client.send(Opcodes.PAUSE, guildId=self.guild_id, pause=self.paused)
+        await self.client.update_player(self.guild_id, paused=False)
 
-    def seek(self, position: int) -> None:
+    async def seek(self, position: int) -> None:
+        if not self.track:
+            raise ValueError("No track is currently playing")
+
         if position < 0:
             raise ValueError("Position must be greater than 0")
-        elif position > self.track.length:
+        elif position > self.track.info.length:
             raise ValueError("Position must be less than track length")
 
         self.position = position
 
-        return self.client.send(Opcodes.SEEK, guildId=self.guild_id, position=position)
+        await self.client.update_player(
+            self.guild_id,
+            position=position,
+        )
 
-    def set_volume(self, volume: int) -> None:
-        if volume < 0 or volume > 1000:
-            raise ValueError("Volume must be between 0 and 1000")
+    async def set_volume(self, volume: int | float) -> None:
+        if volume < 0 or volume > 500:
+            raise ValueError("Volume must be between 0 and 500")
 
-        self.volume = volume
+        self.filters["volume"] = volume / 100.0
 
-        return self.client.send(Opcodes.VOLUME, guildId=self.guild_id, volume=volume)
+        await self.set_filters(**self.filters)
 
     def set_loop(self, loop: bool) -> None:
         self.loop = loop
 
-    def set_filters(self, **filters) -> None:
+    async def set_filters(self, **filters) -> None:
         self.filters = filters
-        return self.client.send(Opcodes.FILTERS, guildId=self.guild_id, **filters)
+        await self.client.update_player(self.guild_id, filters=filters)
+
+    async def on_skip(self, player: "Player") -> None:
+        """This method is called when a track is skipped. Override this method to handle the event."""
+        pass
 
 class Client:
     async def __new__(cls, *args) -> "Client":
@@ -107,17 +107,18 @@ class Client:
         await instance.__init__(*args)
         return instance
 
-    async def __init__(self, user_id: str, host: str, port: int, password: str, _ssl: bool = False) -> None:
+    async def __init__(self, user_id: str, host: str, port: int, password: str, _ssl: bool = False, session_id: Optional[str] = None) -> None:
         self.user_id = user_id
         self.host = host
         self.port = port
         self.password = password
         self._ssl = _ssl
-        self.session_id = None
+        self.session_id = session_id
         self._voice_state = VoiceState()
         self.players: list[Player] = []
 
         self.loop = asyncio.get_event_loop()
+        self._base_url = "%s://%s:%d" % ("https" if self._ssl else "http", host, port)
         self.session = aiohttp.ClientSession(loop=self.loop)
 
         self.headers = {
@@ -126,14 +127,14 @@ class Client:
             "Client-Name": "femlink/1.0"
         }
 
-        self.ws = await self.session.ws_connect("%s://%s:%d/v3/websocket" % ("wss" if self._ssl else "ws", host, port), headers=self.headers)
+        if self.session_id is not None:
+            self.headers["Session-Id"] = self.session_id
+
+        self.ws = await self.session.ws_connect("%s://%s:%d/v4/websocket" % ("wss" if self._ssl else "ws", host, port), headers=self.headers)
 
         self.receiver_task = self.loop.create_task(self.data_receiver())
 
-    def send(self, op: Opcodes, **kwargs) -> None:
-        return self.ws.send_json({"op": op.value, **kwargs})
-
-    def get_player(self, guild_id: str) -> Player:
+    def get_player(self, guild_id: str) -> Player | None:
         for player in self.players:
             if player.guild_id == guild_id:
                 return player
@@ -151,12 +152,30 @@ class Client:
                 if op is Opcodes.READY:
                     self.session_id = data["sessionId"]
 
+                    # if data["resumed"] is True:
+                    #     for player in await self.get_players():
+                    #         self._voice_state.session_id = player["voice"]["sessionId"]
+                    #         await self.voice_server_update({
+                    #             "guild_id": player["guildId"],
+                    #             "token": player["voice"]["token"],
+                    #             "endpoint": player["voice"]["endpoint"],
+                    #         })
+
                 elif op is Opcodes.PLAYER_UPDATE:
                     player = self.get_player(data["guildId"])
+
+                    if not player:
+                        self.players.append(Player(self, data["guildId"]))
+                        continue
+
                     player.position = data["state"]["position"]
 
                 elif op is Opcodes.EVENT:
                     player = self.get_player(data["guildId"])
+
+                    if not player:
+                        continue
+
                     event = Events(data["type"])
 
                     if event in (Events.TRACK_END, Events.TRACK_EXCEPTION):
@@ -164,7 +183,10 @@ class Client:
                             await player.play(player.track)
                             continue
 
-                        if data["reason"] in ("FINISHED", "LOAD_FAILED"):
+                        if "reason" not in data:
+                            print("Received event without reason:", data)
+
+                        if data["reason"] in ("finished", "loadFailed"):
                             player.track = None
                             await player.skip()
 
@@ -172,8 +194,7 @@ class Client:
                         await player.play(player.track)
                         await player.seek(player.position)
 
-        self.ws = await self.session.ws_connect("ws://%s:%d/v3/websocket" % (self.host, self.port), headers=self.headers)
-
+        self.ws = await self.session.ws_connect("ws://%s:%d/v4/websocket" % (self.host, self.port), headers=self.headers)
         self.receiver_task = self.loop.create_task(self.data_receiver())
 
     async def voice_server_update(self, data: dict) -> None:
@@ -187,12 +208,18 @@ class Client:
         if data["user_id"] != self.user_id:
             return
 
+        player = self.get_player(data["guild_id"])
+
         if data["channel_id"] is None:
             self._voice_state.clear()
-            player = self.get_player(data["guild_id"])
+
             if player:
-                del self.players[player]
+                await self.destroy_player(data["guild_id"])
+                self.players.remove(player)
             return
+
+        if player is not None and player.channel_id != data["channel_id"] and data["channel_id"] is not None:
+            player.channel_id = data["channel_id"]
 
         if data["session_id"] == self._voice_state.session_id:
             return
@@ -203,30 +230,86 @@ class Client:
 
     async def voice_update(self) -> None:
         if self._voice_state.event is not None:
-            await self.send(Opcodes.VOICE_UPDATE, guildId=self._voice_state.event.guild_id, sessionId=self._voice_state.session_id, event=self._voice_state.event.to_dict())
+            await self.update_player(self._voice_state.event.guild_id, voice_state=self._voice_state, no_replace=True)
 
-    async def get_tracks(self, identifier: str) -> list[Track]:
-        async with self.session.get("%s://%s:%d/v3/loadtracks?identifier=%s" % ("https" if self._ssl else "http", self.host, self.port, identifier), headers=self.headers) as response:
+    async def update_player(
+            self,
+            guild_id: str,
+            identifier: Optional[str] = MISSING,
+            encoded_track: Optional[str] = MISSING,
+            position: Optional[int] = MISSING,
+            end_time: Optional[int] = MISSING,
+            volume: Optional[int] = MISSING,
+            paused: Optional[bool] = MISSING,
+            filters: Optional[dict[str, Any]] = MISSING,
+            voice_state: Optional[VoiceState] = MISSING,
+            no_replace: bool = MISSING
+        ) -> None:
+        data = {}
+        params = {}
+
+        if encoded_track is not MISSING or identifier is not MISSING:
+            track = {}
+
+            if identifier is not MISSING:
+                track["identifier"] = identifier
+            elif encoded_track is not MISSING:
+                track["encoded"] = encoded_track
+
+            if no_replace is not MISSING:
+                params["noReplace"] = no_replace
+
+            data["track"] = track
+
+        if position is not MISSING:
+            data["position"] = position
+        if end_time is not MISSING:
+            data["endTime"] = end_time
+        if volume is not MISSING:
+            data["volume"] = volume
+        if paused is not MISSING:
+            data["paused"] = paused
+        if filters is not MISSING:
+            data["filters"] = filters
+        if voice_state is not MISSING and voice_state is not None and voice_state.event is not None:
+            data["voice"] = {
+                "token": voice_state.event.token,
+                "endpoint": voice_state.event.endpoint,
+                "sessionId": voice_state.session_id,
+            }
+
+        async with self.session.patch(f"{self._base_url}/v4/sessions/{self.session_id}/players/{guild_id}", headers=self.headers, json=data, params=params) as response:
+            if response.status != 200:
+                raise Exception(f"Failed to update player: {response.status} {response.reason}")
+
+    async def destroy_player(self, guild_id: str) -> None:
+        async with self.session.delete(f"{self._base_url}/v4/sessions/{self.session_id}/players/{guild_id}", headers=self.headers) as response:
+            if response.status != 204:
+                raise Exception(f"Failed to destroy player: {response.status} {response.reason}")
+
+        player = self.get_player(guild_id)
+
+        if player is not None:
+            self.players.remove(player)
+
+    async def get_tracks(self, identifier: str) -> LoadResult:
+        async with self.session.get(f"{self._base_url}/v4/loadtracks?identifier={identifier}", headers=self.headers) as response:
             data = await response.json()
-            tracks = []
+            data["loadType"] = LoadResultType(data["loadType"])
+            return data
 
-            for track in data["tracks"]:
-                track_info = TrackInfo(
-                    identifier = track["info"]["identifier"],
-                    is_seekable = track["info"]["isSeekable"],
-                    artist = track["info"]["author"],
-                    length = track["info"]["length"],
-                    is_stream = track["info"]["isStream"],
-                    title = track["info"]["title"],
-                    source_name = track["info"]["sourceName"],
-                    uri = track["info"]["uri"]
-                )
+    async def get_players(self) -> list[dict]:
+        async with self.session.get(f"{self._base_url}/v4/sessions/{self.session_id}/players", headers=self.headers) as response:
+            if response.status != 200:
+                raise Exception(f"Failed to get players: {response.status} {response.reason}")
 
-                track = Track(
-                    encoded = track["encoded"],
-                    info = track_info
-                )
+            return await response.json()
 
-                tracks.append(track)
-
-            return tracks
+    async def update_session(self, resuming: bool, timeout: int = 60) -> None:
+        async with self.session.patch(
+            f"{self._base_url}/v4/sessions/{self.session_id}",
+            headers=self.headers,
+            json={"resuming": resuming, "timeout": timeout}
+        ) as response:
+            if response.status != 200:
+                raise Exception(f"Failed to update session: {response.status} {response.reason}")

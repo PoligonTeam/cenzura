@@ -42,7 +42,7 @@ def check_api_secret(func):
     return wrapper
 
 class Client:
-    def __init__(self, api_key: str = None, api_secret: str = None, session: aiohttp.ClientSession = None):
+    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None, session: Optional[aiohttp.ClientSession] = None):
         self.api_key = api_key
         self.api_secret = api_secret
         self.own_session = session is None
@@ -60,13 +60,13 @@ class Client:
 
         keys.sort()
 
-        string = "api_key" + self.api_key
+        string = "api_key" + self.api_key # type: ignore
 
         for name in keys:
             string += name
             string += params[name]
 
-        string += self.api_secret
+        string += self.api_secret # type: ignore
 
         return hashlib.md5(string.encode("utf-8"))
 
@@ -78,7 +78,7 @@ class Client:
     async def _request(self, method: str, params: dict) -> dict:
         async with self.session.request(method, "http://ws.audioscrobbler.com/2.0/", params={
             **params,
-            "api_key": self.api_key,
+            "api_key": self.api_key, # type: ignore
             "format": "json"
         }) as response:
             if response.status == 403:
@@ -111,6 +111,8 @@ class Client:
             elif error == 29:
                 raise RateLimitExceeded()
 
+            raise Exception(f"Unknown error: {error} ({response.status})")
+
     @check_api_key
     async def recent_tracks(self, username: str, limit: int = 2, **kwargs: dict) -> RecentTracks:
         response = await self._request("GET", {
@@ -136,7 +138,19 @@ class Client:
         return [TopArtist.from_dict(artist) for artist in response["topartists"]["artist"]]
 
     @check_api_key
-    async def track_info(self, artist: str, track: str, username: str = None, **kwargs: dict) -> Track:
+    async def top_tracks(self, username: str, period: Literal["overall", "7day", "1month", "3month", "6month", "12month"] = "overall", limit: int = 1, **kwargs: dict) -> Sequence[Track]:
+        response = await self._request("GET", {
+            "method": "user.getTopTracks",
+            "user": username,
+            "period": period,
+            "limit": limit,
+            **kwargs
+        })
+
+        return [Track.from_dict(track) for track in response["toptracks"]["track"]]
+
+    @check_api_key
+    async def track_info(self, artist: str, track: str, username: Optional[str] = None, **kwargs: dict) -> Track:
         response = await self._request("GET", {
             "method": "track.getInfo",
             **({"username": username} if username is not None else {}),
@@ -148,7 +162,7 @@ class Client:
         return Track.from_dict(response["track"])
 
     @check_api_key
-    async def track_search(self, track: str, artist: str = None, limit: int = 1) -> Sequence[Track]:
+    async def track_search(self, track: str, artist: Optional[str] = None, limit: int = 1) -> Sequence[Track]:
         response = await self._request("GET", {
             "method": "track.search",
             "track": track,
@@ -159,7 +173,7 @@ class Client:
         return [Track.from_dict(track) for track in response["results"]["trackmatches"]["track"]]
 
     @check_api_key
-    async def artist_info(self, artist: str, username: str = None, **kwargs: dict) -> Artist:
+    async def artist_info(self, artist: str, username: Optional[str] = None, **kwargs: dict) -> Artist:
         response = await self._request("GET", {
             "method": "artist.getInfo",
             **({"username": username} if username is not None else {}),
@@ -192,5 +206,9 @@ class Client:
                 raise NotFound()
 
             data = await response.text()
+            groups = IMAGE_REGEX.search(data)
 
-            return IMAGE_REGEX.search(data).group(1)
+            if groups is None:
+                raise NotFound()
+
+            return groups.group(1)

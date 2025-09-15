@@ -124,9 +124,9 @@ class BoardRow:
     number: str
     track: str
     url: str
-    time_with_delay: datetime = None
-    operator: str = None
-    operator_image: str = None
+    time_with_delay: Optional[datetime] = None
+    operator: Optional[str] = None
+    operator_image: Optional[str] = None
 
     def __post_init__(self):
         self.time = datetime.fromtimestamp(int(self.time) / 1000)
