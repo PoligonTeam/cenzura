@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ class Games(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(description="https://korrumzthegame.wtf", usage="[name] [avatar-number_1-20]", aliases=["ktg"])
-    async def korrumzthegame(self, ctx: Union["Context", "AppContext"], username: int | str = None, avatar: int = None) -> None:
+    async def korrumzthegame(self, ctx: "Context | AppContext", username: int | str = None, avatar: int = None) -> None:
         if isinstance(username, int) and avatar is None:
             avatar = username
             username = None

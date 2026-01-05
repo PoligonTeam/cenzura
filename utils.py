@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -269,6 +269,7 @@ def convert(**items):
         types.User: lambda user: dict(
             id = user.id,
             username = user.username,
+            global_name = user.global_name,
             avatar_url = user.avatar_url,
             bot = user.bot,
             primary_guild = dict(
@@ -313,7 +314,13 @@ def convert(**items):
         )),
         types.Interaction: lambda interaction: dict(
             message = dict(id=interaction.message.id),
-            data = dict(values=interaction.data.values)
+            values = interaction.data.values or (
+                dict(list(
+                    (row.component.custom_id, row.component.value if row.component.value else row.component.values)
+                    for row in interaction.data.components
+                )) if interaction.data.components else None
+            ),
+            resolved = interaction.data.resolved
         ),
         Track: lambda track: dict(
             artist = dict(
@@ -413,17 +420,7 @@ def convert(**items):
     return converted
 
 def get_int(user, user2 = None):
-    user2 = user2 or user
-
-    user_avatar = user.avatar
-    user2_avatar = user2.avatar
-
-    if user_avatar is None:
-        user_avatar = "".join(chr(int(char)) for char in str(int(user.created_at.timestamp())))
-    if user2_avatar is None:
-        user2_avatar = "".join(chr(int(char)) for char in str(int(user2.created_at.timestamp())))
-
-    return (int(user.id) + int(user2.id)) * sum(ord(a) + ord(b) for a, b in list(zip(user_avatar, user2_avatar))) % 10000 // 100
+    return math.floor(math.sin(sum((user.id + (user2 or user).id).encode())) * 10000 % 1 * 100)
 
 def table(names, rows):
     text = ""
@@ -447,13 +444,13 @@ def table(names, rows):
 
     return text
 
-async def request(method: str, url: str, *, headers: Optional[dict] = None, cookies: Optional[dict] = None, data: Optional[dict] = None):
+async def request(method: str, url: str, *, headers: Optional[dict] = None, cookies: Optional[dict] = None, data: Optional[dict] = None, **_kwargs):
     async with ClientSession(timeout=ClientTimeout(10)) as session:
         try:
             async with session.request(method, url, headers={"User-Agent": "femscript/1.0"} | (headers or {}), cookies=cookies, json=data, proxy=config.PROXY) as response:
                 length = response.content_length
 
-                if length is not None and length > 10 * 1024 * 1024:
+                if length and length > 10 * 1024 * 1024:
                     return {
                         "status": -1,
                         "text": "Content too large",
@@ -563,9 +560,11 @@ def wrap_builtins(femscript: Femscript) -> None:
     femscript.wrap_function(femcord.Embed)
 
     @femscript.wrap_function()
-    def Components() -> femcord.Components:
+    def Components(title: Optional[str] = None, custom_id: Optional[str] = None, **kwargs) -> femcord.Components:
+        femscript.title = title
+        femscript.custom_id = custom_id
         femscript.is_components_v2 = True
-        return femcord.Components()
+        return femcord.Components(**kwargs)
 
     femscript.add_variable(var("ButtonStyles", {
         "PRIMARY": femcord.ButtonStyles.PRIMARY,
@@ -574,6 +573,11 @@ def wrap_builtins(femscript: Femscript) -> None:
         "DANGER": femcord.ButtonStyles.DANGER,
         "LINK": femcord.ButtonStyles.LINK,
         "PREMIUM": femcord.ButtonStyles.PREMIUM
+    }))
+
+    femscript.add_variable(var("TextInputStyles", {
+        "SHORT": femcord.TextInputStyles.SHORT,
+        "PARAGRAPH": femcord.TextInputStyles.PARAGRAPH
     }))
 
     femscript.add_variable(var("PaddingSizes", {
@@ -585,6 +589,23 @@ def wrap_builtins(femscript: Femscript) -> None:
         "USER": femcord.SelectDefaultValueTypes.USER,
         "ROLE": femcord.SelectDefaultValueTypes.ROLE,
         "CHANNEL": femcord.SelectDefaultValueTypes.CHANNEL
+    }))
+
+    femscript.add_variable(var("ChannelTypes", {
+        "GUILD_TEXT": femcord.ChannelTypes.GUILD_TEXT,
+        "DM": femcord.ChannelTypes.DM,
+        "GUILD_VOICE": femcord.ChannelTypes.GUILD_VOICE,
+        "GROUP_DM": femcord.ChannelTypes.GROUP_DM,
+        "GUILD_CATEGORY": femcord.ChannelTypes.GUILD_CATEGORY,
+        "GUILD_NEWS": femcord.ChannelTypes.GUILD_NEWS,
+        "GUILD_STORE": femcord.ChannelTypes.GUILD_STORE,
+        "GUILD_NEWS_THREAD": femcord.ChannelTypes.GUILD_NEWS_THREAD,
+        "GUILD_PUBLIC_THREAD": femcord.ChannelTypes.GUILD_PUBLIC_THREAD,
+        "GUILD_PRIVATE_THREAD": femcord.ChannelTypes.GUILD_PRIVATE_THREAD,
+        "GUILD_STAGE_VOICE": femcord.ChannelTypes.GUILD_STAGE_VOICE,
+        "GUILD_DIRECTORY": femcord.ChannelTypes.GUILD_DIRECTORY,
+        "GUILD_FORUM": femcord.ChannelTypes.GUILD_FORUM,
+        "GUILD_MEDIA": femcord.ChannelTypes.GUILD_MEDIA
     }))
 
     @femscript.wrap_function()
@@ -615,6 +636,13 @@ def wrap_builtins(femscript: Femscript) -> None:
     femscript.wrap_function(femcord.MediaGallery)
     femscript.wrap_function(femcord.Separator)
     femscript.wrap_function(femcord.Container)
+
+    @femscript.wrap_function()
+    def Label(**kwargs) -> femcord.Label:
+        femscript.modal = True
+        return femcord.Label(**kwargs)
+    
+    femscript.wrap_function(femcord.FileUpload)
 
 def fn1va(text: str) -> int:
     offset = 0x811c9dc5

@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import json
 import re
 import string
 
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context, AppContext
@@ -50,17 +50,17 @@ class Fun(commands.Cog):
         self.translations = bot.get_translations_for("fun")
 
     @commands.hybrid_command(description="User avatar", usage="[user]", aliases=["av"], type=ApplicationCommandTypes.USER)
-    async def avatar(self, ctx: Union["Context", "AppContext"], user: types.User = None):
+    async def avatar(self, ctx: "Context | AppContext", user: types.User = None):
         user = user or ctx.author
 
         async with ClientSession() as session:
             async with session.get(user.avatar_url + "?size=512") as response:
                 content = await response.content.read()
 
-        await ctx.reply(files=[("avatar." + ("gif" if user.avatar[:2] == "a_" else "png"), content)])
+        await ctx.reply(files=[("avatar." + ("gif" if user.avatar and user.avatar[:2] == "a_" else "png"), content)])
 
     @commands.hybrid_command(description="Shows the percentage of love between users", usage="(user) [user]", aliases=["love"], type=ApplicationCommandTypes.USER)
-    async def ship(self, ctx: Union["Context", "AppContext"], user: types.User, user2: types.User = None):
+    async def ship(self, ctx: "Context | AppContext", user: types.User, user2: types.User = None):
         async with femcord.HybridTyping(ctx):
             user2 = user2 or ctx.author
 
@@ -159,7 +159,7 @@ class Fun(commands.Cog):
         await ctx.reply("```" + figlet + "```")
 
     @commands.hybrid_command(description="Orientation quiz", aliases=["howgay", "quiz"])
-    async def orientation(self, ctx: Union["Context", "AppContext"]):
+    async def orientation(self, ctx: "Context | AppContext"):
         is_app = isinstance(ctx, commands.AppContext)
 
         components = femcord.Components(
@@ -495,8 +495,14 @@ class Fun(commands.Cog):
             if len(arg) > 15:
                 arg = "\n".join(arg[x:x+15] for x in range(0, len(arg), 15))
 
-        image = await self.bot.http.session.get(url)
-        arg = io.BytesIO(await image.content.read())
+        async with ClientSession() as session:
+            async with session.get(url) as response:
+                length = response.headers.get("Content-Length")
+                if length and int(length) > 10 * 1024 * 1024:
+                    return await ctx.reply("File cannot be larger than 10MB")
+                image = await response.read()
+
+        arg = io.BytesIO(image)
         result_image = io.BytesIO()
 
         def create_image() -> None:
@@ -560,7 +566,7 @@ class Fun(commands.Cog):
         await ctx.reply(files=[("gay.png", result_image.getvalue())])
 
     @commands.hybrid_command(description="Select the cwel", usage="[user/attachment/reply]", type=ApplicationCommandTypes.USER)
-    async def cwel(self, ctx: Union["Context", "AppContext"], user: types.User = None):
+    async def cwel(self, ctx: "Context | AppContext", user: types.User = None):
         user = user or ctx.author
         url = user.avatar_url
 
@@ -653,7 +659,7 @@ class Fun(commands.Cog):
         await ctx.reply("https://tapetus.pl/obrazki/n/" + image["href"][:-3].replace(",", "_") + "jpg")
 
     @commands.hybrid_command(description="Shows information about user", usage="[user]", aliases=["ui", "user", "cotozacwel", "kimtykurwajestes"], type=ApplicationCommandTypes.USER)
-    async def userinfo(self, ctx: Union["Context", "AppContext"], user: types.Member | types.User = None):
+    async def userinfo(self, ctx: "Context | AppContext", user: types.Member | types.User = None):
         user = user or ctx.member
 
         if isinstance(user, types.Member):
@@ -857,41 +863,139 @@ class Fun(commands.Cog):
     @commands.command(description="Shows information about the guild", usage="[guild_id]", aliases=["si"])
     async def serverinfo(self, ctx: "Context", guild = None):
         guild = self.bot.gateway.get_guild(guild) or ctx.guild
+        has_tag = "GUILD_TAGS" in guild.features
 
-        embed = femcord.Embed(title=await ctx.get_translation("information_about", (guild.name,)), color=self.bot.embed_color)
-        embed.set_thumbnail(url=guild.icon_url)
+        components = femcord.Components()
+        container = femcord.Container()
+        components.add_component(container)
+
+        text = []
+
+        if guild.banner:
+            container.add_component(femcord.MediaGallery().add_item(femcord.MediaItem(media=femcord.UnfurledMediaItem(url=guild.banner_url + "?size=4096"))))
 
         statuses = {
-            femcord.StatusTypes.ONLINE: 0,
-            femcord.StatusTypes.DND: 0,
-            femcord.StatusTypes.IDLE: 0,
-            femcord.StatusTypes.OFFLINE: 0
+            femcord.StatusTypes.ONLINE: {
+                "style": femcord.ButtonStyles.SUCCESS,
+                "count": 0
+            },
+            femcord.StatusTypes.DND: {
+                "style": femcord.ButtonStyles.DANGER,
+                "count": 0
+            },
+            femcord.StatusTypes.IDLE: {
+                "style": femcord.ButtonStyles.PRIMARY,
+                "count": 0
+            },
+            femcord.StatusTypes.OFFLINE: {
+                "style": femcord.ButtonStyles.SECONDARY,
+                "count": 0
+            }
         }
 
-        for member in guild.members:
-            statuses[member.presence.status] += 1
+        tag = None
 
-        embed.add_field(name=await ctx.get_translation("si_owner"), value=types.m @ guild.owner)
-        embed.add_field(name="ID:", value=guild.id)
-        embed.add_field(name=await ctx.get_translation("si_users"), value=" ".join(f"{value}{self.bot.gateway.get_emoji(name=key.name)}" for key, value in statuses.items()), inline=True)
-        embed.add_field(name=await ctx.get_translation("si_channels"), value=len(guild.channels), inline=True)
-        embed.add_field(name=await ctx.get_translation("roles"), value=len(guild.roles), inline=True)
-        embed.add_field(name=await ctx.get_translation("si_emojis"), value=len(guild.emojis), inline=True)
-        embed.add_field(name=await ctx.get_translation("si_stickers"), value=len(guild.stickers), inline=True)
-        embed.add_blank_field()
-        embed.add_field(name=await ctx.get_translation("date_created"), value=f"{femcord.types.t @ guild.created_at} ({femcord.types.t['R'] @ guild.created_at})")
-        embed.add_field(name=await ctx.get_translation("si_boosts"), value=guild.premium_subscription_count, inline=True)
-        embed.add_field(name=await ctx.get_translation("si_level"), value=guild.premium_tier, inline=True)
-        embed.add_blank_field()
-        if guild.vanity_url is not None:
-            embed.add_field(name=await ctx.get_translation("si_custom_url"), value="discord.gg/" + guild.vanity_url, inline=guild.banner is None)
-        embed.add_field(name=await ctx.get_translation("si_icon"), value=f"[link]({guild.icon_url})", inline=True)
+        for member in guild.members.values():
+            statuses[member.presence.status]["count"] += 1
+
+            if has_tag and tag is None:
+                if member.user.primary_guild is not None and member.user.primary_guild.identity_guild_id == guild.id:
+                    tag = member.user.primary_guild
+
+        section = femcord.Section().set_accessory(femcord.Thumbnail(media=femcord.UnfurledMediaItem(url=guild.icon_url)))
+        section.add_component(femcord.TextDisplay(content="# " + await _("Information about {}:", guild.name)))
+        container.add_component(section)
+
+        if text:
+            section.add_component(
+                femcord.TextDisplay(
+                    content = "### " + " **|** ".join(text)
+                )
+            )
+
+        if tag:
+            primary_guild = f"`{tag.tag}`"
+
+            if tag.badge:
+                if tag.badge not in [emoji.name for emoji in self.bot.gateway.emojis]:
+                    async with self.bot.http.session.get(tag.badge_url) as response:
+                        await self.bot.gateway.create_application_emoji(tag.badge, await response.read())
+
+                emoji = self.bot.gateway.get_emoji(name=tag.badge)
+                primary_guild = f"{emoji} " + primary_guild
+
+            text.append(primary_guild)
+
+        container.add_component(femcord.Separator())
+        container.add_component(femcord.TextDisplay(content=f"**ID:** {guild.id} | **{_('Owner:')}** {types.m @ guild.owner}"))
+        container.add_component(femcord.TextDisplay(content=f"**{_('Channels:')}** {len(guild.channels)} | **{_('Roles:')}** {len(guild.roles)}"))
+        container.add_component(femcord.TextDisplay(content=f"**{_('Emojis:')}** {len(guild.emojis or [])} | **{_('Stickers:')}** {len(guild.stickers)}"))
+        container.add_component(femcord.TextDisplay(content=f"**{_('Boosts:')}** {guild.premium_subscription_count} | **{_('Level:')}** {guild.premium_tier}"))
+        container.add_component(femcord.TextDisplay(content=f"**{_('Date created:')}** {femcord.types.t @ guild.created_at} ({femcord.types.t['R'] @ guild.created_at})"))
+
+        container.add_component(femcord.TextDisplay(content=f"**{_('Icon:')}** [link]({guild.icon_url})"))
+
         if guild.banner is not None:
-            embed.add_field(name=await ctx.get_translation("si_banner"), value=f"[link]({guild.banner_url})", inline=True)
-            embed.set_image(url=guild.banner_url)
-            embed.add_blank_field()
+            container.add_component(femcord.TextDisplay(content=f"**{_('Banner:')}** [link]({guild.banner_url}?size=4096)"))
 
-        await ctx.reply(embed=embed)
+        if guild.vanity_url is not None:
+            container.add_component(femcord.TextDisplay(content=f"**{_('Custom URL:')}** [discord.gg\x00/{guild.vanity_url}](https://discord.gg/{guild.vanity_url})"))
+
+        container.add_component(femcord.TextDisplay(content=f"**{_('Users:')}**"))
+        container.add_component(
+            femcord.ActionRow(
+                components = [
+                    femcord.Button(
+                        label = str(value["count"]),
+                        emoji = self.bot.gateway.get_emoji(name=key.name),
+                        style = value["style"],
+                        custom_id = f"status_{key.name}",
+                        disabled = True
+                    ) for key, value in statuses.items()
+                ]
+            )
+        )
+
+        await ctx.reply(components=components, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+
+    # @commands.command(description="Shows information about the guild", usage="[guild_id]", aliases=["si"])
+    # async def serverinfo(self, ctx: "Context", guild = None):
+    #     guild = self.bot.gateway.get_guild(guild) or ctx.guild
+
+    #     embed = femcord.Embed(title=await ctx.get_translation("information_about", (guild.name,)), color=self.bot.embed_color)
+    #     embed.set_thumbnail(url=guild.icon_url)
+
+    #     statuses = {
+    #         femcord.StatusTypes.ONLINE: 0,
+    #         femcord.StatusTypes.DND: 0,
+    #         femcord.StatusTypes.IDLE: 0,
+    #         femcord.StatusTypes.OFFLINE: 0
+    #     }
+
+    #     for member in guild.members:
+    #         statuses[member.presence.status] += 1
+
+    #     embed.add_field(name=await ctx.get_translation("si_owner"), value=types.m @ guild.owner)
+    #     embed.add_field(name="ID:", value=guild.id)
+    #     embed.add_field(name=await ctx.get_translation("si_users"), value=" ".join(f"{value}{self.bot.gateway.get_emoji(name=key.name)}" for key, value in statuses.items()), inline=True)
+    #     embed.add_field(name=await ctx.get_translation("si_channels"), value=len(guild.channels), inline=True)
+    #     embed.add_field(name=await ctx.get_translation("roles"), value=len(guild.roles), inline=True)
+    #     embed.add_field(name=await ctx.get_translation("si_emojis"), value=len(guild.emojis), inline=True)
+    #     embed.add_field(name=await ctx.get_translation("si_stickers"), value=len(guild.stickers), inline=True)
+    #     embed.add_blank_field()
+    #     embed.add_field(name=await ctx.get_translation("date_created"), value=f"{femcord.types.t @ guild.created_at} ({femcord.types.t['R'] @ guild.created_at})")
+    #     embed.add_field(name=await ctx.get_translation("si_boosts"), value=guild.premium_subscription_count, inline=True)
+    #     embed.add_field(name=await ctx.get_translation("si_level"), value=guild.premium_tier, inline=True)
+    #     embed.add_blank_field()
+    #     if guild.vanity_url is not None:
+    #         embed.add_field(name=await ctx.get_translation("si_custom_url"), value="discord.gg/" + guild.vanity_url, inline=guild.banner is None)
+    #     embed.add_field(name=await ctx.get_translation("si_icon"), value=f"[link]({guild.icon_url})", inline=True)
+    #     if guild.banner is not None:
+    #         embed.add_field(name=await ctx.get_translation("si_banner"), value=f"[link]({guild.banner_url})", inline=True)
+    #         embed.set_image(url=guild.banner_url)
+    #         embed.add_blank_field()
+
+    #     await ctx.reply(embed=embed)
 
     @commands.command(description="Shows information about invite", usage="(invite)", aliases=["ii"])
     async def inviteinfo(self, ctx: "Context", invite):
@@ -1048,7 +1152,7 @@ class Fun(commands.Cog):
     async def who(self, ctx: "Context"):
         members = []
 
-        members_with_pfp = [member for member in ctx.guild.members if member.user.avatar]
+        members_with_pfp = [member for member in ctx.guild.members.values() if member.user.avatar]
 
         if len(members_with_pfp) < 10:
             return await ctx.reply("There is not enough users with avatar on this server")
@@ -1113,7 +1217,7 @@ class Fun(commands.Cog):
         await ctx.reply(get_random_username())
 
     @commands.hybrid_command()
-    async def sticker(self, ctx: Union["Context", "AppContext"], *, text: Max[str, 20]):
+    async def sticker(self, ctx: "Context | AppContext", *, text: Max[str, 20]):
         is_app = isinstance(ctx, commands.AppContext)
         kwargs = {"flags": [femcord.enums.MessageFlags.EPHEMERAL]} if is_app else {}
 
@@ -1275,7 +1379,7 @@ class Fun(commands.Cog):
             await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, components=components, files=[("sticker.gif", await sticker.generate())])
 
     @commands.hybrid_command()
-    async def nitro(self, ctx: Union["Context", "AppContext"]):
+    async def nitro(self, ctx: "Context | AppContext"):
         code = "".join([random.choice(string.ascii_letters) for _ in range(16)])
 
         components = femcord.Components(

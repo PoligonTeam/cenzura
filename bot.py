@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ from lokiclient import LokiClient
 from models import Guilds
 from scheduler.scheduler import Scheduler
 from ipc import IPC
-from poligonlgbt import Poligon
 from datetime import datetime
 
 import asyncio
@@ -268,16 +267,14 @@ class HybridContext:
                             title = "Select page",
                             custom_id = "select_page_modal",
                             components = [
-                                femcord.ActionRow(
-                                    components = [
-                                        femcord.TextInput(
-                                            label = "page",
-                                            custom_id = "select_page_input",
-                                            style = femcord.TextInputStyles.SHORT,
-                                            min_length = 1,
-                                            max_length = len(str(len(pages)))
-                                        )
-                                    ]
+                                femcord.Label(
+                                    label = "Page number",
+                                    component = femcord.TextInput(
+                                        custom_id = "select_page_input",
+                                        style = femcord.TextInputStyles.SHORT,
+                                        min_length = 1,
+                                        max_length = len(str(len(pages)))
+                                    )
                                 )
                             ]
                         )
@@ -285,7 +282,7 @@ class HybridContext:
 
                     interaction, = await self.bot.wait_for("interaction_create", lambda interaction: check(interaction, message), timeout=timeout)
 
-                    value = interaction.data.components[0].components[0].value
+                    value = interaction.data.components[0].component.value
 
                     if value.isnumeric():
                         value = int(value) - 1
@@ -330,7 +327,6 @@ class Bot(commands.Bot):
         self.scheduler = Scheduler()
         self.ipc = IPC(self, config.FEMBOT_SOCKET_PATH, [config.DASHBOARD_SOCKET_PATH,])
         self.loki = LokiClient(config.LOKI_BASE_URL, self.scheduler)
-        self.poligon: Poligon = None
 
         self.embed_color = 0xb22487
         self.user_agent = "Mozilla/5.0 (SMART-TV; Linux; Tizen 2.3) AppleWebkit/538.1 (KHTML, like Gecko) SamsungBrowser/1.0 TV Safari/538.1"
@@ -450,10 +446,6 @@ class Bot(commands.Bot):
         await Tortoise.generate_schemas()
 
         print("connected to database")
-
-        self.poligon = await Poligon(config.POLIGON_LGBT_API_KEY, config.POLIGON_LGBT_UPLOAD_KEY)
-
-        print("created poligon.lgbt client")
 
     async def get_latency_data(self):
         before = time.perf_counter()

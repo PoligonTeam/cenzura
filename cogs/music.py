@@ -101,7 +101,7 @@ class Music(commands.Cog):
             await ctx.reply("Nie gram na żadnym kanale głosowym")
             return
 
-        if player.channel_id != ctx.member.voice_state.channel.id:
+        if ctx.member.voice_state is None or player.channel_id != ctx.member.voice_state.channel.id:
             await ctx.reply("Nie jesteś na tym samym kanale głosowym co bot")
             return
 
@@ -119,7 +119,7 @@ class Music(commands.Cog):
         if player is None:
             await self.join(ctx)
             player = self.client.get_player(ctx.guild.id)
-        elif player.channel_id != ctx.member.voice_state.channel.id:
+        elif ctx.member.voice_state.channel is None or player.channel_id != ctx.member.voice_state.channel.id:
             await ctx.reply("Nie jesteś na tym samym kanale głosowym co bot")
             return
 

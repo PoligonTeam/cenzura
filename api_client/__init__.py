@@ -14,77 +14,58 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import aiohttp, base64, bs4, io
-from dataclasses import dataclass
-from types import TracebackType
-from typing import Optional, Type, TypedDict
+import aiohttp, base64, bs4
+from typing import Dict, List, Literal, NotRequired, Optional, TypedDict, Union, Unpack, Any
 
-ERROR_MAP = {
-    "api_down": "API is down",
-    "unexpected_status": "Unexpected status code",
-    "invalid_payload": "Invalid payload",
-    "invalid_apikey": "Invalid API key",
-    "invalid_url": "Invalid URL",
-    "live_unsupported": "Live videos are not supported",
-    "too_long": "Videos longer than 5 minutes are not supported",
-    "no_formats": "No formats found",
-    "too_large": "File too large",
-    "load_failed": "Failed to fetch URL"
-}
+class ScoreBreakdown(TypedDict):
+    source: float
+    artistMatch: float
+    trackMatch: float
+    confidence: float
+    recencyPenalty: float
+    freshnessBonus: float
 
-class ResponseDict(TypedDict):
+class TrackInfo(TypedDict):
+    id: int
+    title: str
+    normalizedTitle: str
+    imageUrl: Optional[str]
+    imageThumbnailUrl: Optional[str]
+
+class ArtistInfo(TypedDict, total=False):
+    id: int
+    name: str
+    normalizedName: str
+
+class DecisionLogEntry(TypedDict, total=False):
+    step: str
+    source: NotRequired[Literal["MUSIXMATCH", "GENIUS"]]
+    action: str
+    score: NotRequired[float]
+    candidateId: NotRequired[int]
+    notes: NotRequired[str]
+    extras: NotRequired[Union[ScoreBreakdown, Dict[str, Any]]]
+    timestamp: str
+
+class LyricSearchSuccessResponse(TypedDict):
+    eventId: int
+    versionId: int
+    score: float
+    breakdown: ScoreBreakdown
+    source: Literal["MUSIXMATCH", "GENIUS"]
+    track: TrackInfo
+    artist: ArtistInfo
+    lyrics: str
+    snippet: NotRequired[str]
+    fullLyricsUrl: str
+    decisionLog: List[DecisionLogEntry]
+
+class ErrorResponse(TypedDict):
     error: str
 
-class ScreenshotResponseDict(ResponseDict):
-    image: str
-    content: str
-
-class YoutubeInfoDict(TypedDict):
-    title: str
-    likes: str
-    dislikes: str
-    views: str
-    length: str
-    thumbnail: str
-
-class YoutubeResponseDict(ResponseDict):
-    video: str
-    info: YoutubeInfoDict
-
-@dataclass
-class ScreenshotResponse:
-    image: io.BytesIO
-    content: str
-
-    @classmethod
-    def from_dict(cls, data: ScreenshotResponseDict) -> "ScreenshotResponse":
-        return cls(io.BytesIO(base64.b64decode(data["image"])), bs4.BeautifulSoup(data["content"], "html.parser").prettify())
-
-@dataclass
-class YoutubeInfo:
-    title: str
-    likes: str
-    dislikes: str
-    views: str
-    length: str
-    thumbnail: str
-
-@dataclass
-class YoutubeResponse:
-    video: io.BytesIO
-    info: YoutubeInfo
-
-    @classmethod
-    def from_dict(cls, data: YoutubeResponseDict) -> "YoutubeResponse":
-        return cls(io.BytesIO(base64.b64decode(data["video"])), YoutubeInfo(**data["info"]))
-
-class LyricsResponse(TypedDict):
-    status: int
-    lyrics: str
-    artist: str
-    title: str
-    source: str
-    cached: bool
+class ScreenshotSuccessResponse(TypedDict):
+    image: bytes  # Image data as BytesIO
+    content: str # HTML content as a prettified string
 
 class ApiError(Exception):
     def __init__(self, message: str, url: str):
@@ -92,17 +73,16 @@ class ApiError(Exception):
         self.url = url
 
 class ApiClient:
-    def __init__(self, base_url: str, error_map: dict[str, str] = ERROR_MAP) -> None:
+    def __init__(self, base_url: str) -> None:
         self.session = aiohttp.ClientSession(base_url=base_url)
-        self.error_map = error_map
 
     async def __aenter__(self) -> "ApiClient":
         return self
 
-    async def __aexit__(self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]) -> None:
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         await self.session.close()
 
-    async def _post(self, url: str, **kwargs) -> dict:
+    async def _post(self, url: str, **kwargs: Unpack[aiohttp.client._RequestOptions]) -> dict:
         try:
             async with self.session.post(url, **kwargs) as response:
                 if response.status not in (200, 400, 401):
@@ -111,25 +91,51 @@ class ApiClient:
                 data = await response.json()
 
                 if "error" in data:
-                    raise ApiError(self.error_map.get(data["error"], "Unknown error"), url)
+                    raise ApiError(data["error"], url)
 
                 return data
         except aiohttp.ClientError as e:
             if isinstance(e, aiohttp.ClientConnectorError):
-                raise ApiError(self.error_map["api_down"], url)
+                raise ApiError("Api is down.", url)
             elif isinstance(e, aiohttp.ClientPayloadError):
-                raise ApiError(self.error_map["invalid_payload"], url)
+                raise ApiError("Invalid payload.", url)
 
-            raise ApiError(self.error_map["unexpected_status"], url)
+            raise ApiError("Unknown error occured.", url)
 
-    async def screenshot(self, url: str, full_page: Optional[bool] = False) -> ScreenshotResponse:
-        data = await self._post("/screenshot", json={"url": url, "full_page": full_page})
-        return ScreenshotResponse.from_dict(data)
+    async def _get(self, url: str, **kwargs: Unpack[aiohttp.client._RequestOptions]) -> dict:
+        try:
+            async with self.session.get(url, **kwargs) as response:
+                if response.status not in (200, 400, 401):
+                    raise ApiError(f"Unexpected status code: {response.status}", url)
 
-    async def ytdl(self, url: str) -> YoutubeResponse:
-        data = await self._post("/ytdl", json={"url": url})
-        return YoutubeResponse.from_dict(data)
+                data = await response.json()
 
-    async def lyrics(self, name: str) -> LyricsResponse:
-        data: LyricsResponse = await self._post("/lyrics", json={"name": name}) # type: ignore
-        return data
+                if "error" in data:
+                    raise ApiError(data["error"], url)
+
+                return data
+        except aiohttp.ClientError as e:
+            if isinstance(e, aiohttp.ClientConnectorError):
+                raise ApiError("Api is down.", url)
+            elif isinstance(e, aiohttp.ClientPayloadError):
+                raise ApiError("Invalid payload.", url)
+
+            raise ApiError("Unknown error occured.", url)
+
+    async def screenshot(self, url: str, full_page: Optional[bool] = False) -> ScreenshotSuccessResponse:
+        data = await self._post("/api/screenshot", json={"url": url, "full_page": full_page})
+        return {
+            "image": base64.b64decode(data["image"]),
+            "content": bs4.BeautifulSoup(data["content"], "html.parser").prettify() # type: ignore
+        }
+
+
+    async def lyrics(self, track: str, artist: Optional[str] = None) -> LyricSearchSuccessResponse:
+        params = {
+            "track": track
+        }
+
+        if artist is not None:
+            params["artist"] = artist
+
+        return await self._get("/api/search", params=params) # type: ignore

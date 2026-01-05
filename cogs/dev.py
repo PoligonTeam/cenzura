@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,14 +16,16 @@ limitations under the License.
 
 import femcord.femcord as femcord
 from femcord.femcord import commands, types
+from femcord.femcord.http import Route
 from femscript import FemscriptModule
-from datetime import datetime, timedelta
-import asyncio, time, ast, inspect, models, os
+from datetime import datetime, timezone
+import asyncio, time, ast, inspect, models, os, re
 
 from typing import Union, Optional, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context, AppContext
+    from cogs.music import Music
 
 class Dev(commands.Cog):
     hidden = True
@@ -59,9 +61,18 @@ class Dev(commands.Cog):
         return eval("_eval()", env)
 
     @commands.hybrid_command(description="fembot is a bot, the bot is fembot", usage="(code)")
-    async def eval(self, ctx: Union["Context", "AppContext"], *, code):
+    async def eval(self, ctx: "Context | AppContext", *, code):
         if ctx.author.id not in self.bot.owners:
             return await self.bot.get_command("femscript")(ctx, code=code)
+
+        mentions = {
+            "@": (True, "get_member"),
+            "#": (False, "get_channel"),
+            "@&": (False, "get_role")
+        }
+
+        for mention, (awaitable, func) in mentions.items():
+            code = re.sub(rf'<{mention}(\d+)> ?(?=(?:[^"]*"[^"]*")*[^"]*$)', rf"({"await " if awaitable else ""}ctx.guild.{func}('\1'))", code)
 
         result = await self._eval(code, {
             "femcord": femcord,
@@ -87,7 +98,7 @@ class Dev(commands.Cog):
 
     @commands.hybrid_command(description="fembot is a bot, the bot is fembot")
     @commands.is_owner
-    async def deval(self, ctx: Union["Context", "AppContext"], *, code):
+    async def deval(self, ctx: "Context | AppContext", *, code):
         result = await self.bot.ipc.emit("eval", code)
 
         prefix = "```py\n"
@@ -114,7 +125,7 @@ class Dev(commands.Cog):
     async def command_stats(self, ctx: "Context", *, command: commands.Command = None):
         query = "{type=\"command\"}" if not command else f"{{type=\"command\", command=\"{command.name}\"}}"
 
-        stats = await self.bot.loki.get_logs(query, start=(datetime.utcnow() - timedelta(days=1)).timestamp(), limit=1000)
+        stats = await self.bot.loki.get_logs(query, start=int((datetime.now(tz=timezone.utc)).timestamp()), limit=1000)
         streams = stats["data"]["result"]
         command_names = [stream["stream"]["command"] for stream in streams]
 
@@ -135,15 +146,22 @@ class Dev(commands.Cog):
 
     @commands.command(description="fembot is a bot, the bot is fembot", usage="(command)", aliases=["src"])
     @commands.is_owner
-    async def source(self, ctx: "Context", *, command):
-        command = command.split(" ")
+    async def source(self, ctx: "Context", *, command_name: str):
+        command: list[str] = command_name.split(" ")
         command_object = self.bot.get_command(command[0])
+
+        if command_object is None:
+            return await ctx.reply("Command not found.")
 
         if len(command) > 1:
             while command_object.type is commands.CommandTypes.GROUP:
                 command = command[1:]
+
                 if command:
-                    command_object = command_object.get_subcommand(command[0])
+                    command_object = command_object.get_subcommand(command[0]) # type: ignore
+
+                    if command_object is None:
+                        return await ctx.reply("Command not found.")
 
         code = inspect.getsource(command_object.callback)
 
@@ -199,8 +217,9 @@ class Dev(commands.Cog):
             command = member
             member = ctx.member
 
-        fake_member = self.bot.gateway.copy(member)
-        fake_message = self.bot.gateway.copy(ctx.message)
+        fake_member = types.Member(**member.__dict__)
+        fake_member.roles = [types.Role(**role.__dict__) for role in fake_member.roles]
+        fake_message = types.Message(**ctx.message.__dict__)
 
         fake_member.roles.append(self.bot.su_role)
         fake_member.hoisted_role = self.bot.su_role
@@ -224,7 +243,7 @@ class Dev(commands.Cog):
     @commands.command(description="fembot is a bot, the bot is fembot", usage="(command) [arguments]")
     @commands.is_owner
     async def perf(self, ctx: "Context", command, *, args = None):
-        fake_message = self.bot.gateway.copy(ctx.message)
+        fake_message = types.Message(**ctx.message.__dict__)
 
         fake_message.content = (await self.bot.get_prefix(self.bot, ctx.message))[-1] + command
 
@@ -246,6 +265,51 @@ class Dev(commands.Cog):
         after = await future
 
         await ctx.reply(f"Executed in `{after - before:.2f}s`")
+
+    @commands.command(description="the funny")
+    @commands.is_owner
+    async def soundboard(self, ctx: "Context", *, sound_id: str = None):
+        if sound_id is not None:
+            cog: "Music | None" = self.bot.get_cog("Music") # type: ignore
+
+            if cog is None:
+                return await ctx.reply("Music cog not loaded.")
+
+            player = cog.client.get_player(ctx.guild.id)
+
+            if not player:
+                if ctx.member.voice_state.channel is None:
+                    return await ctx.reply("You are not connected to a voice channel.")
+
+                await cog.connect(ctx.guild, ctx.member.voice_state.channel, mute=False, deaf=False)
+
+                for _ in range(5):
+                    player = cog.client.get_player(ctx.guild.id)
+
+                    if player is not None:
+                        player.channel_id = ctx.member.voice_state.channel.id
+                        break
+
+                    await asyncio.sleep(0.5)
+
+            if not player or not player.channel_id:
+                return await ctx.reply("Bot is not connected to a voice channel.")
+
+            await self.bot.http.request(
+                Route("POST", "channels", player.channel_id, "send-soundboard-sound"),
+                data={
+                    "sound_id": sound_id,
+                    "source_guild_id": ctx.guild.id
+                }
+            )
+
+            return await ctx.reply(f"Odtwarzanie dźwięku o ID `{sound_id}`")
+
+        response = await self.bot.http.request(
+            Route("GET", "guilds", ctx.guild.id, "soundboard-sounds")
+        )
+
+        await ctx.reply_paginator("\n".join(f"{sound['name']} - {sound['sound_id']}" for sound in response["items"]), by_lines=True)
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Dev(bot))

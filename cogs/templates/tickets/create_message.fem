@@ -1,0 +1,2 @@
+message = "Hi <@{}>, thank you for reaching out! A member of our staff will be with you shortly. Please describe your issue in detail so we can assist you better.";
+return format(message, user.id);

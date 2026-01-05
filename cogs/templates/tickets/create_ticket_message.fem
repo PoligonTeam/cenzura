@@ -1,0 +1,15 @@
+components = Components();
+container = Container();
+container.add_component(TextDisplay { content = "# Create Ticket" });
+media_gallery = MediaGallery();
+media_gallery.add_item(MediaItem { media = UnfurledMediaItem { url = "https://img.freepik.com/free-psd/ticket-controller-illustration_23-2151598294.jpg" } });
+action_row1 = ActionRow();
+button1 = Button { borrow(ButtonStyles); label = "General"; emoji = { name = ":speech_balloon:" }; custom_id = "create_ticket_general"; style = &ButtonStyles.PRIMARY };
+button2 = Button { borrow(ButtonStyles); label = "Support"; emoji = { name = ":tools:" }; custom_id = "create_ticket_support"; style = &ButtonStyles.PRIMARY };
+button3 = Button { borrow(ButtonStyles); label = "Ban Appeal"; emoji = { name = ":scroll:" }; custom_id = "create_ticket_ban_appeal"; style = &ButtonStyles.PRIMARY };
+action_row1.add_component(button1);
+action_row1.add_component(button2);
+action_row1.add_component(button3);
+container.add_component(media_gallery);
+container.add_component(action_row1);
+components.add_component(container);

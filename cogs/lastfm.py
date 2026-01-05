@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 import femcord.femcord as femcord
 from deezer import DeezerClient
 from femcord.femcord import commands, types, HTTPException
+from femcord.femcord.enums import ApplicationIntegrationTypes, InteractionContextTypes
 from femscript import Femscript # type: ignore
 from utils import convert, wrap_builtins, request, get_artist_image, generate_waveform_from_audio_bytes, highlight
 from aiohttp import ClientSession
@@ -24,10 +25,10 @@ from models import LastFM as LastFMModel
 from config import LASTFM_API_KEY, LASTFM_API_SECRET, LASTFM_API_URL, GROQ_API_KEYS
 from lastfm import Client, Track, Artist, exceptions
 from groq import Groq
-from api_client import ApiClient
-import hashlib, datetime, asyncio, femlink, re, os
+from api_client import ApiClient, ApiError
+import hashlib, datetime, asyncio, femlink, re, os, time
 
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context, AppContext
@@ -60,18 +61,26 @@ class LastFM(commands.Cog):
         string = "api_key" + LASTFM_API_KEY + "method" + method + "token" + token + LASTFM_API_SECRET
         return hashlib.md5(string.encode("utf-8")).hexdigest()
 
-    @commands.command(description="Łączenie konta LastFM do bota")
-    async def login(self, ctx: "Context") -> None:
+    @commands.hybrid_command(description="Łączenie konta LastFM do bota")
+    async def login(self, ctx: "Context | AppContext") -> None:
         async with Client(LASTFM_API_KEY, LASTFM_API_SECRET) as client:
             token = await client.get_token()
 
-            try:
-                message = await ctx.author.send(f"Aby połączyć konto LastFM z botem musisz wejść w poniższy link\n<https://www.last.fm/api/auth?api_key={LASTFM_API_KEY}&token={token}>")
-            except HTTPException:
-                await ctx.reply("Bot nie może wysłać ci wiadomości prywatnej")
-                return
+            message_content = f"Aby połączyć konto LastFM z botem musisz wejść w poniższy link\n<https://www.last.fm/api/auth?api_key={LASTFM_API_KEY}&token={token}>"
 
-            await ctx.reply("Wiadomość z linkiem została wysłana w wiadomości prywatnej")
+            obj: femcord.types.Interaction | femcord.types.Message
+
+            if isinstance(ctx, femcord.commands.AppContext):
+                obj = ctx.interaction
+                await ctx.reply(message_content, flags=[femcord.MessageFlags.EPHEMERAL])
+            else:
+                try:
+                    obj = await ctx.author.send(message_content)
+                except HTTPException:
+                    await ctx.reply("Bot nie może wysłać ci wiadomości prywatnej")
+                    return
+
+                await ctx.reply("Wiadomość z linkiem została wysłana w wiadomości prywatnej")
 
             for attempt in range(3):
                 await asyncio.sleep(20)
@@ -80,7 +89,7 @@ class LastFM(commands.Cog):
                     session = await client.get_session(token)
                 except (exceptions.UnauthorizedToken, exceptions.InvalidApiKey, exceptions.InvalidSignature):
                     if attempt == 2:
-                        await message.edit("Logowanie się nie powiodło... link się przedawnił lub coś poszło nie tak")
+                        await obj.edit("Logowanie się nie powiodło... link się przedawnił lub coś poszło nie tak")
                         return
                     continue
 
@@ -96,7 +105,7 @@ class LastFM(commands.Cog):
 
                 self.lastfm_users[ctx.author.id] = user
 
-                await message.edit("Pomyślnie połączono konto `" + session["name"] + "`")
+                await obj.edit("Pomyślnie połączono konto `" + session["name"] + "`")
                 return
 
     @commands.command(description="Informacje o artyście", aliases=["ai", "artist"])
@@ -132,7 +141,7 @@ class LastFM(commands.Cog):
     @commands.hybrid_command(description="Informacje o obecnie grającej piosence", usage="[użytkownik]", aliases=["ti", "track", "trackstats"])
     async def trackinfo(
             self,
-            ctx: Union["Context", "AppContext"],
+            ctx: "Context | AppContext",
             *,
             user: types.User = None # type: ignore
         ) -> None:
@@ -283,7 +292,7 @@ class LastFM(commands.Cog):
     @commands.hybrid_command(description="lastfm - now playing", usage="[user]", aliases=["fmstats", "fm"])
     async def lastfm(
             self,
-            ctx: Union["Context", "AppContext"],
+            ctx: "Context | AppContext",
             *,
             user: types.User = None # type: ignore
         ) -> None:
@@ -393,7 +402,7 @@ class LastFM(commands.Cog):
                 await ctx.reply(str(result))
 
     @commands.hybrid_command(description="Custom script for lastfm", usage="(script)", aliases=["fms", "fmset"])
-    async def fmscript(self, ctx: Union["Context", "AppContext"], *, script) -> None:
+    async def fmscript(self, ctx: "Context | AppContext", *, script) -> None:
         lastfm_user = self.lastfm_users.get(ctx.author.id)
 
         if lastfm_user is None:
@@ -414,7 +423,7 @@ class LastFM(commands.Cog):
         await ctx.reply("Script has been saved")
 
     @commands.hybrid_command(description="Wybieranie szablonu dla komendy lastfm", usage="(szablon)", aliases=["fmmode"], other={"embed": femcord.Embed(description="\nSzablony: `embedfull`, `embedsmall`, `embedmini`")})
-    async def fmtemplate(self, ctx: Union["Context", "AppContext"], template: str) -> None:
+    async def fmtemplate(self, ctx: "Context | AppContext", template: str) -> None:
         if not template in self.templates:
             await ctx.reply("Nie ma takiego szablonu, dostępne szablony to: " + ", ".join(self.templates.keys()))
             return
@@ -491,8 +500,8 @@ class LastFM(commands.Cog):
             await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
             return
 
-        lastfm_users = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id in [member.user.id for member in ctx.guild.members]]
-        lastfm_user = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == user.id][0]
+        lastfm_users = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id in ctx.guild.members]
+        lastfm_user, = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == user.id]
         lastfm_scrobbles = []
 
         async with femcord.Typing(ctx.channel): # type: ignore
@@ -559,7 +568,7 @@ class LastFM(commands.Cog):
             ctx: "Context",
             *,
             user_or_track: types.User | str = None # type: ignore
-        ) -> None:
+        ):
         lastfm_users = self.lastfm_users.values()
 
         user = ctx.author
@@ -575,8 +584,8 @@ class LastFM(commands.Cog):
             await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
             return
 
-        lastfm_users = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id in [member.user.id for member in ctx.guild.members]]
-        lastfm_user = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == user.id][0]
+        lastfm_users = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id in ctx.guild.members]
+        lastfm_user, = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == user.id]
         lastfm_scrobbles = []
 
         async with femcord.Typing(ctx.channel): # type: ignore
@@ -585,8 +594,7 @@ class LastFM(commands.Cog):
                     try:
                         tracks = await client.track_search(user_or_track)
                     except exceptions.NotFound:
-                        await ctx.reply("Nie znaleziono utworu")
-                        return
+                        return await ctx.reply("Nie znaleziono utworu")
 
                 else:
                     recent_tracks = await client.recent_tracks(lastfm_user.username)
@@ -721,7 +729,7 @@ class LastFM(commands.Cog):
     @commands.hybrid_command(description="Judges your music taste")
     async def judge(
             self,
-            ctx: Union["Context", "AppContext"],
+            ctx: "Context | AppContext",
             user: types.User = None # type: ignore
         ) -> None:
         user = user or ctx.author
@@ -740,7 +748,7 @@ class LastFM(commands.Cog):
             async with Client(LASTFM_API_KEY) as client:
                 artists = await client.top_artists(lastfm_user.username, "7day", 3)
 
-                groq = Groq(GROQ_API_KEYS, "deepseek-r1-distill-llama-70b", "Generate a long-form, sarcastic, and humorous critique of someone's taste in a specific topic (e.g., music, movies, games, or fashion). " \
+                groq = Groq(GROQ_API_KEYS, "allam-2-7b", "Generate a long-form, sarcastic, and humorous critique of someone's taste in a specific topic (e.g., music, movies, games, or fashion). " \
                     "The tone should be playful, exaggerated, and packed with witty metaphors, absurd comparisons, and creative insults. " \
                     "Avoid simple bullet points or structured lists—write in a flowing, rant-like format that builds on itself, " \
                     "making each point more ridiculous and entertaining than the last. Keep it engaging, fun, and slightly unhinged, " \
@@ -751,9 +759,9 @@ class LastFM(commands.Cog):
                 await ctx.reply_paginator(result)
 
     @commands.hybrid_command(description="Pokazuje tekst piosenki", usage="[nazwa]")
-    async def lyrics(self, ctx: Union["Context", "AppContext"], *, name = None) -> None:
+    async def lyrics(self, ctx: "Context | AppContext", *, name = None):
         async with femcord.HybridTyping(ctx):
-            artist = ""
+            artist = None
 
             async with ClientSession() as session:
                 if name == r"%radio":
@@ -787,13 +795,10 @@ class LastFM(commands.Cog):
                     return
 
             async with ApiClient(self.bot.local_api_base_url) as client:
-                lyrics = await client.lyrics(artist + " " + name)
-
-                if lyrics is None or not lyrics["lyrics"]:
-                    await ctx.reply("Nie ma tekstu dla tej piosenki")
-                    return
-
-            artist_image = await get_artist_image(lyrics["artist"])
+                try:
+                    lyrics = await client.lyrics(name, artist)
+                except ApiError as e:
+                    return await ctx.reply(f"Wystąpił błąd podczas pobierania tekstu: {e}")
 
         length = []
         x = lambda i: (length.append(len(i)), i)[-1]
@@ -807,15 +812,15 @@ class LastFM(commands.Cog):
                                 content = x(f"## Source: `{lyrics["source"]}`")
                             ),
                             femcord.TextDisplay(
-                                content = x(f"## Artist name: `{lyrics["artist"]}`")
+                                content = x(f"## Artist name: `{lyrics["artist"].get("name") or "Unknown Artist"}`")
                             ),
                             femcord.TextDisplay(
-                                content = x(f"## Track name: `{lyrics["title"]}`")
+                                content = x(f"## Track name: `{lyrics["track"]["title"]}`")
                             )
                         ],
                         accessory = femcord.Thumbnail(
                             media = femcord.UnfurledMediaItem(
-                                url = artist_image
+                                url = lyrics["track"].get("imageUrl") or "https://www.last.fm/static/images/marvin.05ccf89325af.png"
                             )
                         )
                     )
@@ -847,8 +852,8 @@ class LastFM(commands.Cog):
 
         # await ctx.reply_paginator(lyrics, prefix="```md\n", suffix="```", buttons=True)
 
-    @commands.hybrid_command(description="Shows Spotify playing song")
-    async def spotify(self, ctx: Union["Context", "AppContext"]) -> None:
+    @commands.hybrid_command(description="Shows Spotify playing song", integration_types=[ApplicationIntegrationTypes.GUILD_INSTALL], interaction_context_types=[InteractionContextTypes.GUILD])
+    async def spotify(self, ctx: "Context | AppContext") -> None:
         if not ctx.member.presence.activities:
             await ctx.reply("You are not listening to anything")
             return
@@ -864,37 +869,47 @@ class LastFM(commands.Cog):
             await ctx.reply("You are not listening to Spotify")
             return
 
-        components = femcord.Components(
+        start, end = activity.timestamps.start // 1000, activity.timestamps.end // 1000
+        elapsed, duration = int(time.time()) - start, end - start
+
+        image = activity.assets.large_image
+
+        if image is None:
+            image = await get_artist_image(activity.state)
+        else:
+            image = image.replace("spotify:", "https://i.scdn.co/image/")
+
+        components = femcord.Components()
+        container = femcord.Container(
             components = [
-                femcord.Container(
+                femcord.Section(
                     components = [
-                        femcord.Section(
-                            components = [
-                                femcord.TextDisplay(
-                                    content = f"## {activity.details}\n**by {activity.state}**\nAlbum: {activity.assets.large_text}\nDuration: {self.progress_bar(activity.timestamps.start // 1000, activity.timestamps.end // 1000)}"
-                                )
-                            ],
-                            accessory = femcord.Thumbnail(
-                                media = femcord.UnfurledMediaItem(
-                                    url = activity.assets.large_image.replace("spotify:", "https://i.scdn.co/image/")
-                                )
-                            )
-                        ),
-                        femcord.Separator(),
-                        femcord.ActionRow(
-                            components = [
-                                femcord.Button(
-                                    label = "Listen on Spotify",
-                                    url = f"https://open.spotify.com/track/{activity.sync_id}",
-                                    style = femcord.ButtonStyles.LINK
-                                )
-                            ]
+                        femcord.TextDisplay(
+                            content = f"## {activity.details}\n**by {activity.state}**\nAlbum: {activity.assets.large_text}\nDuration: {self.progress_bar(elapsed, duration)}"
                         )
-                    ]
+                    ],
+                    accessory = femcord.Thumbnail(
+                        media = femcord.UnfurledMediaItem(
+                            url =  image
+                        )
+                    )
                 )
             ]
         )
 
+        if activity.sync_id is not None:
+            container.add_component(femcord.Separator())
+            container.add_component(femcord.ActionRow(
+                components = [
+                    femcord.Button(
+                        label = "Listen on Spotify",
+                        url = f"https://open.spotify.com/track/{activity.sync_id}",
+                        style = femcord.ButtonStyles.LINK
+                    )
+                ]
+            ))
+
+        components.add_component(container)
         await ctx.reply(components=components, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
 
 def setup(bot: "Bot") -> None:

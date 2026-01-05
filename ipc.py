@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import hashlib
 import config
 import aiohttp
 
-from typing import TypedDict, NotRequired, TYPE_CHECKING
+from typing import TypedDict, NotRequired, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .bot import Bot
@@ -52,6 +52,7 @@ class GuildDict(TypedDict):
     id: str
     name: str
     icon: str
+    banner: Optional[str]
     channels: list[ChannelDict]
     roles: list[RoleDict]
 
@@ -68,19 +69,17 @@ class IPC(Client):
         self.bot = bot
 
     def user_has_permissions(self, guild: "Guild", user_id: str) -> bool:
-        if user_id in (member.user.id for member in guild.members):
-            index = get_index(guild.members, user_id, key=lambda m: m.user.id)
-            member = guild.members[index]
-
-            return guild.owner.user.id == user_id or member.permissions.has("ADMINISTRATOR")
-
-        return False
+        member = guild.members.get(user_id)
+        if not member:
+            return False
+        return guild.owner == member or member.permissions.has("ADMINISTRATOR")
 
     def guild_to_dict(self, guild: "Guild") -> GuildDict:
         return GuildDict(
             id = guild.id,
             name = guild.name,
             icon = guild.icon,
+            banner = guild.banner,
             channels = [
                 ChannelDict(
                     id = channel.id,
@@ -263,3 +262,4 @@ class IPC(Client):
         components.add_component(container)
 
         await channel.send(components=components, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+        self.bot.loki.add_webhook_event_log(event)

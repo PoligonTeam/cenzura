@@ -1,31 +1,52 @@
 math = {
-    fn randint(min, max) {
-        multiplier = max - min;
-        result = min + multiplier * random();
-        math.floor(result)
-    }
-
-    fn random_choice(list) {
-        num = math.randint(0, len(list));
-        getitem(list, num)
-    }
-
-    fn _5050() {
-        0.5 > random()
-    }
-
-    fn round(number) {
-        if {
-            decimal = number % 1;
-            decimal > 0.5
-        } {
-            number + 1 - decimal
+    fn pow(base, exp) {
+        fn _(solution, count) {
+            if { count == 1 } {
+                solution
+            } else {
+                _(solution*base, -1+count)
+            }
+        }
+        if { exp == 0 } {
+            1
         } else {
-            number - decimal
+            if { exp == 1 } {
+                base
+            } else {
+                _(base, exp)
+            }
+        }
+    }
+
+    fn round(number, digits) {
+        _point = math.pow(10, digits);
+        _a = number*_point;
+        _b = _a%1;
+        _c = _a-_b;
+        if { _b >= 0.5 } {
+            _r = _c/_point;
+            _r+1/_point
+        } else {
+            _c/_point
         }
     }
 
     fn floor(number) {
         number - number % 1
+    }
+
+    fn randint(min, max) {
+        _multiplier = max - min;
+        _result = min + _multiplier * random();
+        math.floor(_result)
+    }
+
+    fn random_choice(list) {
+        _num = math.randint(0, len(list));
+        getitem(list, _num)
+    }
+
+    fn _5050() {
+        0.5 > random()
     }
 };

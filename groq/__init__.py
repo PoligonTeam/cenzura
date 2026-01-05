@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ THINK_REGEX = re.compile(r"(<think>)?(.|\n)*<\/think>\n")
 
 Model = Literal[
     "allam-2-7b",
-    "deepseek-r1-distill-llama-70b",
     "gemma2-9b-it",
     "groq/compound",
     "groq/compound-mini",
@@ -35,10 +34,11 @@ Model = Literal[
     "meta-llama/llama-guard-4-12b",
     "meta-llama/llama-prompt-guard-2-22m",
     "meta-llama/llama-prompt-guard-2-86m",
-    "moonshotai/kimi-k2-instruct-",
+    "moonshotai/kimi-k2-instruct",
     "moonshotai/kimi-k2-instruct-0905",
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
+    "openai/gpt-oss-safeguard-20b",
     "playai-tts",
     "playai-tts-arabic",
     "qwen/qwen3-32b",
@@ -50,20 +50,44 @@ class Message(TypedDict):
     role: Literal["system", "user", "assistant"]
     content: str
 
+class JsonSchema(TypedDict):
+    type: Literal["json_schema"]
+    json_schema: dict
+
 class ChatData(TypedDict):
     model: Model
     messages: list[Message]
+    max_completion_tokens: Optional[int]
+    response_format: Optional[JsonSchema]
 
 class RateLimitError(Exception):
-    def __init__(self, message: str) -> None:
+    def __init__(self, message: str, data: dict) -> None:
         super().__init__(message)
         self.message = message
+        self.data = data
+
+    def __str__(self) -> str:
+        return f"<RateLimitError message={self.message!r} data={self.data!r}>"
+
+    def __repr__(self) -> str:
+        return f"<RateLimitError message={self.message!r} data={self.data!r}>"
 
 class Groq:
     URL = "https://api.groq.com/openai/v1"
     API_KEY_COUNTER = 0
 
-    def __init__(self, api_keys: list[str], model: Model, system_message: Optional[str] = None, seed: int = -1, max_messages: int = 20, *, loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
+    def __init__(
+        self,
+        api_keys: list[str],
+        model: Model,
+        system_message: Optional[str] = None,
+        seed: int = -1,
+        max_messages: int = 20,
+        max_completion_tokens: Optional[int] = None,
+        json_schema: Optional[JsonSchema] = None,
+        *,
+        loop: Optional[asyncio.AbstractEventLoop] = None
+    ) -> None:
         self.loop = loop or asyncio.get_event_loop()
         self.session = aiohttp.ClientSession()
         self.api_keys = api_keys
@@ -71,6 +95,8 @@ class Groq:
         self.system_message = system_message
         self.seed = seed
         self.max_messages = max_messages
+        self.max_completion_tokens = max_completion_tokens
+        self.json_schema = json_schema
         self.messages: list[Message] = []
 
     def __del__(self) -> None:
@@ -100,17 +126,25 @@ class Groq:
                 content = self.system_message
             )] + self.messages
 
-        return {
-            "model": self.model,
+        data: ChatData = {
+            "model": self.model, # type: ignore
             "messages": self.messages
         }
+
+        if self.max_completion_tokens is not None:
+            data["max_completion_tokens"] = self.max_completion_tokens
+
+        if self.json_schema is not None:
+            data["response_format"] = self.json_schema
+
+        return data
 
     async def chat(self, content: str) -> str:
         async with self.session.post(Groq.URL + "/chat/completions", headers=self.headers, json=self.get_message(content)) as response:
             data = await response.json()
 
             if "error" in data:
-                raise RateLimitError(data["error"]["message"])
+                raise RateLimitError(data["error"]["message"], data)
 
             self.messages.extend([choice["message"] for choice in data["choices"]])
 
@@ -119,3 +153,48 @@ class Groq:
             result = result.replace("<think>", "")
 
             return result
+
+    async def transcribe(
+            self,
+            url: Optional[str] = None,
+            file: Optional[bytes] = None,
+            language: Optional[str] = None,
+        ) -> str:
+        """Transcribe audio using Groq Whisper model.
+        Args:
+            audio (tuple[bytes, str]): A tuple containing the audio bytes and the file format.
+            language (Optional[str], optional): The language of the audio. Defaults to None.
+        Returns:
+            str: The transcribed text.
+        """
+        if not url and not file:
+            raise ValueError("Either 'url' or 'file' must be provided.")
+
+        if url and file:
+            raise ValueError("Only one of 'url' or 'file' should be provided.")
+
+        with aiohttp.MultipartWriter("form-data") as form:
+            data = {
+                "model": self.model,
+                "prompt": self.system_message,
+                "url": url,
+                "language": language,
+                "response_format": "verbose_json"
+            }
+
+            for key, value in data.items():
+                if value is not None:
+                    part = form.append(str(value))
+                    part.set_content_disposition("form-data", name=key)
+
+            async with self.session.post(
+                self.URL + "/audio/transcriptions",
+                headers=self.headers,
+                data=form
+            ) as response:
+                data = await response.json()
+
+                if "error" in data:
+                    raise RateLimitError(data["error"]["message"], data)
+
+                return data["text"]

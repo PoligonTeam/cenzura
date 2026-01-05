@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ from femcord.femcord.commands import Context
 from femcord.femcord.types import Guild, Member, User, Message, Interaction
 from femcord.femcord.enums import MessageFlags
 from femcord.femcord.http import Route, HTTPException
+from femcord.femcord.utils import MISSING
 from femscript import Femscript, var # type: ignore
 from models import Guilds
 import utils
@@ -39,7 +40,11 @@ class Events(commands.Cog):
             if ctx.message is not None:
                 print(f"{ctx.author.username}: {ctx.message.content}")
 
-            if ctx.error is None:
+            if isinstance(ctx, femcord.commands.AppContext):
+                options = {item.name: item.value for item in ctx.interaction.data.options or []}
+                print(f"{ctx.interaction.user.username}: /{ctx.interaction.data.name} {options}")
+
+            if ctx.error is None or ctx.error is MISSING:
                 self.bot.loki.add_command_log(ctx)
 
     @commands.Listener
@@ -115,12 +120,13 @@ class Events(commands.Cog):
                 channel = guild.get_channel(femscript.channel_id)
 
                 if channel is not None:
+                    flags = [MessageFlags.SUPPRESS_NOTIFICATIONS]
                     if hasattr(femscript, "is_components_v2"):
-                        await channel.send(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+                        await channel.send(components=result, flags=flags + [femcord.MessageFlags.IS_COMPONENTS_V2])
                     elif isinstance(result, femcord.Embed):
-                        await channel.send(embed=result)
+                        await channel.send(embed=result, flags=flags)
                     else:
-                        await channel.send(content=str(result))
+                        await channel.send(content=str(result), flags=flags)
 
         if guild.autorole:
             await member.add_role(guild.get_role(guild.autorole))
@@ -160,12 +166,13 @@ class Events(commands.Cog):
                 channel = guild.get_channel(femscript.channel_id)
 
                 if channel is not None:
+                    flags = [MessageFlags.SUPPRESS_NOTIFICATIONS]
                     if hasattr(femscript, "is_components_v2"):
-                        await channel.send(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+                        await channel.send(components=result, flags=flags + [femcord.MessageFlags.IS_COMPONENTS_V2])
                     elif isinstance(result, femcord.Embed):
-                        await channel.send(embed=result)
+                        await channel.send(embed=result, flags=flags)
                     else:
-                        await channel.send(content=str(result))
+                        await channel.send(content=str(result), flags=flags)
 
     @commands.Listener
     async def on_message_create(self, message: Message) -> None:

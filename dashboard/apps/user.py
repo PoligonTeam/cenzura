@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -100,6 +100,7 @@ class Endpoint:
                 if not self.max >= len(custom_command) >= self.min:
                     return False
             return True # TODO: zrobic na to checka
+        return False
 
 endpoints = dict(
     prefix = Endpoint(

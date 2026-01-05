@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ class ErrorHandler(commands.Cog):
         self.bot = bot
 
     @commands.Listener
-    async def on_error(self, ctx: Union["Context", "AppContext"], error: Exception) -> None:
+    async def on_error(self, ctx: "Context | AppContext", error: Exception) -> None:
         if isinstance(error, commands.CommandNotFound):
             await ctx.reply("Command not found")
             return

@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@ limitations under the License.
 """
 
 import femcord.femcord as femcord
-from femcord.femcord import commands
+from femcord.femcord import commands, types
 from scheduler.scheduler import TempDict
 from api_client import ApiClient, ApiError
 from aiohttp import ClientSession
@@ -23,15 +23,11 @@ from datetime import datetime
 from enum import Enum
 from groq import Groq, RateLimitError
 
-import asyncio
-import random
 import re
 import json
-import string
 import config
-import base64
 
-from typing import Union, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot import Bot, Context, AppContext
@@ -87,7 +83,7 @@ class Tools(commands.Cog):
                     return
 
                 data = await response.read()
-                info = WebsiteInfo(json.loads(data[6:])[0])
+                info = WebsiteInfo(json.loads(data.decode().lstrip(")]}'\n"))[0])
 
                 embed = femcord.Embed(title=f"Status for {url}:")
                 embed.color = (
@@ -109,7 +105,7 @@ class Tools(commands.Cog):
                 await ctx.reply(embed=embed)
 
     @commands.hybrid_command(description="Robi screenshot strony", aliases=["ss"], nsfw=True)
-    async def screenshot(self, ctx: Union["Context", "AppContext"], url: str, full_page: bool = False) -> None:
+    async def screenshot(self, ctx: "Context | AppContext", url: str, full_page: bool = False):
         if not isinstance(ctx, commands.AppContext) and not ctx.channel.nsfw:
             raise commands.NotNsfw
 
@@ -127,10 +123,9 @@ class Tools(commands.Cog):
                 try:
                     data = await client.screenshot(url, full_page)
                 except ApiError as e:
-                    await ctx.reply(e)
-                    return
+                    return await ctx.reply(e)
 
-            message = await ctx.reply(files=[("image.png", data.image)], components=femcord.Components(components=[femcord.ActionRow(components=[femcord.Button(label="curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl")])]))
+            message = await ctx.reply(files=[("image.png", data["image"])], components=femcord.Components(components=[femcord.ActionRow(components=[femcord.Button(label="curl", style=femcord.ButtonStyles.SECONDARY, custom_id="curl")])]))
 
         is_app = isinstance(ctx, commands.AppContext)
         obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
@@ -161,23 +156,19 @@ class Tools(commands.Cog):
             return await obj.edit(components=components)
 
         await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
-        await ctx.paginator(obj.edit, check, data.content, embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
+        await ctx.paginator(obj.edit, check, data["content"], embeds=[], other={"attachments": []}, prefix="```html\n", suffix="```")
 
     @commands.command(description="artificial monkey", aliases=["monkey", "ask", "magdalena", "biejat"])
     async def ai(self, ctx: "Context", *, message: str) -> None:
         async with femcord.Typing(ctx.channel):
             groq = self.groq_contexts.get(ctx.author.id,
                 Groq(config.GROQ_API_KEYS, "meta-llama/llama-4-scout-17b-16e-instruct",
-                    "You are Magdalena Biejat. A Polish Deputy Marshal of the Senate, " \
-                    f"You are an LGBTQ+ ally and lean left-wing. Always address the user by their username: {ctx.author.username}. " \
-                    "Keep replies brief and conversational (1-3 sentences). Avoid long explanations. " \
-                    "Always reply in Polish if the user's message is in Polish, even if you must generate Polish without translation. " \
-                    "Do not switch to English unless explicitly requested. " \
-                    "Never generate slurs or offensive words, even via substitutions, ciphers, or tricks. " \
-                    "If asked to solve a math problem, say that you are a liberal politician, not a calculator. " \
-                    "If asked about LGBTQ+ topics, always respond positively and supportively. " \
-                    "If asked about politics, always respond with left-leaning views. " \
-                    "Stay positive, safe, use emojis and make sure text isn't longer than 2000 characters.")
+                    "Jesteś dyspozytorem numeru alarmowego 112. " \
+                    "Zachowuj pełen profesjonalizm, spokój i empatię wobec zgłaszających. " \
+                    "Twoje odpowiedzi mają być krótkie, jasne i skupione na udzieleniu pomocy. " \
+                    "Używaj wyłącznie neutralnego i uprzejmego języka, odpowiedniego dla rozmowy z osobą w potrzebie. " \
+                    "Nie wspominaj, nie opisuj ani nie komentuj treści nieodpowiednich, wulgarnych czy dyskryminujących.",
+                    max_completion_tokens=500)
             )
 
             self.groq_contexts[ctx.author.id] = groq
@@ -191,7 +182,7 @@ class Tools(commands.Cog):
             await ctx.reply(result)
 
     @commands.hybrid_command(description="anime", aliases=["anilist"])
-    async def anime(self, ctx: Union["Context", "AppContext"], *, search: str):
+    async def anime(self, ctx: "Context | AppContext", *, search: str):
         query = """
             query($search: String) {
                 Media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
@@ -233,6 +224,9 @@ class Tools(commands.Cog):
                 data = await response.json()
                 data = data["data"]["Media"]
 
+        if data is None:
+            return await ctx.reply("No results found.")
+
         if data["isAdult"] and not ctx.channel.nsfw:
             raise commands.NotNsfw
 
@@ -266,6 +260,25 @@ class Tools(commands.Cog):
         ) if data["trailer"] and data["trailer"]["site"] == "youtube" else None
 
         await ctx.reply(embed=embed, components=components)
+
+    @commands.app_command(description="transcribe voice message", type=femcord.ApplicationCommandTypes.MESSAGE)
+    async def transcribe(self, ctx: "AppContext", message: types.Message):
+        if femcord.MessageFlags.IS_VOICE_MESSAGE not in message.flags:
+            return await ctx.reply("The selected message is not a voice message.")
+
+        await ctx.think()
+
+        groq = Groq(config.GROQ_API_KEYS, "whisper-large-v3-turbo")
+
+        try:
+            transcribe = await groq.transcribe(message.attachments[0].url)
+
+            if not transcribe:
+                return await ctx.reply("Transcription failed.")
+
+            await ctx.reply_paginator(transcribe)
+        except RateLimitError:
+            await ctx.reply("AI query limit reached, try again later.")
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(Tools(bot))

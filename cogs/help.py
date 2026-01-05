@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,9 +23,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from bot import Bot, Context
 
-permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles", "change_nickname")
+permissions = Permissions("kick_members", "ban_members", "manage_channels", "add_reactions", "view_channel", "send_messages", "manage_messages", "embed_links", "attach_files", "read_message_history", "manage_roles", "change_nickname", "create_guild_expressions")
 
-BOTINVITE = f"https://discord.com/oauth2/authorize?client_id=%s&permissions={permissions.get_int()}&scope=bot"
+BOTINVITE = f"https://discord.com/oauth2/authorize?client_id=%s&permissions={permissions.get_int()}&scope=bot%%20aplications.commands"
 SUPPORT = "https://discord.gg/tDQURnVtGC"
 SOURCECODE = "https://github.com/PoligonTeam/cenzura"
 WEBSITE = "https://cenzura.poligon.lgbt"

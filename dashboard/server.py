@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -166,7 +166,7 @@ class Server:
                 if "id" not in user:
                     return web.HTTPBadRequest()
 
-        token = jwt.encode({"user_id": user["id"], "exp": datetime.now(UTC) + timedelta(days=7)}, config.JWT_SECRET, "HS256")
+        token = jwt.encode({"user_id": user["id"], "username": user["username"], "avatar": user["avatar"], "exp": datetime.now(UTC) + timedelta(days=7)}, config.JWT_SECRET, "HS256")
 
         return web.json_response({"token": token})
 

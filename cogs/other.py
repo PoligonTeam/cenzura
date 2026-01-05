@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ from utils import *
 from types import CoroutineType
 from models import Guilds
 from enum import Enum
-import config, datetime
+import config, datetime, base64
 
 from typing import Union, Literal, TypedDict, Any, Optional, TYPE_CHECKING
 
@@ -129,7 +129,7 @@ class Other(commands.Cog):
                 pass
 
     @commands.hybrid_command(description="pisaju skrypt", usage="(code)", aliases=["fs", "fscript", "cs", "cscript"])
-    async def femscript(self, ctx: Union["Context", "AppContext"], *, code):
+    async def femscript(self, ctx: "Context | AppContext", *, code):
         database = {}
 
         if ctx.guild:
@@ -179,6 +179,10 @@ class Other(commands.Cog):
         @femscript.wrap_function()
         async def get_user(user: str) -> dict:
             return convert(_=await self.bot.gateway.get_user(user)).get("_")
+        
+        @femscript.wrap_function()
+        async def get_member(user: str) -> dict:
+            return convert(_=await ctx.guild.get_member(user)).get("_")
 
         @femscript.wrap_function()
         def get_channel(channel: str) -> dict:
@@ -236,7 +240,7 @@ class Other(commands.Cog):
                 if not command or ("prefix" in command.other and not command.other["prefix"] == prefix):
                     return
 
-                fake_message = self.bot.gateway.copy(message)
+                fake_message = types.Message(**message.__dict__)
                 fake_message.content = (await self.bot.get_prefix(self.bot, message))[-1] + message.content[len(prefix):]
 
                 return await self.bot.process_commands(fake_message)
@@ -384,6 +388,10 @@ class Other(commands.Cog):
                 @femscript.wrap_function()
                 async def get_user(user: str) -> dict:
                     return convert(_=await self.bot.gateway.get_user(user)).get("_")
+
+                @femscript.wrap_function()
+                async def get_member(user: str) -> dict:
+                    return convert(_=await ctx.guild.get_member(user)).get("_")
 
                 @femscript.wrap_function()
                 async def add_role(user_id: str, role_id: str) -> None:
@@ -602,11 +610,9 @@ class Other(commands.Cog):
     @commands.Listener
     async def on_interaction_create(self, interaction: femcord.types.Interaction):
         if interaction.type is InteractionTypes.APPLICATION_COMMAND and interaction.guild and (command := self.bot.get_command(interaction.data.name, guild_id=interaction.guild.id)):
-            await self.handle_slash_command(interaction, command)
+            return await self.handle_slash_command(interaction, command)
         if not interaction.guild or interaction.data.custom_id not in interaction.guild.interaction_callbacks:
             return
-
-        await interaction.callback(InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, flags=[femcord.MessageFlags.EPHEMERAL])
 
         guild = Guilds.get(guild_id=interaction.guild.id)
         converted = convert(guild=interaction.guild, channel=interaction.channel, user=interaction.user, member=interaction.member, interaction=interaction)
@@ -642,6 +648,10 @@ class Other(commands.Cog):
         @femscript.wrap_function()
         async def get_user(user: str) -> dict:
             return convert(_=await self.bot.gateway.get_user(user)).get("_")
+        
+        @femscript.wrap_function()
+        async def get_member(user: str) -> dict:
+            return convert(_=await ctx.guild.get_member(user)).get("_")
 
         @femscript.wrap_function()
         def get_channel(channel: str) -> dict:
@@ -664,6 +674,10 @@ class Other(commands.Cog):
             member = await interaction.guild.get_member(user_id)
             await member.modify(communication_disabled_until=datetime.datetime.now(tz=timezone.utc) + datetime.timedelta(seconds=seconds))
 
+        @femscript.wrap_function()
+        def non_ephemeral() -> None:
+            femscript.non_ephemeral = True
+
         femscript.wrap_function(request)
 
         wrap_builtins(femscript)
@@ -672,10 +686,18 @@ class Other(commands.Cog):
 
         await guild.update(database=database)
 
-        if hasattr(femscript, "is_components_v2"):
-            return await interaction.edit(components=result, flags=[femcord.MessageFlags.EPHEMERAL, femcord.MessageFlags.IS_COMPONENTS_V2])
+        flags = [femcord.MessageFlags.EPHEMERAL]
 
-        await interaction.edit(**{"content" if not isinstance(result, femcord.Embed) else "embed": result}, flags=[femcord.MessageFlags.EPHEMERAL])
+        if hasattr(femscript, "non_ephemeral"):
+            flags = []
+
+        if hasattr(femscript, "modal"):
+            return await interaction.callback(InteractionCallbackTypes.MODAL, title=femscript.title, custom_id=femscript.custom_id, components=result)
+
+        if hasattr(femscript, "is_components_v2"):
+            return await interaction.callback(InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, components=result, flags=flags + [femcord.MessageFlags.IS_COMPONENTS_V2])
+
+        await interaction.callback(InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE, **{"content" if not isinstance(result, femcord.Embed) else "embed": result}, flags=flags)
 
     @commands.command(description="Creating an interaction callback", usage="(custom_id) [code]", aliases=["bind"])
     @commands.has_permissions("manage_guild", "manage_roles")
@@ -713,6 +735,77 @@ class Other(commands.Cog):
         await guild.update(interaction_callbacks=interaction_callbacks)
 
         await ctx.reply("Callback has been set")
+
+    def edit_member(self, guild_id: str, key: str, value: Optional[str]) -> Awaitable:
+        return self.bot.http.request(Route("PATCH", "guilds", guild_id, "members", "@me"), data={key: value})
+
+    @commands.group(name="bot")
+    @commands.has_permissions("manage_guild")
+    async def _bot(self, ctx: "Context"):
+        cog = self.bot.get_cog("Help")
+        embed = cog.get_help_embed(ctx.command)
+
+        await ctx.reply(embed=embed)
+
+    @_bot.command(usage="[nick]")
+    @commands.has_permissions("manage_guild")
+    async def nick(self, ctx: "Context", nick = None):
+        await self.edit_member(ctx.guild.id, "nick", nick)
+        await ctx.reply("ok")
+
+    @_bot.command(usage="[bio]")
+    @commands.has_permissions("manage_guild")
+    async def bio(self, ctx: "Context", bio = None):
+        await self.edit_member(ctx.guild.id, "bio", bio)
+        await ctx.reply("ok")
+
+    @_bot.command(usage="[attachment/reply]")
+    @commands.has_permissions("manage_guild")
+    async def avatar(self, ctx: "Context"):
+        if ctx.message.referenced_message and ctx.message.referenced_message.attachments:
+            url = ctx.message.referenced_message.attachments[0].proxy_url
+        elif ctx.message.referenced_message and ctx.message.referenced_message.embeds \
+             and ctx.message.referenced_message.embeds[0].thumbnail and ctx.message.referenced_message.embeds[0].thumbnail.proxy_url:
+            url = ctx.message.referenced_message.embeds[0].thumbnail.proxy_url
+        elif ctx.message.attachments:
+            url = ctx.message.attachments[0].proxy_url
+        else:
+            await self.edit_member(ctx.guild.id, "avatar", None)
+            return await ctx.reply("ok")
+
+        async with ClientSession() as session:
+            async with session.get(url) as response:
+                length = response.content_length
+                if length and length > 5 * 1024 * 1024 * 1024:
+                    return await ctx.reply("File cannot be larger than 5MB")
+                data = await response.read()
+        
+        await self.edit_member(ctx.guild.id, "avatar", femcord.utils.data_uri_scheme(data))
+        await ctx.reply("ok")
+
+    @_bot.command(usage="[attachment/reply]")
+    @commands.has_permissions("manage_guild")
+    async def banner(self, ctx: "Context"):
+        if ctx.message.referenced_message and ctx.message.referenced_message.attachments:
+            url = ctx.message.referenced_message.attachments[0].proxy_url
+        elif ctx.message.referenced_message and ctx.message.referenced_message.embeds \
+             and ctx.message.referenced_message.embeds[0].thumbnail and ctx.message.referenced_message.embeds[0].thumbnail.proxy_url:
+            url = ctx.message.referenced_message.embeds[0].thumbnail.proxy_url
+        elif ctx.message.attachments:
+            url = ctx.message.attachments[0].proxy_url
+        else:
+            await self.edit_member(ctx.guild.id, "banner", None)
+            return await ctx.reply("ok")
+        
+        async with ClientSession() as session:
+            async with session.get(url) as response:
+                length = response.content_length
+                if length and length > 5 * 1024 * 1024 * 1024:
+                    return await ctx.reply("File cannot be larger than 5MB")
+                data = await response.read()
+
+        await self.edit_member(ctx.guild.id, "banner", femcord.utils.data_uri_scheme(data))
+        await ctx.reply("ok")
 
 def setup(bot: "Bot") -> None:
     bot.load_cog(custom_commands_cog := CustomCommands())

@@ -1,5 +1,5 @@
 """
-Copyright 2022-2025 PoligonTeam
+Copyright 2022-2026 PoligonTeam
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,8 +15,23 @@ limitations under the License.
 """
 
 from tortoise.models import Model
-from tortoise.fields import Field, IntField, TextField, JSONField, BooleanField, DatetimeField
+from tortoise.fields import Field, IntField, TextField, JSONField, BooleanField, DatetimeField, CharEnumField, ReverseRelation, ForeignKeyRelation, ForeignKeyField, Field
+from enum import Enum
+from typing import TypedDict
 import json
+
+class TicketConfig(TypedDict):
+    enabled: bool
+    log_channel_id: str
+    category_id: str
+    tickets_role_id: str
+    tickets_message_id: str
+    ticket_categories: list[str]
+
+class TicketStatus(Enum):
+    OPEN = "open"
+    CLOSED = "closed"
+    IN_PROGRESS = "in_progress"
 
 class TextArray(Field):
     SQL_TYPE = "text[]"
@@ -24,7 +39,7 @@ class TextArray(Field):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def to_db_value(self, value, _):
+    def to_db_value(self, value, instance):
         return value
 
     def to_python_value(self, value):
@@ -38,7 +53,7 @@ class JSONArray(Field):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def to_db_value(self, value, _):
+    def to_db_value(self, value, instance):
         if isinstance(value, dict):
             return json.dumps(value)
         return value
@@ -65,6 +80,8 @@ class Guilds(Model):
     verification_channel = TextField()
     eventhandlers = JSONField()
     interaction_callbacks = JSONField()
+    # tickets_config = JSONField[TicketConfig]()
+    # tickets: ReverseRelation["Tickets"]
 
 class Users(Model):
     id = IntField(pk=True)
@@ -102,3 +119,13 @@ class Giveaways(Model):
     end_time = DatetimeField()
     participants = TextArray()
     ended = BooleanField(default=False)
+
+# class Tickets(Model):
+#     id = IntField(pk=True)
+#     guild_id: ForeignKeyRelation[Guilds] = ForeignKeyField("models.Guilds", related_name="tickets")
+#     user_id = TextField()
+#     channel_id = TextField()
+#     status = CharEnumField(
+#         enum_type=TicketStatus,
+#         default="open"
+#     )
