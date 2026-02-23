@@ -146,7 +146,7 @@ class Admin(commands.Cog):
         await ctx.reply("Ustawiono język")
 
     @set.command(description="Verification", usage="[code]", aliases=["verification"])
-    @commands.has_permissions("manage_guild")
+    @commands.has_permissions("add_roles", "manage_guild")
     async def captcha(self, ctx: "Context", *, code = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
 
@@ -222,7 +222,7 @@ class Admin(commands.Cog):
         await ctx.reply("Sent verification message")
 
     @set.command(description="Welcome message", usage="[code]", aliases=["welcome", "welcomemsg"])
-    @commands.has_permissions("manage_guild")
+    @commands.has_permissions("add_roles", "manage_guild")
     async def welcomemessage(self, ctx: "Context", *, code = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
         guild_db = await query.first()
@@ -261,7 +261,7 @@ class Admin(commands.Cog):
         await ctx.reply("Updated")
 
     @set.command(description="Leave message", usage="[code]", aliases=["leave", "leavemsg"])
-    @commands.has_permissions("manage_guild")
+    @commands.has_permissions("add_roles", "manage_guild")
     async def leavemessage(self, ctx: "Context", *, code = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
         guild_db = await query.first()
@@ -300,7 +300,7 @@ class Admin(commands.Cog):
         await ctx.reply("Updated")
 
     @set.command(description="Ustawia autorole", usage="[rola]")
-    @commands.has_permissions("manage_guild", "manage_roles")
+    @commands.has_permissions("add_roles", "manage_guild")
     async def autorole(self, ctx: "Context", role: types.Role | str = None):
         query = Guilds.filter(guild_id=ctx.guild.id)
 

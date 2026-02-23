@@ -63,6 +63,21 @@ class Music(commands.Cog):
             await player.client.destroy_player(player.guild_id)
             await self.connect(player.guild_id, None)
 
+    async def _join(self, guild: types.Guild, channel: types.Channel, mute: bool, deaf: bool) -> femlink.Player:
+        await self.connect(guild, channel, mute=mute, deaf=deaf)
+
+        for _ in range(5):
+            player = self.client.get_player(guild.id)
+
+            if player is not None:
+                player.on_skip = self.on_skip
+                player.channel_id = channel.id
+                return player
+
+            await asyncio.sleep(0.5)
+
+        raise Exception("Couldn't join.")
+
     @commands.Listener
     async def on_voice_server_update(self, data: dict) -> None:
         await self.client.voice_server_update(data)
@@ -72,58 +87,48 @@ class Music(commands.Cog):
         await self.client.voice_state_update(data)
 
     @commands.command(description="Łączy z kanałem głosowym", usage="[wyciszony_mikrofon] [wyciszone_słuchawki]")
-    async def join(self, ctx: "Context", mute: int = 0, deaf: int = 0) -> None:
+    async def join(self, ctx: "Context", mute: int = 0, deaf: int = 0):
         channel = ctx.member.voice_state.channel
 
         if channel is None:
             await ctx.reply("Nie jesteś na żadnym kanale głosowym")
             return
 
-        await self.connect(ctx.guild, channel, mute=bool(mute), deaf=bool(deaf))
-
-        for _ in range(5):
-            player = self.client.get_player(ctx.guild.id)
-
-            if player is not None:
-                player.on_skip = self.on_skip
-                player.channel_id = channel.id
-                break
-
-            await asyncio.sleep(0.5)
+        try:
+            await self._join(ctx.guild, channel, bool(mute), bool(deaf))
+        except Exception as e:
+            return await ctx.reply(str(e))
 
         await ctx.reply("Dołączyłem na kanał głosowy")
 
     @commands.command(description="Rozłącza z kanału głosowego")
-    async def leave(self, ctx: "Context") -> None:
+    async def leave(self, ctx: "Context"):
         player = self.client.get_player(ctx.guild.id)
 
         if player is None:
-            await ctx.reply("Nie gram na żadnym kanale głosowym")
-            return
+            return await ctx.reply("Nie gram na żadnym kanale głosowym")
 
-        if ctx.member.voice_state is None or player.channel_id != ctx.member.voice_state.channel.id:
-            await ctx.reply("Nie jesteś na tym samym kanale głosowym co bot")
-            return
+        if ctx.member.voice_state is None or player.channel_id != ctx.member.voice_state.channel.id: # type: ignore
+            return await ctx.reply("Nie jesteś na tym samym kanale głosowym co bot")
 
         await self.connect(ctx.guild, None)
         await ctx.reply("Wyszedłem z kanału głosowego")
 
     @commands.command(description="Odtwarza muzykę", usage="(tytuł)")
-    async def play(self, ctx: "Context", *, query: str) -> None:
+    async def play(self, ctx: "Context", *, query: str):
         player = self.client.get_player(ctx.guild.id)
 
         if ctx.member.voice_state.channel is None:
-            await ctx.reply("Nie jesteś na żadnym kanale głosowym")
-            return
+            return await ctx.reply("Nie jesteś na żadnym kanale głosowym")
 
         if player is None:
-            await self.join(ctx)
-            player = self.client.get_player(ctx.guild.id)
-        elif ctx.member.voice_state.channel is None or player.channel_id != ctx.member.voice_state.channel.id:
-            await ctx.reply("Nie jesteś na tym samym kanale głosowym co bot")
-            return
+            try:
+                player = await self._join(ctx.guild, ctx.channel, False, False)
+            except Exception as e:
+                return await ctx.reply(str(e))
 
-        assert player
+        elif ctx.member.voice_state.channel is None or player.channel_id != ctx.member.voice_state.channel.id:
+            return await ctx.reply("Nie jesteś na tym samym kanale głosowym co bot")
 
         if query == r"%radio":
             query = "https://radio.poligon.lgbt/listen/station_1/radio.mp3"
@@ -135,9 +140,7 @@ class Music(commands.Cog):
         result = await self.client.get_tracks(query)
 
         if result["loadType"] in (femlink.LoadResultType.ERROR, femlink.LoadResultType.EMPTY) or not result["data"]:
-            print(result["data"])
-            await ctx.reply("Nie znaleziono żadnych utworów")
-            return
+            return await ctx.reply("Nie znaleziono żadnych utworów")
 
         tracks: list[femlink.Track] = []
 

@@ -18,6 +18,7 @@ import femcord.femcord as femcord
 from femcord.femcord import commands, types
 from femcord.femcord.http import Route
 from femcord.femcord.enums import CommandOptionTypes, InteractionTypes, InteractionCallbackTypes
+from femcord.femcord.utils import get_index
 from femscript import Femscript, var, FemscriptException
 from datetime import timezone
 from poligonlgbt import get_extension
@@ -179,7 +180,7 @@ class Other(commands.Cog):
         @femscript.wrap_function()
         async def get_user(user: str) -> dict:
             return convert(_=await self.bot.gateway.get_user(user)).get("_")
-        
+
         @femscript.wrap_function()
         async def get_member(user: str) -> dict:
             return convert(_=await ctx.guild.get_member(user)).get("_")
@@ -337,7 +338,7 @@ class Other(commands.Cog):
                     for index, item in enumerate(args):
                         if index >= len(values):
                             break
-                        
+
                         _type = values[index]
 
                         if _type == "str" and index + 1 >= len(values):
@@ -539,11 +540,16 @@ class Other(commands.Cog):
             return await ctx.reply("Removed")
 
         command_object = self.bot.get_command(command_data["name"], guild_id=ctx.guild.id)
+        all_used_names = [alias for command in self.bot.commands if not command.guild_id or command.guild_id == ctx.guild.id for alias in [command.name] + command.aliases]
+
+        if command_data["name"] in all_used_names and not command_object:
+            return await ctx.reply(f"Command `{command_data['name']}` is already used in the bot or guild custom commands")
 
         for alias in command_data["aliases"]:
-            alias_command = self.bot.get_command(alias, guild_id=ctx.guild.id)
-            if alias_command is not None and not alias_command.name == ctx.guild.id + "_" + command_data["name"]:
-                return await ctx.reply(f"Alias `{alias}` is already used in the bot")
+            if command_object and alias in command_object.aliases:
+                continue
+            if alias in all_used_names:
+                return await ctx.reply(f"Alias `{alias}` is already used in the bot or guild custom commands")
 
         text = "Created"
 
@@ -648,7 +654,7 @@ class Other(commands.Cog):
         @femscript.wrap_function()
         async def get_user(user: str) -> dict:
             return convert(_=await self.bot.gateway.get_user(user)).get("_")
-        
+
         @femscript.wrap_function()
         async def get_member(user: str) -> dict:
             return convert(_=await ctx.guild.get_member(user)).get("_")
@@ -779,7 +785,7 @@ class Other(commands.Cog):
                 if length and length > 5 * 1024 * 1024 * 1024:
                     return await ctx.reply("File cannot be larger than 5MB")
                 data = await response.read()
-        
+
         await self.edit_member(ctx.guild.id, "avatar", femcord.utils.data_uri_scheme(data))
         await ctx.reply("ok")
 
@@ -796,7 +802,7 @@ class Other(commands.Cog):
         else:
             await self.edit_member(ctx.guild.id, "banner", None)
             return await ctx.reply("ok")
-        
+
         async with ClientSession() as session:
             async with session.get(url) as response:
                 length = response.content_length

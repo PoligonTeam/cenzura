@@ -21,9 +21,10 @@ from femcord.femcord.http import Route
 from femcord.femcord.permissions import Permissions
 from femcord.femcord.enums import Intents, ApplicationCommandTypes, PublicFlags
 from femcord.femcord.utils import get_index
+from femdb import FemDB, Question
 from aiohttp import ClientSession, FormData
 from bs4 import BeautifulSoup, ResultSet
-from datetime import datetime
+from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from concurrent.futures import ThreadPoolExecutor
 from pyfiglet import Figlet
@@ -48,6 +49,7 @@ class Fun(commands.Cog):
         self.results = {}
         self.urls = {}
         self.translations = bot.get_translations_for("fun")
+        self.femdb = FemDB("./assets/questiondb.femdb")
 
     @commands.hybrid_command(description="User avatar", usage="[user]", aliases=["av"], type=ApplicationCommandTypes.USER)
     async def avatar(self, ctx: "Context | AppContext", user: types.User = None):
@@ -101,15 +103,8 @@ class Fun(commands.Cog):
                 get_int(user, user2)
             ), files=[("ship.png", result_image.getvalue())])
 
-    @commands.command(description="dog", aliases=["ars", "6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"])
+    @commands.command(description="dog")
     async def dog(self, ctx: "Context"):
-        alias = ctx.message.content.split()[0][len((await self.bot.get_prefix(self.bot, ctx.message))[-1]):]
-
-        if alias in ("6vz", "piesvz", "<@338075554937044994>", "<@!338075554937044994>"):
-            return await ctx.reply(files=[("dog.png", open("./assets/images/6vz.png", "rb")), ("dog2.png", open("./assets/images/6vz2.png", "rb"))])
-        elif alias == "ars":
-            return await ctx.reply(files=[("dog.jpg", open("./assets/images/ars.jpg", "rb"))])
-
         response = await self.bot.http.session.get("https://dog.ceo/api/breeds/image/random")
         response_data = await response.json()
         image = await self.bot.http.session.get(response_data["message"])
@@ -124,13 +119,8 @@ class Fun(commands.Cog):
 
         await ctx.reply(files=[("dog." + extension, content)])
 
-    @commands.command(description="cat", aliases=["mesik", "<@563718132863074324>", "<@!563718132863074324>"])
+    @commands.command(description="cat")
     async def cat(self, ctx: "Context"):
-        alias = ctx.message.content.split()[0][len((await self.bot.get_prefix(self.bot, ctx.message))[-1]):]
-
-        if alias in ("mesik", "<@563718132863074324>", "<@!563718132863074324>"):
-            return await ctx.reply(files=[("cat.jpg", open("./assets/images/mesik.jpg", "rb")), ("cat2.png", open("./assets/images/mesik2.jpg", "rb"))])
-
         image = await self.bot.http.session.get("https://cataas.com/cat" + ("/gif" if random.random() > .5 else ""))
         content = await image.content.read()
 
@@ -303,6 +293,132 @@ class Fun(commands.Cog):
         )
 
         await interaction.callback(femcord.InteractionCallbackTypes.UPDATE_MESSAGE, components=components)
+
+    def get_questions(self, category: str, points: str, _type: str, count: int) -> list[Question]:
+        ranges = self.femdb.get_ranges_for(category, points, _type)
+        idxs = random.sample(range(sum([b - a + 1 for a, b in ranges])), count)
+
+        questions = []
+
+        for idx in idxs:
+            for a, b in ranges:
+                size = b - a + 1
+                if idx < size:
+                    questions.append(self.femdb.get_question(a + idx))
+                    break
+                idx -= size
+
+        return questions
+
+    @commands.hybrid_command(description="egzamin teorytyczny na prawo jazdy", aliases=["prawojazdy"])
+    async def egzamin(self, ctx: "Context | AppContext", category) -> None:
+        is_app = isinstance(ctx, commands.AppContext)
+
+        category = category.upper()
+
+        if category not in ("D", "A", "T", "B", "A1", "B1", "C", "C1", "D1", "A2", "AM"):
+            return await ctx.reply("Możesz zdawać egzamin tylko na kategorie `D, A, T, B, A1, B1, C, C1, D1, A2, AM`")
+
+        basic_questions = \
+            self.get_questions(category, "3", "basic", 10) + \
+            self.get_questions(category, "2", "basic", 6) + \
+            self.get_questions(category, "1", "basic", 4)
+        random.shuffle(basic_questions)
+        specialized_questions = \
+            self.get_questions(category, "3", "specialized", 6) + \
+            self.get_questions(category, "2", "specialized", 4) + \
+            self.get_questions(category, "1", "specialized", 2)
+        random.shuffle(specialized_questions)
+        questions = basic_questions + specialized_questions
+
+        points = 0
+
+        def get_components(question: Question, index: int) -> tuple[femcord.Components, list[tuple[str, bytes]], int]:
+            files = []
+
+            is_abc = isinstance(question.answer, str)
+
+            components = femcord.Components()
+            container = femcord.Container()
+
+            container.add_component(femcord.TextDisplay(content="# " + question.question))
+
+            if question.media:
+                extension = question.media.split(".")[-1]
+
+                container.add_component(femcord.MediaGallery(items=[femcord.MediaItem(media=femcord.UnfurledMediaItem(url="attachment://file." + extension))]))
+
+                with open("./assets/dlmedia/" + question.media, "rb") as f:
+                    files = [("file." + extension, f.read())]
+
+            if is_abc:
+                timeout = 50
+            else:
+                timeout = 20
+
+            if question.media:
+                timeout += 2
+                if question.media[-4:] == ".mp4":
+                    timeout += get_mp4_duration(files[0][1])
+
+            action_row = femcord.ActionRow()
+
+            if is_abc:
+                container.add_component(femcord.TextDisplay(content="\n".join([f"**{i}**. {answer}" for i, answer in enumerate(question.answers, 1)])))
+
+                action_row.add_component(femcord.Button(label="a", style=femcord.ButtonStyles.PRIMARY, custom_id="dla"))
+                action_row.add_component(femcord.Button(label="b", style=femcord.ButtonStyles.PRIMARY, custom_id="dlb"))
+                action_row.add_component(femcord.Button(label="c", style=femcord.ButtonStyles.PRIMARY, custom_id="dlc"))
+            else:
+                action_row.add_component(femcord.Button(label="tak", style=femcord.ButtonStyles.PRIMARY, custom_id="dlyes"))
+                action_row.add_component(femcord.Button(label="nie", style=femcord.ButtonStyles.PRIMARY, custom_id="dlno"))
+
+            action_row.add_component(femcord.Button(label="pomiń", style=femcord.ButtonStyles.SECONDARY, custom_id="dlskip"))
+
+            container.add_component(femcord.TextDisplay(content=f"-# Pytanie {"specjalistyczne" if is_abc else "podstawowe"} ({index - (20 if is_abc else 0)}/{12 if is_abc else 20}) za {question.points} punkt{"y" if question.points > 1 else ""}\n-# Czas na odpowiedź skończy się za {types.t['R'] @ (datetime.now() + timedelta(0, timeout))}"))
+
+            container.add_component(action_row)
+
+            components.add_component(container)
+
+            return components, files, timeout
+
+        message = await ctx.reply(components=femcord.Components(components=[femcord.TextDisplay(content="proszę czekać")]), flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+
+        obj: commands.AppContext | femcord.types.Message = ctx if is_app else message
+
+        def check(interaction: femcord.types.Interaction, _: Optional[femcord.types.Message] = None) -> bool:
+            if is_app:
+                return interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message is not None and interaction.message.interaction_metadata.id == ctx.interaction.id
+            return interaction.user.id == ctx.author.id and interaction.channel.id == ctx.channel.id and interaction.message.id == message.id
+
+        for index, question in enumerate(questions, 1):
+            components, files, question_time = get_components(question, index)
+
+            await obj.edit(components=components, files=files, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
+
+            try:
+                interaction: femcord.types.Interaction
+                interaction, = await self.bot.wait_for("interaction_create", check, timeout=question_time)
+            except TimeoutError:
+                continue
+
+            if (interaction.data.custom_id == "dlyes" and question.answer) or \
+               (interaction.data.custom_id == "dlno" and not question.answer) or \
+               (interaction.data.custom_id == "dla" and question.answer == "A") or \
+               (interaction.data.custom_id == "dlb" and question.answer == "B") or \
+               (interaction.data.custom_id == "dlc" and question.answer == "C"):
+                points += question.points
+
+            await interaction.callback(femcord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE)
+
+        await obj.edit(components=femcord.Components(
+            components = [
+                femcord.TextDisplay(
+                    content = "Uzyskałeś wynik **" + ("POZYTYWNY" if points >= 68 else "NEGATYWNY") + f"** (`{points}`/`74`)"
+                )
+            ]
+        ), flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
 
     @commands.command(description="Achievement Get!", usage="(text)")
     async def achievement(self, ctx: "Context", *, text: replace_chars) -> None:

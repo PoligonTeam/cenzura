@@ -79,14 +79,21 @@ def replace_chars(text):
 
 def get_random_username():
     gender = random.randint(0, 1)
+    words_line = random.randint(0, 96374 if gender == 0 else 79263)
+    names_line = random.randint(0, 9995)
 
     with open("assets/words%d.txt" % gender, "r") as f:
-        word = random.choice(f.read().splitlines())
+        for line, word in enumerate(f):
+            if line == words_line:
+                break
 
     with open("assets/names%d.txt" % gender, "r") as f:
-        name = random.choice(f.read().splitlines()).replace(" ", "_").lower()
+        for line, name in enumerate(f):
+            if line == names_line:
+                break
+        name = name.replace(" ", "_").lower()
 
-    return f"{word}_{name}{random.randint(1, 100)}"
+    return f"{word[:-1]}_{name[:-1]}{random.randint(1, 100)}"
 
 async def generate_waveform_from_audio_bytes(audio_bytes: bytes) -> tuple[str, float]:
     audio_stream = io.BytesIO(audio_bytes)
@@ -180,6 +187,52 @@ async def generate_waveform_from_audio_bytes(audio_bytes: bytes) -> tuple[str, f
         if process.returncode is None:
             process.kill()
         await process.wait()
+
+def get_mp4_duration(data: bytes) -> int:
+    ptr = 0
+
+    while ptr + 8 <= len(data):
+        size, = struct.unpack(">I", data[ptr:ptr+4])
+
+        if size == 0:
+            break
+
+        if size < 8:
+            raise ValueError("Invalid MP4 file")
+
+        if data[ptr+4:ptr+8] == b"moov":
+            return parse_mvhd(data[ptr+8:ptr+size])
+
+        ptr += size
+
+    raise ValueError("Invalid MP4 file")
+
+def parse_mvhd(data: bytes) -> int:
+    ptr = 0
+
+    while ptr + 8 <= len(data):
+        size, = struct.unpack(">I", data[ptr:ptr+4])
+
+        if size == 0:
+            break
+
+        if size < 8:
+            raise ValueError("Invalid mvhd box")
+
+        if data[ptr+4:ptr+8] == b"mvhd":
+            version = data[ptr+8]
+            if version == 0:
+                timescale, duration = struct.unpack(">II", data[ptr+20:ptr+28])
+            elif version == 1:
+                timescale, duration = struct.unpack(">IQ", data[ptr+32:ptr+44])
+            else:
+                raise ValueError("Invalid mvhd version")
+
+            return duration // timescale
+
+        ptr += size
+
+    raise ValueError("Invalid mvhd box")
 
 async def update_lastfm_avatars():
     async def get_lastfm_avatar(lastfm_user: LastFM):
@@ -641,8 +694,12 @@ def wrap_builtins(femscript: Femscript) -> None:
     def Label(**kwargs) -> femcord.Label:
         femscript.modal = True
         return femcord.Label(**kwargs)
-    
+
     femscript.wrap_function(femcord.FileUpload)
+    femscript.wrap_function(femcord.GroupOption)
+    femscript.wrap_function(femcord.RadioGroup)
+    femscript.wrap_function(femcord.CheckboxGroup)
+    femscript.wrap_function(femcord.Checkbox)
 
 def fn1va(text: str) -> int:
     offset = 0x811c9dc5

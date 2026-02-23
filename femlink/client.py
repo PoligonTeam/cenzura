@@ -152,6 +152,7 @@ class Client:
                 if op is Opcodes.READY:
                     self.session_id = data["sessionId"]
 
+                    # TODO: implement resuming
                     # if data["resumed"] is True:
                     #     for player in await self.get_players():
                     #         self._voice_state.session_id = player["voice"]["sessionId"]

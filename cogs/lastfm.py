@@ -61,52 +61,58 @@ class LastFM(commands.Cog):
         string = "api_key" + LASTFM_API_KEY + "method" + method + "token" + token + LASTFM_API_SECRET
         return hashlib.md5(string.encode("utf-8")).hexdigest()
 
+    def get_error_embed(self, error: Exception) -> femcord.Embed:
+        return femcord.Embed(
+            title="Problem while connecting to Last.fm",
+            description="Can't retrieve data because Last.fm returned an error. Please try again later.",
+            color=0xff2b2b).set_footer(text=f"last.fm error code: {error.__class__.__name__}")
+
     @commands.hybrid_command(description="Łączenie konta LastFM do bota")
-    async def login(self, ctx: "Context | AppContext") -> None:
-        async with Client(LASTFM_API_KEY, LASTFM_API_SECRET) as client:
-            token = await client.get_token()
+    async def login(self, ctx: "Context | AppContext"):
+        try:
+            async with Client(LASTFM_API_KEY, LASTFM_API_SECRET) as client:
+                token = await client.get_token()
 
-            message_content = f"Aby połączyć konto LastFM z botem musisz wejść w poniższy link\n<https://www.last.fm/api/auth?api_key={LASTFM_API_KEY}&token={token}>"
+                message_content = f"Aby połączyć konto LastFM z botem musisz wejść w poniższy link\n<https://www.last.fm/api/auth?api_key={LASTFM_API_KEY}&token={token}>"
 
-            obj: femcord.types.Interaction | femcord.types.Message
+                obj: femcord.types.Interaction | femcord.types.Message
 
-            if isinstance(ctx, femcord.commands.AppContext):
-                obj = ctx.interaction
-                await ctx.reply(message_content, flags=[femcord.MessageFlags.EPHEMERAL])
-            else:
-                try:
-                    obj = await ctx.author.send(message_content)
-                except HTTPException:
-                    await ctx.reply("Bot nie może wysłać ci wiadomości prywatnej")
-                    return
-
-                await ctx.reply("Wiadomość z linkiem została wysłana w wiadomości prywatnej")
-
-            for attempt in range(3):
-                await asyncio.sleep(20)
-
-                try:
-                    session = await client.get_session(token)
-                except (exceptions.UnauthorizedToken, exceptions.InvalidApiKey, exceptions.InvalidSignature):
-                    if attempt == 2:
-                        await obj.edit("Logowanie się nie powiodło... link się przedawnił lub coś poszło nie tak")
-                        return
-                    continue
-
-                user = self.lastfm_users.get(ctx.author.id)
-
-                if user is None:
-                    user = LastFMModel(user_id=ctx.author.id, username=session["name"], token=session["key"], script=self.templates["embedmini"])
+                if isinstance(ctx, femcord.commands.AppContext):
+                    obj = ctx.interaction
+                    await ctx.reply(message_content, flags=[femcord.MessageFlags.EPHEMERAL])
                 else:
-                    user.username = session["name"]
-                    user.token = session["key"]
+                    try:
+                        obj = await ctx.author.send(message_content)
+                    except HTTPException:
+                        return await ctx.reply("Bot nie może wysłać ci wiadomości prywatnej")
 
-                await user.save()
+                    await ctx.reply("Wiadomość z linkiem została wysłana w wiadomości prywatnej")
 
-                self.lastfm_users[ctx.author.id] = user
+                for attempt in range(3):
+                    await asyncio.sleep(20)
 
-                await obj.edit("Pomyślnie połączono konto `" + session["name"] + "`")
-                return
+                    try:
+                        session = await client.get_session(token)
+                    except (exceptions.UnauthorizedToken, exceptions.InvalidApiKey, exceptions.InvalidSignature):
+                        if attempt == 2:
+                            return await obj.edit("Logowanie się nie powiodło... link się przedawnił lub coś poszło nie tak")
+                        continue
+
+                    user = self.lastfm_users.get(ctx.author.id)
+
+                    if user is None:
+                        user = LastFMModel(user_id=ctx.author.id, username=session["name"], token=session["key"], script=self.templates["embedmini"])
+                    else:
+                        user.username = session["name"]
+                        user.token = session["key"]
+
+                    await user.save()
+
+                    self.lastfm_users[ctx.author.id] = user
+
+                    return await obj.edit("Pomyślnie połączono konto `" + session["name"] + "`")
+        except Exception as e:
+            await ctx.reply(embed=self.get_error_embed(e))
 
     @commands.command(description="Informacje o artyście", aliases=["ai", "artist"])
     async def artistinfo(self, ctx: "Context", *, artist_name: str) -> None:
@@ -144,7 +150,7 @@ class LastFM(commands.Cog):
             ctx: "Context | AppContext",
             *,
             user: types.User = None # type: ignore
-        ) -> None:
+        ):
         is_app = isinstance(ctx, commands.AppContext)
 
         if is_app:
@@ -157,18 +163,18 @@ class LastFM(commands.Cog):
 
         if lastfm is None:
             if ctx.author is user:
-                await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
-                return
+                return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
 
-            await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
-            return
+            return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
+
 
         async with Client(LASTFM_API_KEY) as client:
             try:
                 recent_tracks = await client.recent_tracks(lastfm.username, limit=1)
             except exceptions.NotFound:
-                await ctx.reply("Nie znaleziono takiego użytkownika")
-                return
+                return await ctx.reply("Nie znaleziono takiego użytkownika")
+            except Exception as e:
+                return await ctx.reply(embed=self.get_error_embed(e))
 
             track = recent_tracks.tracks[0]
 
@@ -177,15 +183,18 @@ class LastFM(commands.Cog):
             track_info.duration = track_info.duration
             preview_url = None
 
-            async with DeezerClient() as deezer:
-                deezer_search = await deezer.search(track.title + " " + track.artist.name)
+            try:
+                async with DeezerClient() as deezer:
+                    deezer_search = await deezer.search(track.title + " " + track.artist.name)
 
-                if deezer_search["total"] > 0:
-                    deezer_track = await deezer.get_track(deezer_search["data"][0]["id"])
+                    if deezer_search["total"] > 0:
+                        deezer_track = await deezer.get_track(deezer_search["data"][0]["id"])
 
-                    if deezer_track["preview"] is not None:
-                        preview_url = deezer_track["preview"]
-                        track_info.duration = deezer_track["duration"]
+                        if deezer_track["preview"] is not None:
+                            preview_url = deezer_track["preview"]
+                            track_info.duration = deezer_track["duration"]
+            except Exception as e:
+                pass
 
             components = femcord.Components()
             container = femcord.Container()
@@ -295,7 +304,7 @@ class LastFM(commands.Cog):
             ctx: "Context | AppContext",
             *,
             user: types.User = None # type: ignore
-        ) -> None:
+        ):
         user = user or ctx.author
 
         lastfm = self.lastfm_users.get(user.id)
@@ -313,12 +322,12 @@ class LastFM(commands.Cog):
                 try:
                     tracks = await client.recent_tracks(lastfm.username)
                 except exceptions.NotFound:
-                    await ctx.reply(f"Account {lastfm.username} doesn't exist")
-                    return
+                    return await ctx.reply(f"Account {lastfm.username} doesn't exist")
+                except Exception as e:
+                    return await ctx.reply(embed=self.get_error_embed(e))
 
                 if not tracks.tracks:
-                    await ctx.reply(f"{tracks.username} doesn't have any scrobbles")
-                    return
+                    return await ctx.reply(f"{tracks.username} doesn't have any scrobbles")
 
                 data = {
                     "tracks": [],
@@ -360,8 +369,8 @@ class LastFM(commands.Cog):
                     count += 1
 
                     if count > 100:
-                        await ctx.reply("Timed out")
-                        return
+                        return await ctx.reply("Timed out")
+
 
                 data["tracks"].sort(key=lambda track: track[0])
                 data["tracks"] = [track[1] for track in data["tracks"]]
@@ -392,12 +401,11 @@ class LastFM(commands.Cog):
                 result = await femscript.execute(debug=ctx.author.id in self.bot.owners)
 
                 if hasattr(femscript, "is_components_v2"):
-                    await ctx.reply(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
-                    return
+                    return await ctx.reply(components=result, flags=[femcord.MessageFlags.IS_COMPONENTS_V2])
 
                 if isinstance(result, femcord.Embed):
-                    await ctx.reply(embed=result)
-                    return
+                    return await ctx.reply(embed=result)
+
 
                 await ctx.reply(str(result))
 
@@ -484,7 +492,7 @@ class LastFM(commands.Cog):
             ctx: "Context",
             *,
             user_or_track: types.User | str = None # type: ignore
-        ) -> None:
+        ):
         lastfm_users = self.lastfm_users.values()
 
         user = ctx.author
@@ -494,51 +502,52 @@ class LastFM(commands.Cog):
 
         if not user.id in self.lastfm_users.keys():
             if ctx.author is user:
-                await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
-                return
+                return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
 
-            await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
-            return
+            return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
 
-        lastfm_users = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id in ctx.guild.members]
-        lastfm_user, = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == user.id]
+        lastfm_users = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id in ctx.guild.members.keys()]
+        lastfm_user = self.lastfm_users[user.id]
         lastfm_scrobbles = []
 
         async with femcord.Typing(ctx.channel): # type: ignore
-            async with Client(LASTFM_API_KEY) as client:
-                if isinstance(user_or_track, str):
-                    try:
-                        artist = await client.artist_info(user_or_track, lastfm_user.username)
-                    except exceptions.NotFound:
-                        await ctx.reply("Nie znaleziono artysty")
-                        return
-                else:
-                    tracks = await client.recent_tracks(lastfm_user.username)
-                    artist = tracks.tracks[0].artist
+            try:
+                async with Client(LASTFM_API_KEY) as client:
+                    if isinstance(user_or_track, str):
+                        try:
+                            artist = await client.artist_info(user_or_track, lastfm_user.username)
+                        except exceptions.NotFound:
+                           return await ctx.reply("Nie znaleziono artysty")
 
-                artist_name = artist.name
-                artist_url = artist.url
+                    else:
+                        tracks = await client.recent_tracks(lastfm_user.username)
+                        artist = tracks.tracks[0].artist
 
-                artist_thumbnail = await get_artist_image(artist_name)
+                    artist_name = artist.name
+                    artist_url = artist.url
 
-                async def get_scrobbles(lastfm_user):
-                    nonlocal lastfm_scrobbles, artist_url
-                    artist_info = await client.artist_info(artist_name, lastfm_user.username)
+                    artist_thumbnail = await get_artist_image(artist_name)
 
-                    userplaycount = "0"
+                    async def get_scrobbles(lastfm_user):
+                        nonlocal lastfm_scrobbles, artist_url
+                        artist_info = await client.artist_info(artist_name, lastfm_user.username)
 
-                    if artist_info.stats.userplaycount is not None:
-                        userplaycount = artist_info.stats.userplaycount
+                        userplaycount = "0"
 
-                    lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, userplaycount))
+                        if artist_info.stats.userplaycount is not None:
+                            userplaycount = artist_info.stats.userplaycount
 
-                for lastfm_user in lastfm_users:
-                    self.bot.loop.create_task(get_scrobbles(lastfm_user))
+                        lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, userplaycount))
 
-                while len(lastfm_scrobbles) < len(lastfm_users):
-                    await asyncio.sleep(0.1)
+                    for lastfm_user in lastfm_users:
+                        self.bot.loop.create_task(get_scrobbles(lastfm_user))
 
-                lastfm_scrobbles.sort(key=lambda scrobbles: int(scrobbles[2]), reverse=True)
+                    while len(lastfm_scrobbles) < len(lastfm_users):
+                        await asyncio.sleep(0.1)
+
+                    lastfm_scrobbles.sort(key=lambda scrobbles: int(scrobbles[2]), reverse=True)
+            except Exception as e:
+                return await ctx.reply(embed=self.get_error_embed(e))
 
             description = ""
 
@@ -578,53 +587,54 @@ class LastFM(commands.Cog):
 
         if not user.id in [lastfm_user.user_id for lastfm_user in lastfm_users]:
             if ctx.author is user:
-                await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
-                return
+                return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
 
-            await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
-            return
+            return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
 
-        lastfm_users = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id in ctx.guild.members]
-        lastfm_user, = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id == user.id]
+        lastfm_users = [lastfm_user for lastfm_user in lastfm_users if lastfm_user.user_id in ctx.guild.members.keys()]
+        lastfm_user = self.lastfm_users[user.id]
         lastfm_scrobbles = []
 
         async with femcord.Typing(ctx.channel): # type: ignore
-            async with Client(LASTFM_API_KEY) as client:
-                if isinstance(user_or_track, str):
-                    try:
-                        tracks = await client.track_search(user_or_track)
-                    except exceptions.NotFound:
-                        return await ctx.reply("Nie znaleziono utworu")
+            try:
+                async with Client(LASTFM_API_KEY) as client:
+                    if isinstance(user_or_track, str):
+                        try:
+                            tracks = await client.track_search(user_or_track)
+                        except exceptions.NotFound:
+                            return await ctx.reply("Nie znaleziono utworu")
 
-                else:
-                    recent_tracks = await client.recent_tracks(lastfm_user.username)
-                    tracks = recent_tracks.tracks
+                    else:
+                        recent_tracks = await client.recent_tracks(lastfm_user.username)
+                        tracks = recent_tracks.tracks
 
-                artist_name = tracks[0].artist.name
-                track_name = tracks[0].title
-                track_url = tracks[0].url
+                    artist_name = tracks[0].artist.name
+                    track_name = tracks[0].title
+                    track_url = tracks[0].url
 
-                artist_thumbnail = await get_artist_image(artist_name)
+                    artist_thumbnail = await get_artist_image(artist_name)
 
-                async def get_scrobbles(lastfm_user: LastFMModel):
-                    nonlocal lastfm_scrobbles, artist_name, track_name
+                    async def get_scrobbles(lastfm_user: LastFMModel):
+                        nonlocal lastfm_scrobbles, artist_name, track_name
 
-                    track = await client.track_info(artist_name, track_name, lastfm_user.username)
+                        track = await client.track_info(artist_name, track_name, lastfm_user.username)
 
-                    userplaycount = "0"
+                        userplaycount = "0"
 
-                    if track.scrobbles is not None:
-                        userplaycount = track.scrobbles
+                        if track.scrobbles is not None:
+                            userplaycount = track.scrobbles
 
-                    lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, userplaycount))
+                        lastfm_scrobbles.append((await ctx.guild.get_member(lastfm_user.user_id), lastfm_user, userplaycount))
 
-                for lastfm_user in lastfm_users:
-                    self.bot.loop.create_task(get_scrobbles(lastfm_user))
+                    for lastfm_user in lastfm_users:
+                        self.bot.loop.create_task(get_scrobbles(lastfm_user))
 
-                while len(lastfm_scrobbles) < len(lastfm_users):
-                    await asyncio.sleep(0.1)
+                    while len(lastfm_scrobbles) < len(lastfm_users):
+                        await asyncio.sleep(0.1)
 
-                lastfm_scrobbles.sort(key=lambda scrobbles: int(scrobbles[2]), reverse=True)
+                    lastfm_scrobbles.sort(key=lambda scrobbles: int(scrobbles[2]), reverse=True)
+            except Exception as e:
+                return await ctx.reply(embed=self.get_error_embed(e))
 
         description = ""
 
@@ -654,38 +664,41 @@ class LastFM(commands.Cog):
             ctx: "Context",
             *,
             user: types.User = None # type: ignore
-        ) -> None:
+        ):
         user = user or ctx.author
 
         lastfm_user = self.lastfm_users.get(user.id)
 
         if lastfm_user is None:
             if ctx.author is user:
-                await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
-                return
+                return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
 
-            await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
-            return
+            return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
 
-        async with femcord.Typing(ctx.channel):
-            async with Client(LASTFM_API_KEY) as client:
-                artists = await client.top_artists(lastfm_user.username, "overall", 100)
+        try:
+            async with femcord.Typing(ctx.channel):
+                async with Client(LASTFM_API_KEY) as client:
+                    try:
+                        artists = await client.top_artists(lastfm_user.username, "overall", 100)
+                    except Exception as e:
+                        return await ctx.reply(embed=self.get_error_embed(e))
 
-                if not artists:
-                    await ctx.reply("Ten użytkownik nie słuchał żadnych artystów")
-                    return
+                    if not artists:
+                        return await ctx.reply("Ten użytkownik nie słuchał żadnych artystów")
 
-            pages = []
+                pages = []
 
-            for i in range(0, len(artists), 10):
-                chunk = artists[i:i + 10]
-                page_content = "\n".join([f"{i + index + 1}. {artist.name} - {artist.playcount} scrobbles" for index, artist in enumerate(chunk)])
-                pages.append(page_content)
+                for i in range(0, len(artists), 10):
+                    chunk = artists[i:i + 10]
+                    page_content = "\n".join([f"{i + index + 1}. {artist.name} - {artist.playcount} scrobbles" for index, artist in enumerate(chunk)])
+                    pages.append(page_content)
 
-            base_embed = femcord.Embed(title=f"Najczęściej słuchani artyści {user.username}", color=self.bot.embed_color, timestamp=datetime.datetime.now())
-            base_embed.set_thumbnail(url=await get_artist_image(artists[0].name))
+                base_embed = femcord.Embed(title=f"Najczęściej słuchani artyści {user.username}", color=self.bot.embed_color, timestamp=datetime.datetime.now())
+                base_embed.set_thumbnail(url=await get_artist_image(artists[0].name))
 
-        await ctx.reply_paginator(pages=pages, base_embed=base_embed)
+            await ctx.reply_paginator(pages=pages, base_embed=base_embed)
+        except Exception as e:
+            await ctx.reply(embed=self.get_error_embed(e))
 
     @commands.command(description="Najczęściej słuchane utwory", usage="[użytkownik]")
     async def toptracks(
@@ -693,26 +706,27 @@ class LastFM(commands.Cog):
             ctx: "Context",
             *,
             user: types.User = None # type: ignore
-        ) -> None:
+        ):
         user = user or ctx.author
 
         lastfm_user = self.lastfm_users.get(user.id)
 
         if lastfm_user is None:
             if ctx.author is user:
-                await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
-                return
+                return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
 
-            await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
-            return
+            return await ctx.reply("Ta osoba nie ma połączonego konta LastFM")
+
 
         async with femcord.Typing(ctx.channel):
             async with Client(LASTFM_API_KEY) as client:
-                tracks = await client.top_tracks(lastfm_user.username, "overall", 100)
+                try:
+                    tracks = await client.top_tracks(lastfm_user.username, "overall", 100)
+                except Exception as e:
+                    return await ctx.reply(embed=self.get_error_embed(e))
 
                 if not tracks:
-                    await ctx.reply("Ten użytkownik nie słuchał żadnych utworów")
-                    return
+                    return await ctx.reply("Ten użytkownik nie słuchał żadnych utworów")
 
             pages = []
 
@@ -731,32 +745,34 @@ class LastFM(commands.Cog):
             self,
             ctx: "Context | AppContext",
             user: types.User = None # type: ignore
-        ) -> None:
+        ):
         user = user or ctx.author
 
         lastfm_user = self.lastfm_users.get(user.id)
 
         if lastfm_user is None:
             if ctx.author is user:
-                 await ctx.reply("You don't have a linked lastfm account, use `login` to link them")
-                 return
+                 return await ctx.reply("You don't have a linked lastfm account, use `login` to link them")
 
-            await ctx.reply("This user doesn't have a linked lastfm account")
-            return
+            return await ctx.reply("This user doesn't have a linked lastfm account")
+
 
         async with femcord.HybridTyping(ctx):
             async with Client(LASTFM_API_KEY) as client:
-                artists = await client.top_artists(lastfm_user.username, "7day", 3)
+                try:
+                    artists = await client.top_artists(lastfm_user.username, "7day", 3)
+                except Exception as e:
+                    return await ctx.reply(embed=self.get_error_embed(e))
 
                 groq = Groq(GROQ_API_KEYS, "allam-2-7b", "Generate a long-form, sarcastic, and humorous critique of someone's taste in a specific topic (e.g., music, movies, games, or fashion). " \
                     "The tone should be playful, exaggerated, and packed with witty metaphors, absurd comparisons, and creative insults. " \
                     "Avoid simple bullet points or structured lists—write in a flowing, rant-like format that builds on itself, " \
                     "making each point more ridiculous and entertaining than the last. Keep it engaging, fun, and slightly unhinged, " \
-                    "while ensuring it remains lighthearted rather than mean-spirited. Maximum 800 characters. You can use some markdown too.")
+                    "while ensuring it remains lighthearted rather than mean-spirited. Maximum 800 characters. You can use some markdown too.", max_completion_tokens=1024)
 
-                result = await groq.chat("\n".join([f"{index}. {artist.name} - rank {artist.rank}" for index, artist in enumerate(artists)]))
+        result = await groq.chat("\n".join([f"{index}. {artist.name} - rank {artist.rank}" for index, artist in enumerate(artists)]))
 
-                await ctx.reply_paginator(result)
+        await ctx.reply_paginator(result)
 
     @commands.hybrid_command(description="Pokazuje tekst piosenki", usage="[nazwa]")
     async def lyrics(self, ctx: "Context | AppContext", *, name = None):
@@ -776,23 +792,24 @@ class LastFM(commands.Cog):
                     lastfm = self.lastfm_users.get(ctx.author.id)
 
                     if lastfm is None:
-                        await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
-                        return
+                        return await ctx.reply("Nie masz połączonego konta LastFM, użyj `login` aby je połączyć")
 
                     async with Client(LASTFM_API_KEY, session=session) as client:
-                        recent_tracks = await client.recent_tracks(lastfm.username, limit=1)
+                        try:
+                            recent_tracks = await client.recent_tracks(lastfm.username, limit=1)
+                        except Exception as e:
+                            return await ctx.reply(embed=self.get_error_embed(e))
 
                         if not recent_tracks.tracks:
-                            await ctx.reply("Nie ma żadnych utworów")
-                            return
+                            return await ctx.reply("Nie ma żadnych utworów")
+
 
                         if len(recent_tracks.tracks) == 2:
                             name = recent_tracks.tracks[0].title
                             artist = recent_tracks.tracks[0].artist.name
 
                 if name is None:
-                    await ctx.reply("Nie podałeś nazwy")
-                    return
+                    return await ctx.reply("Nie podałeś nazwy")
 
             async with ApiClient(self.bot.local_api_base_url) as client:
                 try:
@@ -854,7 +871,7 @@ class LastFM(commands.Cog):
 
     @commands.hybrid_command(description="Shows Spotify playing song", integration_types=[ApplicationIntegrationTypes.GUILD_INSTALL], interaction_context_types=[InteractionContextTypes.GUILD])
     async def spotify(self, ctx: "Context | AppContext") -> None:
-        if not ctx.member.presence.activities:
+        if ctx.member is None or not ctx.member.presence.activities:
             await ctx.reply("You are not listening to anything")
             return
 

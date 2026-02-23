@@ -81,6 +81,7 @@ class Station:
     hls_listeners: int
     hls_is_default: Any
     timezone: Any
+    requests_enabled: bool
 
     @classmethod
     def from_dict(cls, data: dict) -> "Station":
